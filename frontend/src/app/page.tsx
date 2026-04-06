@@ -2,9 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import WatchList from "@/components/WatchList";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("");
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
   const router = useRouter();
 
   const handleSearch = (e: React.FormEvent) => {
@@ -14,15 +16,18 @@ export default function Home() {
     }
   };
 
+  // This component will re-render when returning from detail page
+  // The WatchList component will automatically refresh
+
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 to-slate-800 px-4">
-      <div className="w-full max-w-md">
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-8">
+      <div className="max-w-4xl mx-auto">
         <div className="text-center mb-8">
           <h1 className="text-4xl font-bold text-white mb-2">Stock Analyzer</h1>
           <p className="text-slate-400">输入股票代码查看K线图和技术指标</p>
         </div>
 
-        <form onSubmit={handleSearch} className="space-y-4">
+        <form onSubmit={handleSearch} className="space-y-4 mb-8">
           <div className="relative">
             <input
               type="text"
@@ -41,7 +46,11 @@ export default function Home() {
           </button>
         </form>
 
-        <div className="mt-8 text-center text-slate-500 text-sm">
+        <div className="mb-8">
+          <WatchList key={refreshTrigger} />
+        </div>
+
+        <div className="text-center text-slate-500 text-sm">
           <p>示例代码: 000001 (平安银行), 600000 (浦发银行), 300059 (东方财富)</p>
         </div>
       </div>

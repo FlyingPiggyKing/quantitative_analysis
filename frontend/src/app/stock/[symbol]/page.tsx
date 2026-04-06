@@ -5,6 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
+import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
 
 interface StockInfo {
   symbol: string;
@@ -42,6 +43,8 @@ export default function StockDetailPage() {
   const [indicators, setIndicators] = useState<Indicators | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isInWatchlist, setIsInWatchlist] = useState(false);
+  const [watchlistLoading, setWatchlistLoading] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -85,6 +88,42 @@ export default function StockDetailPage() {
     fetchData();
   }, [symbol]);
 
+  // Check watchlist status
+  useEffect(() => {
+    if (!symbol || !stockInfo) return;
+
+    const checkStatus = async () => {
+      try {
+        const result = await checkWatchlist(symbol);
+        setIsInWatchlist(result !== null);
+      } catch (err) {
+        console.error("Failed to check watchlist:", err);
+      }
+    };
+
+    checkStatus();
+  }, [symbol, stockInfo]);
+
+  const handleWatchlistToggle = async () => {
+    if (!stockInfo) return;
+
+    setWatchlistLoading(true);
+    try {
+      if (isInWatchlist) {
+        await removeFromWatchlist(symbol);
+        setIsInWatchlist(false);
+      } else {
+        await addToWatchlist(symbol, stockInfo.name || symbol);
+        setIsInWatchlist(true);
+      }
+    } catch (err) {
+      console.error("Failed to toggle watchlist:", err);
+      alert(err instanceof Error ? err.message : "操作失败");
+    } finally {
+      setWatchlistLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
@@ -125,15 +164,34 @@ export default function StockDetailPage() {
               )}
             </div>
           </div>
-          {klineData.length > 0 && (
-            <div className="text-right">
-              <div className="text-2xl font-bold text-white">{latestPrice.toFixed(2)}</div>
-              <div className={`text-sm ${latestChange >= 0 ? "text-red-400" : "text-green-400"}`}>
-                {latestChange >= 0 ? "+" : ""}
-                {latestChange.toFixed(2)}%
+
+          <div className="flex items-center gap-4">
+            {klineData.length > 0 && (
+              <div className="text-right">
+                <div className="text-2xl font-bold text-white">{latestPrice.toFixed(2)}</div>
+                <div className={`text-sm ${latestChange >= 0 ? "text-red-400" : "text-green-400"}`}>
+                  {latestChange >= 0 ? "+" : ""}
+                  {latestChange.toFixed(2)}%
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            <button
+              onClick={handleWatchlistToggle}
+              disabled={watchlistLoading}
+              className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
+                isInWatchlist
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+            >
+              {watchlistLoading
+                ? "处理中..."
+                : isInWatchlist
+                ? "移除自选"
+                : "加入自选"}
+            </button>
+          </div>
         </div>
       </header>
 

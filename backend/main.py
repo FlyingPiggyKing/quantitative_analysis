@@ -3,7 +3,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from backend.api import stock
+from backend.api import stock, watchlist
 
 # Load .env file from backend directory
 env_path = Path(__file__).parent / ".env"
@@ -27,6 +27,7 @@ app.add_middleware(
 
 # Include routers
 app.include_router(stock.router)
+app.include_router(watchlist.router)
 
 
 @app.get("/")
