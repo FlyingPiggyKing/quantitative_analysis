@@ -1,0 +1,17 @@
+[project]
+name = "stock-analysis-backend"
+version = "1.0.0"
+description = "Stock Analysis API with Tushare Pro"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.109.0",
+    "uvicorn[standard]>=0.27.0",
+    "akshare>=1.12.62",
+    "pydantic>=2.5.3",
+    "pandas>=2.1.4",
+    "tushare>=1.4.29",
+    "python-dotenv>=1.0.0",
+]
+
+[tool.uv]
+dev-dependencies = []

@@ -1,0 +1,17 @@
+# OS files
+.DS_Store
+Thumbs.db
+
+# Backend
+backend/.venv/
+backend/__pycache__/
+backend/.env
+
+# Frontend
+frontend/.next/
+frontend/out/
+frontend/node_modules/
+
+# Environment
+.env
+.env.local

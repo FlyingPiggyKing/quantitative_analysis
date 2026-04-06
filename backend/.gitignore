@@ -1,0 +1,16 @@
+# Virtual environment
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment variables (contains sensitive tokens)
+.env
+
+# uv lock file (system-specific)
+uv.lock
+
+# Build artifacts
+*.egg-info/
+dist/
+build/
