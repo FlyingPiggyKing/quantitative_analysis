@@ -2,7 +2,7 @@
 name = "stock-analysis-backend"
 version = "1.0.0"
 description = "Stock Analysis API with Tushare Pro"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "fastapi>=0.109.0",
     "uvicorn[standard]>=0.27.0",
@@ -11,7 +11,12 @@ dependencies = [
     "pandas>=2.1.4",
     "tushare>=1.4.29",
     "python-dotenv>=1.0.0",
+    "langchain>=1.0.0",
+    "langchain-openai>=1.0.0",
+    "deepagents>=0.5.0a4",
 ]
 
 [tool.uv]
+index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
+trusted-host = "pypi.tuna.tsinghua.edu.cn"
 dev-dependencies = []
