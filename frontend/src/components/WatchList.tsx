@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getWatchlist, WatchlistItem } from "@/services/watchlist";
+import { getTrendPredictions, TrendPrediction } from "@/services/trendPrediction";
 
 interface WatchListProps {
   refreshTrigger?: number;
@@ -10,6 +11,7 @@ interface WatchListProps {
 
 export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
   const [items, setItems] = useState<WatchlistItem[]>([]);
+  const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -22,6 +24,18 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
         const data = await getWatchlist(page, pageSize);
         setItems(data.items);
         setTotalPages(data.total_pages);
+
+        // Fetch trend predictions
+        try {
+          const preds = await getTrendPredictions();
+          const predMap: Record<string, TrendPrediction> = {};
+          preds.forEach((p) => {
+            predMap[p.symbol] = p;
+          });
+          setPredictions(predMap);
+        } catch (err) {
+          console.error("Failed to fetch predictions:", err);
+        }
       } catch (err) {
         console.error("Failed to fetch watchlist:", err);
       } finally {
@@ -67,6 +81,7 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
                   <th className="text-left py-2 px-3">股票代码</th>
                   <th className="text-left py-2 px-3">股票名称</th>
                   <th className="text-left py-2 px-3">添加日期</th>
+                  <th className="text-left py-2 px-3">趋势预测</th>
                 </tr>
               </thead>
               <tbody>
@@ -92,6 +107,13 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
                       </Link>
                     </td>
                     <td className="py-2 px-3 text-slate-400">{formatDate(item.added_at)}</td>
+                    <td className="py-2 px-3">
+                      {predictions[item.symbol] ? (
+                        <TrendIndicator prediction={predictions[item.symbol]} />
+                      ) : (
+                        <span className="text-slate-500">-</span>
+                      )}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -137,4 +159,28 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
       )}
     </div>
   );
+}
+
+function TrendIndicator({ prediction }: { prediction: TrendPrediction }) {
+  const { trend_direction, confidence } = prediction;
+
+  if (trend_direction === "up") {
+    return (
+      <span className="text-emerald-400">
+        ↑ {confidence}%
+      </span>
+    );
+  } else if (trend_direction === "down") {
+    return (
+      <span className="text-red-400">
+        ↓ {confidence}%
+      </span>
+    );
+  } else {
+    return (
+      <span className="text-slate-400">
+        - {confidence}%
+      </span>
+    );
+  }
 }

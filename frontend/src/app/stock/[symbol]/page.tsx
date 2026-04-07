@@ -6,6 +6,7 @@ import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
+import { getTrendPrediction, TrendPrediction, runBatchAnalysis } from "@/services/trendPrediction";
 
 interface StockInfo {
   symbol: string;
@@ -45,6 +46,9 @@ export default function StockDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
+  const [trendPrediction, setTrendPrediction] = useState<TrendPrediction | null>(null);
+  const [trendLoading, setTrendLoading] = useState(false);
+  const [analysisRunning, setAnalysisRunning] = useState(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -88,6 +92,25 @@ export default function StockDetailPage() {
     fetchData();
   }, [symbol]);
 
+  // Fetch trend prediction
+  useEffect(() => {
+    if (!symbol) return;
+
+    const fetchTrend = async () => {
+      setTrendLoading(true);
+      try {
+        const pred = await getTrendPrediction(symbol);
+        setTrendPrediction(pred);
+      } catch (err) {
+        console.error("Failed to fetch trend:", err);
+      } finally {
+        setTrendLoading(false);
+      }
+    };
+
+    fetchTrend();
+  }, [symbol]);
+
   // Check watchlist status
   useEffect(() => {
     if (!symbol || !stockInfo) return;
@@ -121,6 +144,23 @@ export default function StockDetailPage() {
       alert(err instanceof Error ? err.message : "操作失败");
     } finally {
       setWatchlistLoading(false);
+    }
+  };
+
+  const handleRunAnalysis = async () => {
+    if (!stockInfo) return;
+
+    setAnalysisRunning(true);
+    try {
+      await runBatchAnalysis();
+      // Refresh trend prediction
+      const pred = await getTrendPrediction(symbol);
+      setTrendPrediction(pred);
+    } catch (err) {
+      console.error("Failed to run analysis:", err);
+      alert(err instanceof Error ? err.message : "分析失败");
+    } finally {
+      setAnalysisRunning(false);
     }
   };
 
@@ -215,6 +255,50 @@ export default function StockDetailPage() {
           <IndicatorPanel indicators={indicators} loading={false} />
         </section>
 
+        {/* Trend Analysis */}
+        <section className="bg-slate-800 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-medium text-white">趋势分析</h2>
+            {!trendPrediction && !trendLoading && (
+              <button
+                onClick={handleRunAnalysis}
+                disabled={analysisRunning}
+                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg disabled:opacity-50"
+              >
+                {analysisRunning ? "分析中..." : "运行分析"}
+              </button>
+            )}
+          </div>
+
+          {trendLoading ? (
+            <div className="text-slate-400 text-center py-4">加载中...</div>
+          ) : trendPrediction ? (
+            <div className="space-y-3">
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 text-sm">预测方向:</span>
+                  <TrendDirectionBadge direction={trendPrediction.trend_direction} />
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-slate-400 text-sm">置信度:</span>
+                  <span className="text-white font-medium">{trendPrediction.confidence}%</span>
+                </div>
+              </div>
+              <div>
+                <p className="text-slate-400 text-sm mb-1">分析摘要:</p>
+                <p className="text-white text-sm">{trendPrediction.summary}</p>
+              </div>
+              <div className="text-slate-500 text-xs">
+                分析时间: {new Date(trendPrediction.analyzed_at).toLocaleString("zh-CN")}
+              </div>
+            </div>
+          ) : (
+            <div className="text-slate-400 text-center py-4">
+              暂无分析数据
+            </div>
+          )}
+        </section>
+
         {/* Data Table */}
         {klineData.length > 0 && (
           <section className="bg-slate-800 rounded-lg p-4">
@@ -254,4 +338,26 @@ export default function StockDetailPage() {
       </main>
     </div>
   );
+}
+
+function TrendDirectionBadge({ direction }: { direction: string }) {
+  if (direction === "up") {
+    return (
+      <span className="inline-flex items-center px-2 py-1 bg-emerald-500/20 text-emerald-400 text-sm rounded">
+        ↑ 上涨
+      </span>
+    );
+  } else if (direction === "down") {
+    return (
+      <span className="inline-flex items-center px-2 py-1 bg-red-500/20 text-red-400 text-sm rounded">
+        ↓ 下跌
+      </span>
+    );
+  } else {
+    return (
+      <span className="inline-flex items-center px-2 py-1 bg-slate-500/20 text-slate-400 text-sm rounded">
+        - 中性
+      </span>
+    );
+  }
 }
