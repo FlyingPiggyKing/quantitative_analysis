@@ -1,4 +1,4 @@
-"""Watchlist database service using SQLite."""
+"""Watchlist database service using SQLite with user isolation."""
 import sqlite3
 from pathlib import Path
 from typing import Optional
@@ -32,18 +32,20 @@ def init_db():
 
 
 class WatchlistService:
-    """Service for watchlist database operations."""
+    """Service for watchlist database operations with user isolation."""
 
     @staticmethod
-    def get_watchlist(page: int = 1, page_size: int = 10) -> dict:
-        """Get paginated watchlist items."""
+    def get_watchlist(user_id: int, page: int = 1, page_size: int = 10) -> dict:
+        """Get paginated watchlist items for a specific user."""
         init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
 
             # Get total count
-            total = cursor.execute("SELECT COUNT(*) FROM watchlist").fetchone()[0]
+            total = cursor.execute(
+                "SELECT COUNT(*) FROM user_watchlist WHERE user_id = ?", (user_id,)
+            ).fetchone()[0]
 
             # Calculate pagination
             offset = (page - 1) * page_size
@@ -51,8 +53,8 @@ class WatchlistService:
 
             # Get items
             rows = cursor.execute(
-                "SELECT symbol, name, added_at FROM watchlist ORDER BY added_at DESC LIMIT ? OFFSET ?",
-                (page_size, offset)
+                "SELECT symbol, name, added_at FROM user_watchlist WHERE user_id = ? ORDER BY added_at DESC LIMIT ? OFFSET ?",
+                (user_id, page_size, offset)
             ).fetchall()
 
             items = [
@@ -71,48 +73,48 @@ class WatchlistService:
             conn.close()
 
     @staticmethod
-    def add_stock(symbol: str, name: str) -> dict:
-        """Add a stock to the watchlist."""
+    def add_stock(user_id: int, symbol: str, name: str) -> dict:
+        """Add a stock to the user's watchlist."""
         init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
             added_at = datetime.now().isoformat()
             cursor.execute(
-                "INSERT INTO watchlist (symbol, name, added_at) VALUES (?, ?, ?)",
-                (symbol, name, added_at)
+                "INSERT INTO user_watchlist (user_id, symbol, name, added_at) VALUES (?, ?, ?, ?)",
+                (user_id, symbol, name, added_at)
             )
             conn.commit()
             return {"symbol": symbol, "name": name, "added_at": added_at}
         except sqlite3.IntegrityError:
-            # Stock already exists
+            # Stock already exists for this user
             return {"error": "Stock already in watchlist", "symbol": symbol}
         finally:
             conn.close()
 
     @staticmethod
-    def remove_stock(symbol: str) -> bool:
-        """Remove a stock from the watchlist. Returns True if removed, False if not found."""
+    def remove_stock(user_id: int, symbol: str) -> bool:
+        """Remove a stock from the user's watchlist. Returns True if removed, False if not found."""
         init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
-            cursor.execute("DELETE FROM watchlist WHERE symbol = ?", (symbol,))
+            cursor.execute("DELETE FROM user_watchlist WHERE user_id = ? AND symbol = ?", (user_id, symbol))
             conn.commit()
             return cursor.rowcount > 0
         finally:
             conn.close()
 
     @staticmethod
-    def check_stock(symbol: str) -> Optional[dict]:
-        """Check if a stock is in the watchlist. Returns stock info if found, None otherwise."""
+    def check_stock(user_id: int, symbol: str) -> Optional[dict]:
+        """Check if a stock is in the user's watchlist. Returns stock info if found, None otherwise."""
         init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
             row = cursor.execute(
-                "SELECT symbol, name, added_at FROM watchlist WHERE symbol = ?",
-                (symbol,)
+                "SELECT symbol, name, added_at FROM user_watchlist WHERE user_id = ? AND symbol = ?",
+                (user_id, symbol)
             ).fetchone()
             if row:
                 return {"symbol": row["symbol"], "name": row["name"], "added_at": row["added_at"]}

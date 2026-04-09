@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import WatchList from "@/components/WatchList";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
 import { getTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
+import { useAuth } from "@/services/auth";
 
 const TASK_ID_STORAGE_KEY = "active_analysis_task_id";
 const DISMISSED_STORAGE_KEY = "progress_bar_dismissed";
@@ -16,6 +17,7 @@ export default function Home() {
   const [taskProgress, setTaskProgress] = useState<TaskStatusResponse | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
   const router = useRouter();
+  const { user, isLoading } = useAuth();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,6 +25,13 @@ export default function Home() {
       router.push(`/stock/${symbol.trim()}`);
     }
   };
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, isLoading, router]);
 
   // Check for active task on mount
   useEffect(() => {
@@ -80,15 +89,44 @@ export default function Home() {
     localStorage.setItem(DISMISSED_STORAGE_KEY, "true");
   }, []);
 
+  // Show loading or redirect
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
+        <div className="text-white">Loading...</div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
   // Show progress bar if there's an active task and not dismissed
   const showProgressBar = activeTaskId && taskProgress && !isDismissed;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-8">
       <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-white mb-2">Stock Analyzer</h1>
-          <p className="text-slate-400">输入股票代码查看K线图和技术指标</p>
+        <div className="flex justify-between items-center mb-8">
+          <div className="text-center">
+            <h1 className="text-4xl font-bold text-white mb-2">Stock Analyzer</h1>
+            <p className="text-slate-400">输入股票代码查看K线图和技术指标</p>
+          </div>
+          <div className="flex items-center gap-4">
+            <span className="text-slate-300">Welcome, {user.username}</span>
+            <button
+              onClick={() => {
+                localStorage.removeItem("auth_token");
+                localStorage.removeItem("auth_user");
+                router.push("/login");
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSearch} className="space-y-4 mb-8">

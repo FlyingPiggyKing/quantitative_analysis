@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
 import { getTrendPrediction, TrendPrediction, runBatchAnalysisAsync, pollTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
+import { useAuth } from "@/services/auth";
 
 interface StockInfo {
   symbol: string;
@@ -37,7 +38,9 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function StockDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const symbol = params.symbol as string;
+  const { user, isLoading } = useAuth();
 
   const [stockInfo, setStockInfo] = useState<StockInfo | null>(null);
   const [klineData, setKlineData] = useState<KLineData[]>([]);
@@ -50,6 +53,13 @@ export default function StockDetailPage() {
   const [trendLoading, setTrendLoading] = useState(false);
   const [analysisRunning, setAnalysisRunning] = useState(false);
   const [taskProgress, setTaskProgress] = useState<string | null>(null);
+
+  // Redirect to login if not authenticated
+  useEffect(() => {
+    if (!isLoading && !user) {
+      router.push("/login");
+    }
+  }, [user, isLoading, router]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -192,7 +202,7 @@ export default function StockDetailPage() {
     }
   };
 
-  if (loading) {
+  if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
         <div className="text-white text-lg">加载中...</div>
