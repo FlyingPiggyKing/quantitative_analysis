@@ -6,7 +6,7 @@ import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
-import { getTrendPrediction, TrendPrediction, runBatchAnalysis } from "@/services/trendPrediction";
+import { getTrendPrediction, TrendPrediction, runBatchAnalysisAsync, pollTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
 
 interface StockInfo {
   symbol: string;
@@ -49,6 +49,7 @@ export default function StockDetailPage() {
   const [trendPrediction, setTrendPrediction] = useState<TrendPrediction | null>(null);
   const [trendLoading, setTrendLoading] = useState(false);
   const [analysisRunning, setAnalysisRunning] = useState(false);
+  const [taskProgress, setTaskProgress] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -151,15 +152,42 @@ export default function StockDetailPage() {
     if (!stockInfo) return;
 
     setAnalysisRunning(true);
+    setTaskProgress(null);
     try {
-      await runBatchAnalysis();
-      // Refresh trend prediction
-      const pred = await getTrendPrediction(symbol);
-      setTrendPrediction(pred);
+      const response = await runBatchAnalysisAsync();
+      if (!response.task_id) {
+        alert("没有股票需要分析");
+        setAnalysisRunning(false);
+        return;
+      }
+
+      // Store task ID for progress bar on index page - do this immediately
+      // so user can navigate to index and see progress
+      localStorage.setItem("active_analysis_task_id", response.task_id);
+      localStorage.removeItem("progress_bar_dismissed");
+
+      // Poll status and update button progress
+      pollTaskStatus(
+        response.task_id,
+        (status: TaskStatusResponse) => {
+          setTaskProgress(status.progress);
+        },
+        2000
+      ).then(() => {
+        // Refresh trend prediction after completion
+        getTrendPrediction(symbol).then(setTrendPrediction);
+      }).catch((err) => {
+        console.error("Analysis failed:", err);
+      }).finally(() => {
+        // Clear running state when polling completes
+        setAnalysisRunning(false);
+        setTaskProgress(null);
+        // Clear the stored task ID since analysis is done
+        localStorage.removeItem("active_analysis_task_id");
+      });
     } catch (err) {
       console.error("Failed to run analysis:", err);
       alert(err instanceof Error ? err.message : "分析失败");
-    } finally {
       setAnalysisRunning(false);
     }
   };
@@ -265,7 +293,7 @@ export default function StockDetailPage() {
                 disabled={analysisRunning}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg disabled:opacity-50"
               >
-                {analysisRunning ? "分析中..." : "运行分析"}
+                {analysisRunning ? (taskProgress ? `分析中... ${taskProgress}` : "分析中...") : "运行分析"}
               </button>
             )}
           </div>

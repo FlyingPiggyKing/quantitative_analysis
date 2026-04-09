@@ -3,11 +3,16 @@ import time
 import logging
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List
+from typing import List, Optional
 
 from backend.services.trend_prediction_service import TrendPredictionService
 from backend.services.watchlist_service import WatchlistService
 from backend.services.stock_trend_agent import analyze_stock_trend
+from backend.services.task_queue import (
+    submit_analysis_task,
+    get_task_status,
+    TaskStatus,
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -31,11 +36,46 @@ class BatchAnalysisResponse(BaseModel):
     results: List[PredictionResponse]
 
 
+class TaskStatusResponse(BaseModel):
+    task_id: str
+    status: str
+    progress: str
+    current: int
+    total: int
+    results: Optional[List[PredictionResponse]] = None
+    error: Optional[str] = None
+
+
+class BatchAsyncResponse(BaseModel):
+    task_id: str
+    status: str
+    message: str
+
+
 @router.get("", response_model=List[PredictionResponse])
 async def get_all_predictions():
     """Get all latest predictions for analyzed stocks."""
     predictions = TrendPredictionService.get_all_latest_predictions()
     return predictions
+
+
+@router.get("/task/{task_id}", response_model=TaskStatusResponse)
+async def get_task_status_endpoint(task_id: str):
+    """Get the status of a batch analysis task."""
+    task = get_task_status(task_id)
+
+    if task is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    return TaskStatusResponse(
+        task_id=task.task_id,
+        status=task.status.value,
+        progress=task.progress,
+        current=task.current,
+        total=task.total,
+        results=task.results if task.status == TaskStatus.COMPLETED else None,
+        error=task.error,
+    )
 
 
 @router.get("/{symbol}", response_model=PredictionResponse)
@@ -95,4 +135,33 @@ async def batch_analyze():
         analyzed=len(results),
         failed=failed,
         results=results,
+    )
+
+
+@router.post("/batch-async", response_model=BatchAsyncResponse)
+async def batch_analyze_async():
+    """Submit batch analysis to run in background without blocking.
+
+    Returns immediately with a task_id that can be used to poll for status.
+    """
+    logger.info("Submitting batch analysis task to background queue")
+
+    watchlist_result = WatchlistService.get_watchlist(page=1, page_size=100)
+    stocks = watchlist_result.get("items", [])
+    logger.info(f"Found {len(stocks)} stocks in watchlist for async analysis")
+
+    if not stocks:
+        return BatchAsyncResponse(
+            task_id="",
+            status="completed",
+            message="No stocks in watchlist",
+        )
+
+    task_id = submit_analysis_task(stocks)
+    logger.info(f"Submitted analysis task {task_id} for {len(stocks)} stocks")
+
+    return BatchAsyncResponse(
+        task_id=task_id,
+        status="pending",
+        message=f"Analysis queued for {len(stocks)} stocks",
     )
