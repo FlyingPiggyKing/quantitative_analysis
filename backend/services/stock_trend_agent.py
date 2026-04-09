@@ -53,9 +53,10 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
 
 ## Important Guidelines
 
+- **Focus on the LATEST news**: The tavily_search returns news from the current week. Prioritize the most recent articles in your analysis as they are most relevant for 2-week trend prediction
 - If you find limited or no news, note this in your summary and provide lower confidence
 - Consider both company-specific news and broader market/industry trends
-- Base your prediction primarily on the news and macro factors found
+- Base your prediction primarily on the latest news and macro factors found
 - Provide honest, balanced analysis - don't overstate confidence if evidence is weak
 
 ## Response Format

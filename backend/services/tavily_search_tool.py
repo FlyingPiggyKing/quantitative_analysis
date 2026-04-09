@@ -12,6 +12,7 @@ def tavily_search(
     query: str,
     max_results: int = 5,
     topic: Literal["general", "news", "finance"] = "finance",
+    time_range: Literal["day", "week", "month", "year"] = "week",
 ) -> str:
     """Search the web for information on a given query.
 
@@ -22,6 +23,7 @@ def tavily_search(
         query: The search query to look up
         max_results: Maximum number of results to return (default: 5)
         topic: Search topic category - "general", "news", or "finance" (default: "finance")
+        time_range: Time range for results - "day", "week", "month", or "year" (default: "week")
     """
     if not os.environ.get("TAVILY_API_KEY"):
         return "Error: TAVILY_API_KEY not configured"
@@ -31,6 +33,7 @@ def tavily_search(
             query,
             max_results=max_results,
             topic=topic,
+            time_range=time_range,
             include_raw_content=False,
         )
 

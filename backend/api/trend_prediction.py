@@ -1,13 +1,14 @@
 """Trend prediction API routes."""
 import time
 import logging
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import List, Optional
 
 from backend.services.trend_prediction_service import TrendPredictionService
 from backend.services.watchlist_service import WatchlistService
 from backend.services.stock_trend_agent import analyze_stock_trend
+from backend.api.auth import get_current_user
 from backend.services.task_queue import (
     submit_analysis_task,
     get_task_status,
@@ -139,14 +140,14 @@ async def batch_analyze():
 
 
 @router.post("/batch-async", response_model=BatchAsyncResponse)
-async def batch_analyze_async():
+async def batch_analyze_async(current_user: dict = Depends(get_current_user)):
     """Submit batch analysis to run in background without blocking.
 
     Returns immediately with a task_id that can be used to poll for status.
     """
     logger.info("Submitting batch analysis task to background queue")
 
-    watchlist_result = WatchlistService.get_watchlist(page=1, page_size=100)
+    watchlist_result = WatchlistService.get_watchlist(user_id=current_user["user_id"], page=1, page_size=100)
     stocks = watchlist_result.get("items", [])
     logger.info(f"Found {len(stocks)} stocks in watchlist for async analysis")
 

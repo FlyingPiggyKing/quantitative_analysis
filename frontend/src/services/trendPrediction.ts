@@ -1,3 +1,5 @@
+import { getAuthHeaders } from "./auth";
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export interface TrendPrediction {
@@ -63,6 +65,9 @@ export async function runBatchAnalysis(): Promise<BatchAnalysisResponse> {
 export async function runBatchAnalysisAsync(): Promise<BatchAsyncResponse> {
   const res = await fetch(`${API_BASE}/api/trend-predictions/batch-async`, {
     method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+    },
   });
   if (!res.ok) {
     throw new Error("Failed to submit batch analysis");
