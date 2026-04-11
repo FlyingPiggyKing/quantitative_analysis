@@ -10,7 +10,17 @@
 
 ## 环境配置
 
-### 1. 配置 Tushare Token
+### 1. 配置 API Keys
+
+复制 `backend/.env.example` 为 `backend/.env` 并配置以下变量：
+
+| 变量 | 说明 | 获取方式 |
+|------|------|----------|
+| `TUSHARE_TOKEN` | Tushare Pro API Token | https://tushare.pro |
+| `MINIMAX_API_KEY` | MiniMax API Key | 用于AI股票分析 |
+| `TAVILY_API_KEY` | Tavily API Key | https://tavily.com - 用于搜索股票新闻 |
+
+### 2. 配置 Tushare Token
 
 1. 注册 [Tushare Pro](https://tushare.pro)
 2. 登录后在「个人中心」→「API Token」获取 Token

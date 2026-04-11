@@ -1,11 +1,18 @@
 """Stock data service using Tushare Pro API."""
+import os
+from pathlib import Path
+from dotenv import load_dotenv
 import tushare as ts
 import pandas as pd
 from datetime import datetime, timedelta
 from typing import Optional
 
+# Load .env before reading environment variables
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+
 # Tushare token from environment variable
-import os
 TUSHARE_TOKEN = os.environ.get("TUSHARE_TOKEN", "")
 if TUSHARE_TOKEN:
     ts.set_token(TUSHARE_TOKEN)

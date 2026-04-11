@@ -103,6 +103,15 @@ export function getToken(): string | null {
   return localStorage.getItem(TOKEN_KEY);
 }
 
+/**
+ * Clear authentication data from localStorage.
+ * This should be called when receiving 401 from API to ensure clean redirect.
+ */
+export function clearAuthData(): void {
+  localStorage.removeItem(TOKEN_KEY);
+  localStorage.removeItem(USER_KEY);
+}
+
 export function getAuthHeaders(): HeadersInit {
   const token = getToken();
   if (token) {

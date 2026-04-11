@@ -1,8 +1,15 @@
 """Tavily search tool for DeepAgent."""
 import os
+from pathlib import Path
 from typing import Literal
+from dotenv import load_dotenv
 from tavily import TavilyClient
 from langchain.tools import tool
+
+# Load .env before initializing client
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
 
 tavily_client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY", ""))
 

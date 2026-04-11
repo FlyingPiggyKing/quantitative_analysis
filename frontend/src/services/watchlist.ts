@@ -1,6 +1,6 @@
 "use client";
 
-import { getAuthHeaders } from "./auth";
+import { getAuthHeaders, clearAuthData } from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -26,7 +26,8 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   const res = await fetch(url, { ...options, headers });
   if (!res.ok) {
     if (res.status === 401) {
-      // Redirect to login
+      // Clear stale auth data and redirect to login
+      clearAuthData();
       window.location.href = "/login";
       throw new Error("Authentication required");
     }
