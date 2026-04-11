@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import WatchList from "@/components/WatchList";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
-import { getTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
+import { getTaskStatus, runBatchAnalysisAsync, TaskStatusResponse } from "@/services/trendPrediction";
 import { useAuth } from "@/services/auth";
 
 const TASK_ID_STORAGE_KEY = "active_analysis_task_id";
@@ -16,6 +16,10 @@ export default function Home() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [taskProgress, setTaskProgress] = useState<TaskStatusResponse | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
+
+  const isAnalyzing = activeTaskId !== null &&
+    taskProgress !== null &&
+    (taskProgress.status === "pending" || taskProgress.status === "running");
   const router = useRouter();
   const { user, isLoading } = useAuth();
 
@@ -89,6 +93,18 @@ export default function Home() {
     localStorage.setItem(DISMISSED_STORAGE_KEY, "true");
   }, []);
 
+  const handleTrendAnalysis = useCallback(async () => {
+    try {
+      const result = await runBatchAnalysisAsync();
+      if (result.task_id) {
+        setActiveTaskId(result.task_id);
+        setIsDismissed(false);
+      }
+    } catch (err) {
+      console.error("Failed to start trend analysis:", err);
+    }
+  }, []);
+
   // Show loading or redirect
   if (isLoading) {
     return (
@@ -145,6 +161,19 @@ export default function Home() {
             className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
           >
             查询
+          </button>
+
+          <button
+            type="button"
+            onClick={handleTrendAnalysis}
+            disabled={isAnalyzing}
+            className={`w-full px-4 py-3 font-medium rounded-lg transition-colors ${
+              isAnalyzing
+                ? "bg-slate-600 text-slate-400 cursor-not-allowed opacity-50"
+                : "bg-green-600 hover:bg-green-700 text-white"
+            }`}
+          >
+            {isAnalyzing ? "分析中..." : "趋势分析"}
           </button>
         </form>
 
