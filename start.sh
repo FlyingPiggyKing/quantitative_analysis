@@ -12,9 +12,14 @@ nohup ./backend/.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --po
 BACKEND_PID=$!
 echo "Backend started with PID: $BACKEND_PID"
 
-# 启动前端 (Next.js)
+# 构建前端 (Next.js production build)
 cd "$SCRIPT_DIR/frontend"
-nohup npm run dev > "$SCRIPT_DIR/logs/frontend.log" 2>&1 &
+npm run build > "$SCRIPT_DIR/logs/frontend_build.log" 2>&1
+echo "Frontend build completed"
+
+# 启动前端 (Next.js production)
+cd "$SCRIPT_DIR/frontend"
+nohup npm start > "$SCRIPT_DIR/logs/frontend.log" 2>&1 &
 FRONTEND_PID=$!
 echo "Frontend started with PID: $FRONTEND_PID"
 
