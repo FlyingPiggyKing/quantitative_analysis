@@ -4,10 +4,12 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getWatchlist, WatchlistItem } from "@/services/watchlist";
 import { getTrendPredictions, TrendPrediction } from "@/services/trendPrediction";
+import PETrendSparkline from "./PETrendSparkline";
 
 interface ValuationData {
   pe: number | null;
   pb: number | null;
+  pe_history: Array<{ date: string; pe: number | null }>;
 }
 
 interface WatchListProps {
@@ -49,12 +51,13 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
         await Promise.all(
           data.items.map(async (item) => {
             try {
-              const res = await fetch(`${API_BASE}/api/stock/${item.symbol}/valuation`);
+              const res = await fetch(`${API_BASE}/api/stock/${item.symbol}/valuation?days=90`);
               const valData = await res.json();
               if (valData.current) {
                 valMap[item.symbol] = {
                   pe: valData.current.pe,
                   pb: valData.current.pb,
+                  pe_history: valData.history || [],
                 };
               }
             } catch (err) {
@@ -76,11 +79,6 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
     setPage(1);
-  };
-
-  const formatDate = (dateStr: string) => {
-    const date = new Date(dateStr);
-    return date.toLocaleDateString("zh-CN");
   };
 
   if (loading) {
@@ -107,10 +105,10 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
                 <tr className="text-slate-400 border-b border-slate-700">
                   <th className="text-left py-2 px-3">股票代码</th>
                   <th className="text-left py-2 px-3">股票名称</th>
-                  <th className="text-left py-2 px-3">添加日期</th>
+                  <th className="text-left py-2 px-3">PE趋势</th>
                   <th className="text-right py-2 px-3">市盈率(PE)</th>
                   <th className="text-right py-2 px-3">市净率(PB)</th>
-                  <th className="text-left py-2 px-3">趋势预测</th>
+                  <th className="text-left py-2 px-3">AI下周预测</th>
                 </tr>
               </thead>
               <tbody>
@@ -137,7 +135,9 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
                           {item.name}
                         </Link>
                       </td>
-                      <td className="py-2 px-3 text-slate-400">{formatDate(item.added_at)}</td>
+                      <td className="py-2 px-3">
+                        <PETrendSparkline peHistory={val?.pe_history ?? []} />
+                      </td>
                       <td className="py-2 px-3 text-right">
                         {val?.pe != null ? val.pe.toFixed(2) : "-"}
                       </td>
