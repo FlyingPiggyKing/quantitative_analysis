@@ -6,6 +6,8 @@ Thumbs.db
 backend/.venv/
 backend/__pycache__/
 backend/.env
+backend/*.db
+backend/*.db.backup
 
 # Frontend
 frontend/.next/
