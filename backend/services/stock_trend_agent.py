@@ -78,7 +78,7 @@ Your final response should be a JSON object with these fields:
 """
 
 
-def format_data_context(recent_prices: list, indicators: dict) -> str:
+def format_data_context(recent_prices: list, indicators: dict, valuation_data: dict = None) -> str:
     """Format quantitative data as readable text for LLM context."""
     lines = []
 
@@ -119,6 +119,22 @@ def format_data_context(recent_prices: list, indicators: dict) -> str:
         above_ma5 = "在5日均线上方" if price > ma5 else "在5日均线下方"
         above_ma20 = "在20日均线上方" if price > ma20 else "在20日均线下方"
         lines.append(f"均线: {above_ma5}, {above_ma20}")
+
+    # Valuation metrics
+    if valuation_data and "error" not in valuation_data:
+        latest = valuation_data.get("latest", {})
+        pe_ttm = latest.get("pe_ttm")
+        pb = latest.get("pb")
+        turnover_rate = latest.get("turnover_rate")
+        total_mv = latest.get("total_mv")
+        if pe_ttm is not None:
+            lines.append(f"PE(TTM): {pe_ttm:.2f}")
+        if pb is not None:
+            lines.append(f"PB: {pb:.2f}")
+        if turnover_rate is not None:
+            lines.append(f"换手率: {turnover_rate:.2f}%")
+        if total_mv is not None:
+            lines.append(f"总市值: {total_mv:.0f}万元")
 
     return "\n".join(lines)
 
@@ -163,11 +179,20 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
         logger.warning(f"Failed to fetch technical data for {symbol}: {e}")
         technical_data_note = "（技术数据不可用）"
 
+    # Fetch valuation metrics (PE TTM, PB, turnover rate)
+    valuation_data = None
+    try:
+        valuation_result = AkshareService.get_daily_basic(symbol, days=30)
+        if "error" not in valuation_result:
+            valuation_data = valuation_result
+    except Exception as e:
+        logger.warning(f"Failed to fetch valuation data for {symbol}: {e}")
+
     # Step 2: Build data context if we have technical data
     data_context = ""
     if kline_data and indicators and not indicators.get("error"):
         recent_prices = kline_data[-10:] if len(kline_data) >= 10 else kline_data
-        data_context = format_data_context(recent_prices, indicators)
+        data_context = format_data_context(recent_prices, indicators, valuation_data)
 
     # Step 3: Build user message
     agent = create_stock_trend_agent()

@@ -228,6 +228,53 @@ class AkshareService:
         return rsi.dropna().values.tolist()
 
     @staticmethod
+    def get_daily_basic(symbol: str, days: int = 30) -> dict:
+        """Get daily basic metrics (PE TTM, PB, turnover rate, market cap) from Tushare daily_basic."""
+        try:
+            ts_code = _symbol_to_ts_code(symbol)
+            pro = ts.pro_api()
+
+            end_date = datetime.now().strftime("%Y%m%d")
+            start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y%m%d")
+
+            df = pro.daily_basic(
+                ts_code=ts_code,
+                start_date=start_date,
+                end_date=end_date,
+            )
+
+            if df is None or df.empty:
+                return {"symbol": symbol, "error": "No daily_basic data"}
+
+            df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d").dt.strftime("%Y-%m-%d")
+            df = df.sort_values("trade_date").tail(days)
+
+            def safe_float(val):
+                try:
+                    return float(val) if pd.notna(val) else None
+                except (TypeError, ValueError):
+                    return None
+
+            records = []
+            for _, row in df.iterrows():
+                records.append({
+                    "trade_date": row["trade_date"],
+                    "pe_ttm": safe_float(row.get("pe_ttm")),
+                    "pb": safe_float(row.get("pb")),
+                    "turnover_rate": safe_float(row.get("turnover_rate")),
+                    "total_mv": safe_float(row.get("total_mv")),
+                    "circ_mv": safe_float(row.get("circ_mv")),
+                })
+
+            return {
+                "symbol": symbol,
+                "data": records,
+                "latest": records[-1] if records else {},
+            }
+        except Exception as e:
+            return {"symbol": symbol, "error": str(e)}
+
+    @staticmethod
     def get_valuation_data(symbol: str, days: int = 100) -> dict:
         """Get PE, PB, and turnover rate data from Tushare daily_basic endpoint."""
         try:

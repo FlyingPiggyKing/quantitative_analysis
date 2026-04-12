@@ -1,4 +1,4 @@
-## ADDED Requirements
+## MODIFIED Requirements
 
 ### Requirement: Stock Trend Analysis Agent
 The DeepAgent SHALL analyze stock price trends based on latest news, macro environment, technical indicators, and valuation metrics, predicting whether the stock will go up or down in the next 2 weeks.
@@ -44,6 +44,8 @@ The DeepAgent SHALL analyze stock price trends based on latest news, macro envir
 - **WHEN** the valuation data dict contains an `error` key or is absent
 - **THEN** `format_data_context()` SHALL omit the valuation section entirely
 - **AND** the agent SHALL proceed with analysis using only available technical indicators
+
+## ADDED Requirements
 
 ### Requirement: Frontend valuation panel on stock analysis page
 The frontend stock analysis/detail page SHALL display a valuation section showing PE(TTM), PB ratio, turnover rate, and total market cap, with a mini PE(TTM) sparkline showing recent history.

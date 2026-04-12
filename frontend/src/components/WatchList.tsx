@@ -9,6 +9,7 @@ import PETrendSparkline from "./PETrendSparkline";
 interface ValuationData {
   pe: number | null;
   pb: number | null;
+  turnover_rate: number | null;
   pe_history: Array<{ date: string; pe: number | null }>;
 }
 
@@ -53,11 +54,15 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
             try {
               const res = await fetch(`${API_BASE}/api/stock/${item.symbol}/valuation?days=90`);
               const valData = await res.json();
-              if (valData.current) {
+              if (valData.latest) {
                 valMap[item.symbol] = {
-                  pe: valData.current.pe,
-                  pb: valData.current.pb,
-                  pe_history: valData.history || [],
+                  pe: valData.latest.pe_ttm,
+                  pb: valData.latest.pb,
+                  turnover_rate: valData.latest.turnover_rate,
+                  pe_history: (valData.data || []).map((r: { trade_date: string; pe_ttm: number | null }) => ({
+                    date: r.trade_date,
+                    pe: r.pe_ttm,
+                  })),
                 };
               }
             } catch (err) {
@@ -108,6 +113,7 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
                   <th className="text-left py-2 px-3">PE趋势</th>
                   <th className="text-right py-2 px-3">市盈率(PE)</th>
                   <th className="text-right py-2 px-3">市净率(PB)</th>
+                  <th className="text-right py-2 px-3">换手率</th>
                   <th className="text-left py-2 px-3">AI下周预测</th>
                 </tr>
               </thead>
@@ -143,6 +149,9 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
                       </td>
                       <td className="py-2 px-3 text-right">
                         {val?.pb != null ? val.pb.toFixed(2) : "-"}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        {val?.turnover_rate != null ? `${val.turnover_rate.toFixed(2)}%` : "-"}
                       </td>
                       <td className="py-2 px-3">
                         {predictions[item.symbol] ? (

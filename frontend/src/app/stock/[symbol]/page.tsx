@@ -5,8 +5,10 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
+import PETrendSparkline from "@/components/PETrendSparkline";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
 import { getTrendPrediction, TrendPrediction, runBatchAnalysisAsync, pollTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
+import { fetchStockValuation, ValuationRecord } from "@/services/stock";
 import { useAuth } from "@/services/auth";
 
 interface StockInfo {
@@ -28,18 +30,6 @@ interface KLineData {
   change_pct?: number;
 }
 
-interface ValuationData {
-  pe: number | null;
-  pb: number | null;
-  turnover_rate: number | null;
-}
-
-interface ValuationHistory {
-  date: string;
-  pe: number | null;
-  pb: number | null;
-}
-
 interface Indicators {
   macd: { dif: number; dea: number; hist: number };
   rsi: { rsi6: number; rsi12: number; rsi24: number };
@@ -57,8 +47,8 @@ export default function StockDetailPage() {
   const [stockInfo, setStockInfo] = useState<StockInfo | null>(null);
   const [klineData, setKlineData] = useState<KLineData[]>([]);
   const [indicators, setIndicators] = useState<Indicators | null>(null);
-  const [valuation, setValuation] = useState<ValuationData | null>(null);
-  const [valuationHistory, setValuationHistory] = useState<ValuationHistory[]>([]);
+  const [valuation, setValuation] = useState<ValuationRecord | null>(null);
+  const [valuationHistory, setValuationHistory] = useState<ValuationRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
@@ -84,17 +74,16 @@ export default function StockDetailPage() {
 
       try {
         // Fetch stock info, kline data, indicators, and valuation in parallel
-        const [infoRes, klineRes, indicatorsRes, valuationRes] = await Promise.all([
+        const [infoRes, klineRes, indicatorsRes, valuationResult] = await Promise.all([
           fetch(`${API_BASE}/api/stock/${symbol}`),
           fetch(`${API_BASE}/api/stock/${symbol}/kline?days=100`),
           fetch(`${API_BASE}/api/stock/${symbol}/indicators?days=100`),
-          fetch(`${API_BASE}/api/stock/${symbol}/valuation?days=100`),
+          fetchStockValuation(symbol, 100),
         ]);
 
         const infoData = await infoRes.json();
         const klineDataResult = await klineRes.json();
         const indicatorsData = await indicatorsRes.json();
-        const valuationData = await valuationRes.json();
 
         if (infoData.error) {
           const errorMsg = infoData.error.includes("Connection") || infoData.error.includes("Remote")
@@ -108,11 +97,11 @@ export default function StockDetailPage() {
         setStockInfo(infoData);
         setKlineData(klineDataResult.data || []);
         setIndicators(indicatorsData.indicators || null);
-        if (valuationData.current) {
-          setValuation(valuationData.current);
+        if (valuationResult.latest) {
+          setValuation(valuationResult.latest);
         }
-        if (valuationData.history) {
-          setValuationHistory(valuationData.history);
+        if (valuationResult.data) {
+          setValuationHistory(valuationResult.data);
         }
       } catch (err) {
         setError("数据加载失败，请确保后端服务已启动");
@@ -280,16 +269,26 @@ export default function StockDetailPage() {
               <div className="text-right border-l border-slate-600 pl-4">
                 <div className="flex items-center gap-3 text-sm">
                   <div>
-                    <span className="text-slate-400">市盈率: </span>
-                    <span className="text-white font-medium">{valuation.pe != null ? valuation.pe.toFixed(2) : "-"}</span>
+                    <div className="text-slate-400 text-xs">PE(TTM)</div>
+                    <div className="flex items-center gap-1">
+                      <span className="text-white font-medium">{valuation.pe_ttm != null ? valuation.pe_ttm.toFixed(2) : "N/A"}</span>
+                      <PETrendSparkline
+                        peHistory={valuationHistory.map((v) => ({ date: v.trade_date, pe: v.pe_ttm }))}
+                        loading={false}
+                      />
+                    </div>
                   </div>
                   <div>
-                    <span className="text-slate-400">市净率: </span>
-                    <span className="text-white font-medium">{valuation.pb != null ? valuation.pb.toFixed(2) : "-"}</span>
+                    <div className="text-slate-400 text-xs">PB</div>
+                    <span className="text-white font-medium">{valuation.pb != null ? valuation.pb.toFixed(2) : "N/A"}</span>
                   </div>
                   <div>
-                    <span className="text-slate-400">换手率: </span>
-                    <span className="text-white font-medium">{valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "-"}</span>
+                    <div className="text-slate-400 text-xs">换手率</div>
+                    <span className="text-white font-medium">{valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}</span>
+                  </div>
+                  <div>
+                    <div className="text-slate-400 text-xs">总市值</div>
+                    <span className="text-white font-medium">{valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}</span>
                   </div>
                 </div>
               </div>
@@ -322,8 +321,8 @@ export default function StockDetailPage() {
           {klineData.length > 0 ? (
             <StockChart
               data={klineData}
-              peData={valuationHistory.map((v) => ({ date: v.date, value: v.pe }))}
-              pbData={valuationHistory.map((v) => ({ date: v.date, value: v.pb }))}
+              peData={valuationHistory.map((v) => ({ date: v.trade_date, value: v.pe_ttm }))}
+              pbData={valuationHistory.map((v) => ({ date: v.trade_date, value: v.pb }))}
             />
           ) : (
             <div className="h-[400px] flex items-center justify-center text-slate-400">

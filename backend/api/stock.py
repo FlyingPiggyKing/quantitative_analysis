@@ -43,6 +43,6 @@ async def get_indicators(symbol: str, days: int = Query(default=100, ge=30, le=5
 
 
 @router.get("/{symbol}/valuation")
-async def get_valuation(symbol: str, days: int = Query(default=100, ge=30, le=500)):
-    """Get PE, PB, and turnover rate valuation metrics for a stock."""
-    return AkshareService.get_valuation_data(symbol, days)
+async def get_valuation(symbol: str, days: int = Query(default=30, ge=1, le=365)):
+    """Get daily valuation metrics (PE TTM, PB, turnover rate, market cap) for a stock."""
+    return AkshareService.get_daily_basic(symbol, days)
