@@ -226,3 +226,54 @@ class AkshareService:
         rs = gain / loss
         rsi = 100 - (100 / (1 + rs))
         return rsi.dropna().values.tolist()
+
+    @staticmethod
+    def get_valuation_data(symbol: str, days: int = 100) -> dict:
+        """Get PE, PB, and turnover rate data from Tushare daily_basic endpoint."""
+        try:
+            ts_code = _symbol_to_ts_code(symbol)
+            pro = ts.pro_api()
+
+            # Determine date range
+            end_date = datetime.now().strftime("%Y%m%d")
+            start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y%m%d")
+
+            # Fetch daily_basic data (includes pe, pb, turnover_rate)
+            df = pro.daily_basic(ts_code=ts_code, start_date=start_date, end_date=end_date)
+
+            if df is None or df.empty:
+                return {"symbol": symbol, "error": "No valuation data found"}
+
+            # Convert date format
+            df["date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d").dt.strftime("%Y-%m-%d")
+
+            # Sort by date
+            df = df.sort_values("date")
+
+            # Take last N days
+            df = df.tail(days)
+
+            # Get current (most recent) values
+            latest = df.iloc[-1]
+            current = {
+                "pe": float(latest["pe"]) if pd.notna(latest["pe"]) else None,
+                "pb": float(latest["pb"]) if pd.notna(latest["pb"]) else None,
+                "turnover_rate": float(latest["turnover_rate"]) if pd.notna(latest["turnover_rate"]) else None,
+            }
+
+            # Build history array
+            history = []
+            for _, row in df.iterrows():
+                history.append({
+                    "date": row["date"],
+                    "pe": float(row["pe"]) if pd.notna(row["pe"]) else None,
+                    "pb": float(row["pb"]) if pd.notna(row["pb"]) else None,
+                })
+
+            return {
+                "symbol": symbol,
+                "current": current,
+                "history": history,
+            }
+        except Exception as e:
+            return {"symbol": symbol, "error": str(e)}

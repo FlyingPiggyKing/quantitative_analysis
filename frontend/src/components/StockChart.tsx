@@ -1,14 +1,18 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   createChart,
   IChartApi,
+  ISeriesApi,
   CandlestickSeries,
   HistogramSeries,
+  LineSeries,
   CandlestickData,
   HistogramData,
+  LineData,
   Time,
+  SeriesOptionsMap,
 } from "lightweight-charts";
 
 interface KLineData {
@@ -20,13 +24,21 @@ interface KLineData {
   volume: number;
 }
 
-interface StockChartProps {
-  data: KLineData[];
+interface ValuationSeriesData {
+  date: string;
+  value: number | null;
 }
 
-export default function StockChart({ data }: StockChartProps) {
+interface StockChartProps {
+  data: KLineData[];
+  peData?: ValuationSeriesData[];
+  pbData?: ValuationSeriesData[];
+}
+
+export default function StockChart({ data, peData, pbData }: StockChartProps) {
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const chartRef = useRef<IChartApi | null>(null);
+  const [legendData, setLegendData] = useState<{ pe: number | null; pb: number | null }>({ pe: null, pb: null });
 
   useEffect(() => {
     if (!chartContainerRef.current) return;
@@ -90,6 +102,38 @@ export default function StockChart({ data }: StockChartProps) {
       },
     });
 
+    // PE line series
+    let peSeries: ISeriesApi<"Line"> | null = null;
+    if (peData && peData.length > 0) {
+      peSeries = chart.addSeries(LineSeries, {
+        color: "#fbbf24",
+        lineWidth: 2,
+        priceScaleId: "pe",
+      });
+      peSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.85,
+          bottom: 0,
+        },
+      });
+    }
+
+    // PB line series
+    let pbSeries: ISeriesApi<"Line"> | null = null;
+    if (pbData && pbData.length > 0) {
+      pbSeries = chart.addSeries(LineSeries, {
+        color: "#8b5cf6",
+        lineWidth: 2,
+        priceScaleId: "pb",
+      });
+      pbSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.92,
+          bottom: 0,
+        },
+      });
+    }
+
     // Set data
     if (data.length > 0) {
       const candleData: CandlestickData<Time>[] = data.map((d) => ({
@@ -109,8 +153,56 @@ export default function StockChart({ data }: StockChartProps) {
       candlestickSeries.setData(candleData);
       volumeSeries.setData(volumeData);
 
+      // Set PE data, filtering out null values
+      if (peSeries && peData) {
+        const peLineData: LineData<Time>[] = peData
+          .filter((d) => d.value != null)
+          .map((d) => ({
+            time: d.date as Time,
+            value: d.value!,
+          }));
+        peSeries.setData(peLineData);
+
+        // Set initial legend value
+        const lastValidPe = [...peData].reverse().find((d) => d.value != null);
+        if (lastValidPe) {
+          setLegendData((prev) => ({ ...prev, pe: lastValidPe.value }));
+        }
+      }
+
+      // Set PB data, filtering out null values
+      if (pbSeries && pbData) {
+        const pbLineData: LineData<Time>[] = pbData
+          .filter((d) => d.value != null)
+          .map((d) => ({
+            time: d.date as Time,
+            value: d.value!,
+          }));
+        pbSeries.setData(pbLineData);
+
+        // Set initial legend value
+        const lastValidPb = [...pbData].reverse().find((d) => d.value != null);
+        if (lastValidPb) {
+          setLegendData((prev) => ({ ...prev, pb: lastValidPb.value }));
+        }
+      }
+
       chart.timeScale().fitContent();
     }
+
+    // Handle crosshair move for legend update
+    chart.subscribeCrosshairMove((param) => {
+      if (param.seriesData.size > 0) {
+        const peDataAt = param.seriesData.get(peSeries!) as LineData<Time> | undefined;
+        const pbDataAt = param.seriesData.get(pbSeries!) as LineData<Time> | undefined;
+        if (peDataAt || pbDataAt) {
+          setLegendData({
+            pe: peDataAt?.value ?? null,
+            pb: pbDataAt?.value ?? null,
+          });
+        }
+      }
+    });
 
     // Handle resize
     const handleResize = () => {
@@ -129,7 +221,28 @@ export default function StockChart({ data }: StockChartProps) {
       window.removeEventListener("resize", handleResize);
       chart.remove();
     };
-  }, [data]);
+  }, [data, peData, pbData]);
 
-  return <div ref={chartContainerRef} className="w-full h-[400px]" />;
+  return (
+    <div className="relative">
+      {/* Legend */}
+      <div className="absolute top-2 left-2 z-10 flex gap-4 text-sm">
+        {legendData.pe !== null && (
+          <div className="flex items-center gap-1">
+            <span className="w-3 h-0.5 bg-yellow-400"></span>
+            <span className="text-slate-400">PE:</span>
+            <span className="text-white">{legendData.pe.toFixed(2)}</span>
+          </div>
+        )}
+        {legendData.pb !== null && (
+          <div className="flex items-center gap-1">
+            <span className="w-3 h-0.5 bg-purple-500"></span>
+            <span className="text-slate-400">PB:</span>
+            <span className="text-white">{legendData.pb.toFixed(2)}</span>
+          </div>
+        )}
+      </div>
+      <div ref={chartContainerRef} className="w-full h-[400px]" />
+    </div>
+  );
 }

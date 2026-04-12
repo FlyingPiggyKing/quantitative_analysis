@@ -5,6 +5,11 @@ import Link from "next/link";
 import { getWatchlist, WatchlistItem } from "@/services/watchlist";
 import { getTrendPredictions, TrendPrediction } from "@/services/trendPrediction";
 
+interface ValuationData {
+  pe: number | null;
+  pb: number | null;
+}
+
 interface WatchListProps {
   refreshTrigger?: number;
 }
@@ -12,6 +17,7 @@ interface WatchListProps {
 export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
   const [items, setItems] = useState<WatchlistItem[]>([]);
   const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
+  const [valuations, setValuations] = useState<Record<string, ValuationData>>({});
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -36,6 +42,27 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
         } catch (err) {
           console.error("Failed to fetch predictions:", err);
         }
+
+        // Fetch valuation data for each stock
+        const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const valMap: Record<string, ValuationData> = {};
+        await Promise.all(
+          data.items.map(async (item) => {
+            try {
+              const res = await fetch(`${API_BASE}/api/stock/${item.symbol}/valuation`);
+              const valData = await res.json();
+              if (valData.current) {
+                valMap[item.symbol] = {
+                  pe: valData.current.pe,
+                  pb: valData.current.pb,
+                };
+              }
+            } catch (err) {
+              console.error(`Failed to fetch valuation for ${item.symbol}:`, err);
+            }
+          })
+        );
+        setValuations(valMap);
       } catch (err) {
         console.error("Failed to fetch watchlist:", err);
       } finally {
@@ -81,41 +108,52 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
                   <th className="text-left py-2 px-3">股票代码</th>
                   <th className="text-left py-2 px-3">股票名称</th>
                   <th className="text-left py-2 px-3">添加日期</th>
+                  <th className="text-right py-2 px-3">市盈率(PE)</th>
+                  <th className="text-right py-2 px-3">市净率(PB)</th>
                   <th className="text-left py-2 px-3">趋势预测</th>
                 </tr>
               </thead>
               <tbody>
-                {items.map((item) => (
-                  <tr
-                    key={item.symbol}
-                    className="text-white border-b border-slate-700/50 hover:bg-slate-700/30"
-                  >
-                    <td className="py-2 px-3">
-                      <Link
-                        href={`/stock/${item.symbol}`}
-                        className="text-blue-400 hover:text-blue-300"
-                      >
-                        {item.symbol}
-                      </Link>
-                    </td>
-                    <td className="py-2 px-3">
-                      <Link
-                        href={`/stock/${item.symbol}`}
-                        className="hover:text-blue-300"
-                      >
-                        {item.name}
-                      </Link>
-                    </td>
-                    <td className="py-2 px-3 text-slate-400">{formatDate(item.added_at)}</td>
-                    <td className="py-2 px-3">
-                      {predictions[item.symbol] ? (
-                        <TrendIndicator prediction={predictions[item.symbol]} />
-                      ) : (
-                        <span className="text-slate-500">-</span>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+                {items.map((item) => {
+                  const val = valuations[item.symbol];
+                  return (
+                    <tr
+                      key={item.symbol}
+                      className="text-white border-b border-slate-700/50 hover:bg-slate-700/30"
+                    >
+                      <td className="py-2 px-3">
+                        <Link
+                          href={`/stock/${item.symbol}`}
+                          className="text-blue-400 hover:text-blue-300"
+                        >
+                          {item.symbol}
+                        </Link>
+                      </td>
+                      <td className="py-2 px-3">
+                        <Link
+                          href={`/stock/${item.symbol}`}
+                          className="hover:text-blue-300"
+                        >
+                          {item.name}
+                        </Link>
+                      </td>
+                      <td className="py-2 px-3 text-slate-400">{formatDate(item.added_at)}</td>
+                      <td className="py-2 px-3 text-right">
+                        {val?.pe != null ? val.pe.toFixed(2) : "-"}
+                      </td>
+                      <td className="py-2 px-3 text-right">
+                        {val?.pb != null ? val.pb.toFixed(2) : "-"}
+                      </td>
+                      <td className="py-2 px-3">
+                        {predictions[item.symbol] ? (
+                          <TrendIndicator prediction={predictions[item.symbol]} />
+                        ) : (
+                          <span className="text-slate-500">-</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
