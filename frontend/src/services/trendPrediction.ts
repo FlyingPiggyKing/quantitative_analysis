@@ -2,6 +2,49 @@ import { getAuthHeaders } from "./auth";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+export interface SentimentAnalysis {
+  news: Array<{
+    title: string;
+    source: string;
+    date: string;
+    summary: string;
+  }>;
+  summary: string;
+}
+
+export interface TechnicalAnalysis {
+  macd: {
+    value: string;
+    signal: string;
+    interpretation: string;
+  };
+  rsi: {
+    value: string;
+    zone: string;
+    interpretation: string;
+  };
+  ma: {
+    position: string;
+    interpretation: string;
+  };
+  volume: {
+    ratio: string;
+    interpretation: string;
+  };
+  valuation?: {
+    pe: string;
+    pb: string;
+    turnover: string;
+    interpretation: string;
+  };
+}
+
+export interface TrendJudgment {
+  forecast: string;
+  suggestion: "加仓" | "减仓" | "持有" | "建仓" | "观望";
+  reasoning: string;
+}
+
 export interface TrendPrediction {
   symbol: string;
   name: string;
@@ -9,6 +52,9 @@ export interface TrendPrediction {
   confidence: number;
   summary: string;
   analyzed_at: string;
+  情绪分析?: SentimentAnalysis | null;
+  技术分析?: TechnicalAnalysis | null;
+  趋势判断?: TrendJudgment | null;
 }
 
 export interface BatchAnalysisResponse {

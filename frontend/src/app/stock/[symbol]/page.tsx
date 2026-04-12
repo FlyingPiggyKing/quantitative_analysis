@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
+import TrendAnalysisPanel from "@/components/TrendAnalysisPanel";
 import PETrendSparkline from "@/components/PETrendSparkline";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
 import { getTrendPrediction, TrendPrediction, runBatchAnalysisAsync, pollTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
@@ -366,10 +367,17 @@ export default function StockDetailPage() {
                   <span className="text-white font-medium">{trendPrediction.confidence}%</span>
                 </div>
               </div>
-              <div>
-                <p className="text-slate-400 text-sm mb-1">分析摘要:</p>
-                <p className="text-white text-sm">{trendPrediction.summary}</p>
-              </div>
+
+              {/* Use extended analysis panel if available */}
+              {(trendPrediction.情绪分析 || trendPrediction.技术分析 || trendPrediction.趋势判断) ? (
+                <TrendAnalysisPanel prediction={trendPrediction} />
+              ) : (
+                <div>
+                  <p className="text-slate-400 text-sm mb-1">分析摘要:</p>
+                  <p className="text-white text-sm">{trendPrediction.summary}</p>
+                </div>
+              )}
+
               <div className="text-slate-500 text-xs">
                 分析时间: {new Date(trendPrediction.analyzed_at).toLocaleString("zh-CN")}
               </div>

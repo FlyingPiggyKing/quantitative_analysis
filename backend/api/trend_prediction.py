@@ -29,6 +29,9 @@ class PredictionResponse(BaseModel):
     confidence: int
     summary: str
     analyzed_at: str
+    情绪分析: Optional[dict] = None
+    技术分析: Optional[dict] = None
+    趋势判断: Optional[dict] = None
 
 
 class BatchAnalysisResponse(BaseModel):
@@ -114,13 +117,21 @@ async def batch_analyze():
             prediction = analyze_stock_trend(symbol, name)
             logger.info(f"Analysis complete for {symbol}: {prediction.get('trend_direction')}")
 
-            # Save prediction
+            # Save prediction with extended analysis
+            extended_analysis = None
+            if prediction.get("情绪分析") or prediction.get("技术分析") or prediction.get("趋势判断"):
+                extended_analysis = {
+                    "情绪分析": prediction.get("情绪分析"),
+                    "技术分析": prediction.get("技术分析"),
+                    "趋势判断": prediction.get("趋势判断"),
+                }
             saved = TrendPredictionService.save_prediction(
                 symbol=symbol,
                 name=name,
                 trend_direction=prediction.get("trend_direction", "neutral"),
                 confidence=prediction.get("confidence", 0),
                 summary=prediction.get("summary", ""),
+                extended_analysis=extended_analysis,
             )
             results.append(saved)
             logger.info(f"Saved prediction for {symbol}")

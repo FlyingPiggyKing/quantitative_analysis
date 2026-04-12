@@ -42,6 +42,7 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
 2. **Search for stock-specific news**: Use the tavily_search tool to search for recent news about the specific stock (symbol and name).
    - Search query format: "[stock name] [stock symbol] recent news"
    - Use topic="finance" for relevant financial news
+   - Collect up to 5 recent news items from the past 5 days
 
 3. **Search for macro environment**: Use the tavily_search tool to search for macro factors that might affect the stock:
    - Interest rate trends
@@ -53,10 +54,7 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
    - If technical signals confirm news direction → higher confidence
    - If technical signals conflict with news direction → lower confidence and note the disagreement
 
-5. **Return prediction**: Provide your final prediction with:
-   - trend_direction: "up", "down", or "neutral"
-   - confidence: 0-100 percentage based on combined analysis quality
-   - summary: Brief explanation of the analysis reasoning
+5. **Return structured prediction**: Provide your final prediction with structured three-section format
 
 ## Important Guidelines
 
@@ -66,15 +64,55 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
 - If you find limited or no news, note this in your summary and provide lower confidence
 - Consider both company-specific news and broader market/industry trends
 - Provide honest, balanced analysis - don't overstate confidence if evidence is weak
+- **Operation suggestions are for reference only, not investment advice**
 
 ## Response Format
 
-Your final response should be a JSON object with these fields:
+**CRITICAL: You MUST output ONLY a valid JSON object. Do not include any text before or after the JSON.**
+
+Your final response MUST be a valid JSON object with these fields. Here is a complete example:
+
+```json
 {
-    "trend_direction": "up" or "down" or "neutral",
-    "confidence": 0-100,
-    "summary": "Your analysis explanation in Chinese"
+    "trend_direction": "up",
+    "confidence": 78,
+    "情绪分析": {
+        "news": [
+            {
+                "title": "药明康德发布2024年业绩预告",
+                "source": "东方财富网",
+                "date": "2024-01-15",
+                "summary": "公司预计2024年净利润同比增长15%-20%，受益于全球生物医药研发外包需求持续增长。"
+            },
+            {
+                "title": "CXO行业获大行看好",
+                "source": "野村证券",
+                "date": "2024-01-14",
+                "summary": "野村证券发布研报称CXO行业估值具备吸引力，维持药明康德增持评级，目标价108元。"
+            }
+        ],
+        "summary": "市场情绪整体偏多，机构投资者看好CXO行业前景，公司业绩稳健增长提供支撑。"
+    },
+    "技术分析": {
+        "macd": {"value": "0.35/0.28", "signal": "金叉", "interpretation": "MACD在零轴上方形成金叉，短期多头信号明显"},
+        "rsi": {"value": "65.5", "zone": "正常", "interpretation": "RSI处于正常区间，未出现超买超卖"},
+        "ma": {"position": "价格在5日、20日均线上方", "interpretation": "均线多头排列，短期趋势向好"},
+        "volume": {"ratio": "1.3", "interpretation": "成交量放大，市场参与度提升"},
+        "valuation": {"pe": "28.5", "pb": "5.2", "turnover": "2.5%", "interpretation": "估值处于历史中枢偏低位置"}
+    },
+    "趋势判断": {
+        "forecast": "市场环境\n外围市场整体平稳，美联储降息预期升温，流动性环境有利成长股\n\n技术面分析\nMACD金叉确认，均线多头排列，成交量配合放大，108元一线为近期重要阻力位\n\n短期展望\n预计股价在102-110区间震荡偏强运行，若突破108元可能进一步上探110元",
+        "suggestion": "持有",
+        "reasoning": "市场环境\n机构看多情绪较高，外资持续流入提供支撑\n\n技术面分析\n技术指标向好，但RSI已接近70，短期可能有回调压力\n\n操作建议\n建议持有为主，逢低可适度加仓，突破108元后考虑加仓"
+    }
 }
+```
+
+**Key Requirements:**
+1. `forecast` and `reasoning` MUST use exactly 3 paragraphs separated by `\n\n`
+2. Each paragraph has a title (like "市场环境", "技术面分析", "操作建议") followed by content
+3. Use Chinese for all content
+4. Output valid JSON only - no markdown code blocks, no explanatory text
 """
 
 
@@ -242,27 +280,52 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
         import re
 
         # Look for JSON in the response
-        json_match = re.search(r'\{[^}]*"trend_direction"[^}]*\}', content, re.DOTALL)
+        json_match = re.search(r'\{.*\}', content, re.DOTALL)
         if json_match:
             try:
                 prediction = json.loads(json_match.group())
+                # Return the full structured response with backward-compatible fields
                 return {
                     "symbol": symbol,
                     "name": name,
                     "trend_direction": prediction.get("trend_direction", "neutral"),
                     "confidence": prediction.get("confidence", 0),
-                    "summary": prediction.get("summary", content[:500]),
+                    "summary": prediction.get("趋势判断", {}).get("forecast", "") or prediction.get("summary", ""),
+                    "情绪分析": prediction.get("情绪分析"),
+                    "技术分析": prediction.get("技术分析"),
+                    "趋势判断": prediction.get("趋势判断"),
                 }
             except json.JSONDecodeError:
                 pass
 
-        # If JSON parsing fails, return the content as summary
+        # Fallback: try to extract original fields if structured parsing fails
+        fallback_match = re.search(r'"trend_direction"\s*:\s*"([^"]+)"', content)
+        fallback_confidence = re.search(r'"confidence"\s*:\s*(\d+)', content)
+        if fallback_match:
+            try:
+                return {
+                    "symbol": symbol,
+                    "name": name,
+                    "trend_direction": fallback_match.group(1),
+                    "confidence": int(fallback_confidence.group(1)) if fallback_confidence else 0,
+                    "summary": content[:500] if content else "无法解析分析结果",
+                    "情绪分析": None,
+                    "技术分析": None,
+                    "趋势判断": None,
+                }
+            except (json.JSONDecodeError, ValueError):
+                pass
+
+        # If all parsing fails, return the content as summary
         return {
             "symbol": symbol,
             "name": name,
             "trend_direction": "neutral",
             "confidence": 0,
             "summary": content[:500] if content else "无法解析分析结果",
+            "情绪分析": None,
+            "技术分析": None,
+            "趋势判断": None,
         }
 
     except Exception as e:
