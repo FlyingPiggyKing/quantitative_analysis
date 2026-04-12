@@ -123,6 +123,105 @@ uv run uvicorn backend.main:app --port 8000
 
 访问 http://localhost:8000 查看前端页面。
 
+## 服务器迁移/部署检查清单
+
+迁移到新服务器时，按以下步骤检查：
+
+### 1. 端口开放
+确保防火墙打开以下端口：
+- **3000** - 前端
+- **8000** - 后端 API
+
+### 2. 数据库初始化
+
+`watchlist.db` 需要创建以下表才能正常运行：
+
+```bash
+sqlite3 backend/watchlist.db "
+CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT NOT NULL UNIQUE,
+    password_hash TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS captchas (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    token_jti TEXT NOT NULL UNIQUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    expires_at TIMESTAMP NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS user_watchlist (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    symbol TEXT NOT NULL,
+    name TEXT NOT NULL,
+    added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id),
+    UNIQUE(user_id, symbol)
+);
+"
+```
+
+### 3. 前端环境变量
+
+如果前端和后端不在同一服务器，或使用非 localhost 访问，需创建 `frontend/.env.production`：
+
+```bash
+echo "NEXT_PUBLIC_API_URL=http://你的服务器IP:8000" > frontend/.env.production
+```
+
+然后重新构建：
+```bash
+cd frontend
+npm run build
+npm start
+```
+
+### 4. 数据库文件
+
+- `backend/watchlist.db` - 用户、验证码、会话数据
+- `backend/trend_predictions.db` - 股票趋势预测数据（可选，如不存在会自动创建）
+
+### 5. 依赖安装
+
+```bash
+cd backend
+uv sync
+```
+
+### 6. 启动服务
+
+方式一：使用快捷脚本（推荐）
+```bash
+./start.sh
+```
+
+方式二：手动启动
+```bash
+# 后端
+cd backend && nohup ./backend/.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 &
+
+# 前端
+cd frontend && npm run build && nohup npm start &
+```
+
+### 7. 常见问题
+
+**CAPTCHA CORS 错误**：检查前端 `.env.production` 是否设置正确的 `NEXT_PUBLIC_API_URL`
+
+**sqlite3.OperationalError: no such table**：运行上面的数据库初始化 SQL
+
+**net::ERR_CONNECTION_TIMED_OUT**：检查防火墙是否打开 8000 端口
+
 ## 示例股票代码
 
 | 代码 | 名称 |
