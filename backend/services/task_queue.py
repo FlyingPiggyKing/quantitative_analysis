@@ -82,12 +82,22 @@ class TaskQueue:
                 logger.info(f"[Task {task_id}] Analyzing {name} ({symbol})")
                 prediction = analyze_stock_trend(symbol, name)
 
+                # Build extended_analysis if available
+                extended_analysis = None
+                if prediction.get("情绪分析") or prediction.get("技术分析") or prediction.get("趋势判断"):
+                    extended_analysis = {
+                        "情绪分析": prediction.get("情绪分析"),
+                        "技术分析": prediction.get("技术分析"),
+                        "趋势判断": prediction.get("趋势判断"),
+                    }
+
                 saved = TrendPredictionService.save_prediction(
                     symbol=symbol,
                     name=name,
                     trend_direction=prediction.get("trend_direction", "neutral"),
                     confidence=prediction.get("confidence", 0),
                     summary=prediction.get("summary", ""),
+                    extended_analysis=extended_analysis,
                 )
                 results.append(saved)
 
