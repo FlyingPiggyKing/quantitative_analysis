@@ -72,7 +72,7 @@ export default function Home() {
       } catch (err) {
         console.error("Failed to fetch task status:", err);
         // Mark as failed if we can't fetch the task
-        setTaskProgress({ current: 0, total: 0, status: "failed" });
+        setTaskProgress({ task_id: "", progress: "", current: 0, total: 0, status: "failed" });
       }
     };
 
