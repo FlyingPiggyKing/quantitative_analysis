@@ -15,6 +15,7 @@ dependencies = [
     "langchain-openai>=1.0.0",
     "deepagents>=0.5.0a4",
     "tavily>=1.1.0",
+    "langsmith>=0.1.0",
     "pyjwt>=2.8.0",
     "passlib[bcrypt]>=1.7.4",
     "Pillow>=10.0.0",

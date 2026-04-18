@@ -6,6 +6,7 @@ from typing import Dict, Any
 
 from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
+from langsmith import traceable
 
 from backend.services.tavily_search_tool import tavily_search
 from backend.services.akshare_service import AkshareService
@@ -190,6 +191,7 @@ def create_stock_trend_agent():
     return agent
 
 
+@traceable
 def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     """Analyze stock trend using DeepAgent with Tavily search.
 

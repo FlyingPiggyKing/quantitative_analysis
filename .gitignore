@@ -17,3 +17,5 @@ frontend/node_modules/
 # Environment
 .env
 .env.local
+
+logs/
