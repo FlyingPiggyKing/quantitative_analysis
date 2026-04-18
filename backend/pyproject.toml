@@ -19,9 +19,11 @@ dependencies = [
     "pyjwt>=2.8.0",
     "passlib[bcrypt]>=1.7.4",
     "Pillow>=10.0.0",
+    "langchain-mcp-adapters>=0.2.2",
 ]
 
 [tool.uv]
 index-url = "https://pypi.tuna.tsinghua.edu.cn/simple"
-trusted-host = "pypi.tuna.tsinghua.edu.cn"
+
+[dependency-groups]
 dev-dependencies = []

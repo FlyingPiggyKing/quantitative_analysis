@@ -71,6 +71,8 @@ export default function Home() {
         }
       } catch (err) {
         console.error("Failed to fetch task status:", err);
+        // Mark as failed if we can't fetch the task
+        setTaskProgress({ current: 0, total: 0, status: "failed" });
       }
     };
 
@@ -91,6 +93,14 @@ export default function Home() {
   const handleDismiss = useCallback(() => {
     setIsDismissed(true);
     localStorage.setItem(DISMISSED_STORAGE_KEY, "true");
+  }, []);
+
+  const handleClearTask = useCallback(() => {
+    localStorage.removeItem(TASK_ID_STORAGE_KEY);
+    localStorage.removeItem(DISMISSED_STORAGE_KEY);
+    setActiveTaskId(null);
+    setTaskProgress(null);
+    setIsDismissed(false);
   }, []);
 
   const handleTrendAnalysis = useCallback(async () => {
@@ -186,7 +196,7 @@ export default function Home() {
         </div>
       </div>
 
-      {showProgressBar && <AnalysisProgressBar progress={taskProgress} onDismiss={handleDismiss} />}
+      {showProgressBar && <AnalysisProgressBar progress={taskProgress} onDismiss={handleDismiss} onClearTask={handleClearTask} />}
     </div>
   );
 }

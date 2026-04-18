@@ -6,9 +6,11 @@ from typing import Dict, Any
 
 from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
+from langchain.tools import tool
 from langsmith import traceable
 
 from backend.services.tavily_search_tool import tavily_search
+from backend.services.minimax_mcp_search_tool import minimax_mcp_search
 from backend.services.akshare_service import AkshareService
 
 # Configure logging
@@ -17,6 +19,39 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv()
+
+
+@tool(parse_docstring=True)
+def search_with_fallback(
+    query: str,
+    max_results: int = 5,
+) -> str:
+    """Search the web with automatic fallback from Tavily to MiniMax MCP.
+
+    This tool tries Tavily first (primary), and if it fails or returns no results,
+    automatically falls back to MiniMax MCP search. Use this for stock news
+    and macro environment searches.
+
+    Args:
+        query: The search query to look up
+        max_results: Maximum number of results to return (default: 5)
+    """
+    # Try Tavily first (primary search)
+    tavily_result = tavily_search.invoke({"query": query, "max_results": max_results})
+
+    # Check if Tavily succeeded
+    if tavily_result and "error" not in tavily_result.lower() and tavily_result != "No search results found.":
+        return tavily_result
+
+    # Fallback to MiniMax MCP
+    logger.info("Tavily search failed or returned empty, trying MiniMax MCP...")
+    mcp_result = minimax_mcp_search.invoke({"query": query, "max_results": max_results})
+
+    if mcp_result and "error" not in mcp_result.lower() and mcp_result != "No search results found.":
+        return mcp_result
+
+    # Both failed
+    return "No search results available from either source."
 
 
 def _get_model():
@@ -40,12 +75,12 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
    - Price position relative to moving averages
    - Volume ratio (above 1 = volume expansion)
 
-2. **Search for stock-specific news**: Use the tavily_search tool to search for recent news about the specific stock (symbol and name).
+2. **Search for stock-specific news**: Use the search_with_fallback tool to search for recent news about the specific stock (symbol and name).
    - Search query format: "[stock name] [stock symbol] recent news"
-   - Use topic="finance" for relevant financial news
+   - This will try Tavily first, then MiniMax MCP as fallback
    - Collect up to 5 recent news items from the past 5 days
 
-3. **Search for macro environment**: Use the tavily_search tool to search for macro factors that might affect the stock:
+3. **Search for macro environment**: Use the search_with_fallback tool to search for macro factors that might affect the stock:
    - Interest rate trends
    - GDP and economic data
    - Industry-specific trends
@@ -61,7 +96,7 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
 
 - **Use the provided technical data first**: The technical data is provided under "## 技术数据" section. Analyze it BEFORE searching for news.
 - **Weight: 40% technical, 60% news**: Technical signals provide context, but news drives short-term movements.
-- **Focus on the LATEST news**: The tavily_search returns news from the current week. Prioritize the most recent articles in your analysis as they are most relevant for 2-week trend prediction
+- **Focus on the LATEST news**: The search_with_fallback returns news from the current week. Prioritize the most recent articles in your analysis as they are most relevant for 2-week trend prediction
 - If you find limited or no news, note this in your summary and provide lower confidence
 - Consider both company-specific news and broader market/industry trends
 - Provide honest, balanced analysis - don't overstate confidence if evidence is weak
@@ -179,13 +214,13 @@ def format_data_context(recent_prices: list, indicators: dict, valuation_data: d
 
 
 def create_stock_trend_agent():
-    """Create a DeepAgent for stock trend analysis with Tavily search tool."""
+    """Create a DeepAgent for stock trend analysis with fallback search tools."""
     model = _get_model()
 
     agent = create_deep_agent(
         model=model,
         system_prompt=SYSTEM_PROMPT,
-        tools=[tavily_search],
+        tools=[search_with_fallback],
     )
 
     return agent
@@ -193,7 +228,10 @@ def create_stock_trend_agent():
 
 @traceable
 def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
-    """Analyze stock trend using DeepAgent with Tavily search.
+    """Analyze stock trend using DeepAgent with fallback search.
+
+    Uses Tavily as primary search with MiniMax MCP as fallback when
+    Tavily is unavailable.
 
     Args:
         symbol: Stock symbol (e.g., "000001")
@@ -244,12 +282,12 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
 ## 技术数据
 {data_context}
 
-请使用 tavily_search 工具搜索最新新闻，然后结合以上技术数据给出预测。
+请使用 search_with_fallback 工具搜索最新新闻，然后结合以上技术数据给出预测。
 """
     else:
         user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势。
 
-请使用 tavily_search 工具搜索：
+请使用 search_with_fallback 工具搜索：
 1. 关于 {name} ({symbol}) 的最新新闻
 2. 相关的宏观经济和行业信息
 

@@ -1,18 +1,3 @@
-## ADDED Requirements
-
-### Requirement: MiniMax MCP Web Search (Fallback)
-The system SHALL provide a MiniMax MCP-based web search tool that serves as fallback when Tavily is unavailable.
-
-#### Scenario: Search with MiniMax MCP fallback
-- **WHEN** Tavily search fails or returns empty results
-- **THEN** the agent SHALL automatically invoke MiniMax MCP search
-- **AND** continue analysis using MiniMax MCP results
-
-#### Scenario: Both sources unavailable
-- **WHEN** both Tavily and MiniMax MCP return errors or no results
-- **THEN** agent SHALL return "neutral" trend with 0% confidence
-- **AND** summary SHALL state "Insufficient recent news data for analysis"
-
 ## MODIFIED Requirements
 
 ### Requirement: Stock Trend Analysis Agent
@@ -54,25 +39,3 @@ The DeepAgent SHALL analyze stock price trends based on latest news, macro envir
   - Few or no news results found
   - Sentiment is mixed or contradictory
   - Macro environment is unclear or conflicting
-
-#### Scenario: Valuation context included in agent reasoning
-- **WHEN** `format_data_context()` assembles the LLM prompt context
-- **THEN** it SHALL include the latest valuation metrics if available: PE(TTM), PB, turnover rate (换手率), and total market cap
-- **AND** these SHALL appear alongside existing technical indicators in the context block
-
-#### Scenario: Graceful handling of missing valuation data
-- **WHEN** the valuation data dict contains an `error` key or is absent
-- **THEN** `format_data_context()` SHALL omit the valuation section entirely
-- **AND** the agent SHALL proceed with analysis using only available technical indicators
-
-### Requirement: Frontend valuation panel on stock analysis page
-The frontend stock analysis/detail page SHALL display a valuation section showing PE(TTM), PB ratio, turnover rate, and total market cap, with a mini PE(TTM) sparkline showing recent history.
-
-#### Scenario: Valuation data available
-- **WHEN** the valuation API returns valid data for a stock
-- **THEN** the page SHALL display: PE(TTM) value with mini sparkline, PB ratio, turnover rate (%), and total market cap (万元)
-
-#### Scenario: Valuation data unavailable
-- **WHEN** the valuation API returns an error or no data
-- **THEN** each metric field SHALL display "N/A"
-- **AND** the sparkline SHALL be hidden or show an empty state
