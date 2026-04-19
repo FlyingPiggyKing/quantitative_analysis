@@ -63,7 +63,9 @@ export async function removeFromWatchlist(symbol: string): Promise<void> {
 }
 
 export async function checkWatchlist(symbol: string): Promise<WatchlistItem | null> {
-  const res = await fetchWithAuth(`${API_BASE}/api/watchlist/${symbol}`);
+  const res = await fetch(`${API_BASE}/api/watchlist/${symbol}`, {
+    headers: getAuthHeaders(),
+  });
   if (res.status === 404) {
     return null;
   }

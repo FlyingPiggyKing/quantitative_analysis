@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { TrendPrediction, SentimentAnalysis, TechnicalAnalysis, TrendJudgment } from "@/services/trendPrediction";
 
 interface TrendAnalysisPanelProps {
@@ -8,6 +9,16 @@ interface TrendAnalysisPanelProps {
 
 export default function TrendAnalysisPanel({ prediction }: TrendAnalysisPanelProps) {
   const { 情绪分析, 技术分析, 趋势判断 } = prediction;
+
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    sentiment: false,
+    technical: false,
+    judgment: false,
+  });
+
+  const toggleSection = (key: string) => {
+    setCollapsedSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // If no extended analysis, show fallback message
   if (!情绪分析 && !技术分析 && !趋势判断) {
@@ -19,28 +30,73 @@ export default function TrendAnalysisPanel({ prediction }: TrendAnalysisPanelPro
   }
 
   return (
-    <div className="bg-slate-800 rounded-lg p-4 space-y-4">
+    <div className="bg-slate-800 rounded-lg p-3 sm:p-4 space-y-4">
       <h3 className="text-lg font-medium text-white">AI 趋势分析</h3>
 
       {/* 情绪分析 */}
       {情绪分析 && (
-        <SentimentSection data={情绪分析} />
+        <CollapsibleSection
+          title="情绪分析"
+          isCollapsed={collapsedSections.sentiment}
+          onToggle={() => toggleSection("sentiment")}
+        >
+          <SentimentSection data={情绪分析} />
+        </CollapsibleSection>
       )}
 
       {/* 技术分析 */}
       {技术分析 && (
-        <TechnicalSection data={技术分析} />
+        <CollapsibleSection
+          title="技术分析"
+          isCollapsed={collapsedSections.technical}
+          onToggle={() => toggleSection("technical")}
+        >
+          <TechnicalSection data={技术分析} />
+        </CollapsibleSection>
       )}
 
       {/* 趋势判断 */}
       {趋势判断 && (
-        <TrendJudgmentSection data={趋势判断} />
+        <CollapsibleSection
+          title="趋势判断"
+          isCollapsed={collapsedSections.judgment}
+          onToggle={() => toggleSection("judgment")}
+        >
+          <TrendJudgmentSection data={趋势判断} />
+        </CollapsibleSection>
       )}
 
       {/* Disclaimer */}
       <p className="text-xs text-slate-500 mt-4">
         建议仅供参考，不作为投资依据
       </p>
+    </div>
+  );
+}
+
+function CollapsibleSection({
+  title,
+  children,
+  isCollapsed,
+  onToggle,
+}: {
+  title: string;
+  children: React.ReactNode;
+  isCollapsed: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="md:border-0">
+      <button
+        onClick={onToggle}
+        className="w-full flex justify-between items-center p-3 md:p-0 min-h-[44px] active:opacity-70 md:active:opacity-100"
+      >
+        <span className="text-slate-300 font-medium">{title}</span>
+        <span className="text-slate-400 text-xl md:hidden">{isCollapsed ? "+" : "−"}</span>
+      </button>
+      <div className={`${isCollapsed ? "hidden" : "block"} md:block`}>
+        {children}
+      </div>
     </div>
   );
 }

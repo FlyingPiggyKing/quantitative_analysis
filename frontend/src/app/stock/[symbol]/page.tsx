@@ -239,27 +239,44 @@ export default function StockDetailPage() {
   return (
     <div className="min-h-screen bg-slate-900">
       {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 px-4 py-4">
-        <div className="max-w-6xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-slate-400 hover:text-white">
+      <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 sm:py-4">
+        <div className="max-w-6xl mx-auto">
+          {/* Back link and title row */}
+          <div className="flex items-center gap-3 mb-3">
+            <Link href="/" className="text-slate-400 hover:text-white active:scale-95 transition-transform">
               ← 返回
             </Link>
-            <div>
-              <h1 className="text-xl font-bold text-white">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold text-white truncate">
                 {stockInfo?.name || symbol} ({symbol})
               </h1>
               {stockInfo?.sector && (
-                <p className="text-slate-400 text-sm">{stockInfo.sector}</p>
+                <p className="text-slate-400 text-xs sm:text-sm hidden sm:block">{stockInfo.sector}</p>
               )}
             </div>
+            <button
+              onClick={handleWatchlistToggle}
+              disabled={watchlistLoading}
+              className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors active:scale-95 disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                isInWatchlist
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              }`}
+            >
+              {watchlistLoading
+                ? "..."
+                : isInWatchlist
+                ? "移除"
+                : "自选"}
+            </button>
           </div>
 
-          <div className="flex items-center gap-4">
+          {/* Price and valuation row - stacks on mobile */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             {klineData.length > 0 && (
-              <div className="text-right">
-                <div className="text-2xl font-bold text-white">{latestPrice.toFixed(2)}</div>
-                <div className={`text-sm ${latestChange >= 0 ? "text-red-400" : "text-green-400"}`}>
+              <div className="flex items-baseline gap-3">
+                <div className="text-2xl sm:text-3xl font-bold text-white">{latestPrice.toFixed(2)}</div>
+                <div className={`text-base sm:text-lg ${latestChange >= 0 ? "text-red-400" : "text-green-400"}`}>
                   {latestChange >= 0 ? "+" : ""}
                   {latestChange.toFixed(2)}%
                 </div>
@@ -267,57 +284,40 @@ export default function StockDetailPage() {
             )}
 
             {valuation && (
-              <div className="text-right border-l border-slate-600 pl-4">
-                <div className="flex items-center gap-3 text-sm">
-                  <div>
-                    <div className="text-slate-400 text-xs">PE(TTM)</div>
-                    <div className="flex items-center gap-1">
-                      <span className="text-white font-medium">{valuation.pe_ttm != null ? valuation.pe_ttm.toFixed(2) : "N/A"}</span>
-                      <PETrendSparkline
-                        peHistory={valuationHistory.map((v) => ({ date: v.trade_date, pe: v.pe_ttm }))}
-                        loading={false}
-                      />
-                    </div>
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 text-sm border-t sm:border-t-0 border-slate-700 pt-3 sm:pt-0">
+                <div>
+                  <div className="text-slate-400 text-xs">PE(TTM)</div>
+                  <div className="flex items-center gap-1">
+                    <span className="text-white font-medium">{valuation.pe_ttm != null ? valuation.pe_ttm.toFixed(2) : "N/A"}</span>
+                    <PETrendSparkline
+                      peHistory={valuationHistory.map((v) => ({ date: v.trade_date, pe: v.pe_ttm }))}
+                      loading={false}
+                      mobile
+                    />
                   </div>
-                  <div>
-                    <div className="text-slate-400 text-xs">PB</div>
-                    <span className="text-white font-medium">{valuation.pb != null ? valuation.pb.toFixed(2) : "N/A"}</span>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-xs">换手率</div>
-                    <span className="text-white font-medium">{valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}</span>
-                  </div>
-                  <div>
-                    <div className="text-slate-400 text-xs">总市值</div>
-                    <span className="text-white font-medium">{valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}</span>
-                  </div>
+                </div>
+                <div>
+                  <div className="text-slate-400 text-xs">PB</div>
+                  <span className="text-white font-medium">{valuation.pb != null ? valuation.pb.toFixed(2) : "N/A"}</span>
+                </div>
+                <div>
+                  <div className="text-slate-400 text-xs">换手率</div>
+                  <span className="text-white font-medium">{valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}</span>
+                </div>
+                <div>
+                  <div className="text-slate-400 text-xs">总市值</div>
+                  <span className="text-white font-medium">{valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}</span>
                 </div>
               </div>
             )}
-
-            <button
-              onClick={handleWatchlistToggle}
-              disabled={watchlistLoading}
-              className={`px-4 py-2 rounded-lg font-medium transition-colors disabled:opacity-50 ${
-                isInWatchlist
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
-            >
-              {watchlistLoading
-                ? "处理中..."
-                : isInWatchlist
-                ? "移除自选"
-                : "加入自选"}
-            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-6xl mx-auto px-4 py-6 space-y-6">
+      <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Chart */}
-        <section className="bg-slate-800 rounded-lg p-4">
+        <section className="bg-slate-800 rounded-lg p-3 sm:p-4">
           <h2 className="text-lg font-medium text-white mb-4">K线图</h2>
           {klineData.length > 0 ? (
             <StockChart
@@ -326,7 +326,7 @@ export default function StockDetailPage() {
               pbData={valuationHistory.map((v) => ({ date: v.trade_date, value: v.pb }))}
             />
           ) : (
-            <div className="h-[400px] flex items-center justify-center text-slate-400">
+            <div className="h-[250px] sm:h-[400px] flex items-center justify-center text-slate-400">
               暂无数据
             </div>
           )}
@@ -339,14 +339,14 @@ export default function StockDetailPage() {
         </section>
 
         {/* Trend Analysis */}
-        <section className="bg-slate-800 rounded-lg p-4">
+        <section className="bg-slate-800 rounded-lg p-3 sm:p-4">
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-lg font-medium text-white">趋势分析</h2>
             {!trendPrediction && !trendLoading && (
               <button
                 onClick={handleRunAnalysis}
                 disabled={analysisRunning}
-                className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg disabled:opacity-50"
+                className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm rounded-lg disabled:opacity-50 min-h-[44px]"
               >
                 {analysisRunning ? (taskProgress ? `分析中... ${taskProgress}` : "分析中...") : "运行分析"}
               </button>
@@ -391,10 +391,10 @@ export default function StockDetailPage() {
 
         {/* Data Table */}
         {klineData.length > 0 && (
-          <section className="bg-slate-800 rounded-lg p-4">
+          <section className="bg-slate-800 rounded-lg p-3 sm:p-4">
             <h2 className="text-lg font-medium text-white mb-4">近期行情</h2>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+            <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+              <table className="w-full text-sm min-w-[600px] sm:min-w-0">
                 <thead>
                   <tr className="text-slate-400 border-b border-slate-700">
                     <th className="text-left py-2 px-3">日期</th>

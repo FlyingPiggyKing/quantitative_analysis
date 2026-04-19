@@ -3,13 +3,14 @@
 interface PETrendSparklineProps {
   peHistory: Array<{ date: string; pe: number | null }>;
   loading?: boolean;
+  mobile?: boolean;
 }
 
-export default function PETrendSparkline({ peHistory, loading }: PETrendSparklineProps) {
+export default function PETrendSparkline({ peHistory, loading, mobile }: PETrendSparklineProps) {
   if (loading) {
     return (
-      <svg width="80" height="30" viewBox="0 0 80 30" className="opacity-40">
-        <line x1="0" y1="15" x2="80" y2="15" stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
+      <svg width={mobile ? 60 : 80} height={mobile ? 24 : 30} viewBox={`0 0 ${mobile ? 60 : 80} ${mobile ? 24 : 30}`} className="opacity-40">
+        <line x1="0" y1={mobile ? 12 : 15} x2={mobile ? 60 : 80} y2={mobile ? 12 : 15} stroke="#94a3b8" strokeWidth="2" strokeDasharray="4 2" />
       </svg>
     );
   }
@@ -23,9 +24,9 @@ export default function PETrendSparkline({ peHistory, loading }: PETrendSparklin
   const maxPE = Math.max(...validData.map((d) => d.pe!));
   const range = maxPE - minPE || 1;
 
-  const padding = 4;
-  const width = 80;
-  const height = 30;
+  const padding = mobile ? 2 : 4;
+  const width = mobile ? 60 : 80;
+  const height = mobile ? 24 : 30;
   const chartWidth = width - padding * 2;
   const chartHeight = height - padding * 2;
 
@@ -41,7 +42,7 @@ export default function PETrendSparkline({ peHistory, loading }: PETrendSparklin
         points={points.join(" ")}
         fill="none"
         stroke="#60a5fa"
-        strokeWidth="1.5"
+        strokeWidth={mobile ? 1 : 1.5}
         strokeLinejoin="round"
         strokeLinecap="round"
       />

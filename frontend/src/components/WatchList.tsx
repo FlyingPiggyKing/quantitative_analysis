@@ -95,7 +95,7 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
   }
 
   return (
-    <div className="bg-slate-800 rounded-lg p-4">
+    <div className="bg-slate-800 rounded-lg p-3 sm:p-4">
       <h2 className="text-lg font-medium text-white mb-4">我的自选</h2>
 
       {items.length === 0 ? (
@@ -104,7 +104,8 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
         </div>
       ) : (
         <>
-          <div className="overflow-x-auto">
+          {/* Desktop Table View - hidden on mobile */}
+          <div className="hidden sm:block overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="text-slate-400 border-b border-slate-700">
@@ -167,8 +168,48 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
             </table>
           </div>
 
+          {/* Mobile Card View - visible only on mobile */}
+          <div className="sm:hidden space-y-3">
+            {items.map((item) => {
+              const val = valuations[item.symbol];
+              return (
+                <Link
+                  key={item.symbol}
+                  href={`/stock/${item.symbol}`}
+                  className="block bg-slate-700/50 rounded-lg p-3 min-h-[44px] active:opacity-70 transition-opacity"
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div>
+                      <span className="text-blue-400 font-medium">{item.symbol}</span>
+                      <span className="text-white ml-2">{item.name}</span>
+                    </div>
+                    {predictions[item.symbol] ? (
+                      <TrendIndicator prediction={predictions[item.symbol]} />
+                    ) : (
+                      <span className="text-slate-500 text-sm">-</span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-4 text-sm">
+                    <div className="flex items-center gap-1">
+                      <PETrendSparkline peHistory={val?.pe_history ?? []} mobile />
+                      <span className="text-slate-400 text-xs">PE趋势</span>
+                    </div>
+                    <div className="text-slate-400">
+                      <span className="text-white">{val?.pe != null ? val.pe.toFixed(2) : "-"}</span>
+                      <span className="text-slate-500 text-xs ml-1">PE</span>
+                    </div>
+                    <div className="text-slate-400">
+                      <span className="text-white">{val?.pb != null ? val.pb.toFixed(2) : "-"}</span>
+                      <span className="text-slate-500 text-xs ml-1">PB</span>
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+
           {/* Pagination */}
-          <div className="flex items-center justify-between mt-4">
+          <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-3">
             <div className="flex items-center gap-2">
               <span className="text-slate-400 text-sm">每页显示:</span>
               <select
@@ -186,7 +227,7 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
               <button
                 onClick={() => setPage((p) => Math.max(1, p - 1))}
                 disabled={page === 1}
-                className="px-3 py-1 bg-slate-700 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-600"
+                className="px-3 py-1 bg-slate-700 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-600 active:scale-95 transition-transform min-h-[36px] min-w-[44px]"
               >
                 上一页
               </button>
@@ -196,7 +237,7 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
               <button
                 onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
-                className="px-3 py-1 bg-slate-700 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-600"
+                className="px-3 py-1 bg-slate-700 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-600 active:scale-95 transition-transform min-h-[36px] min-w-[44px]"
               >
                 下一页
               </button>

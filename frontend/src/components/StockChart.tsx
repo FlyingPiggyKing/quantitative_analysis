@@ -207,9 +207,10 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
     // Handle resize
     const handleResize = () => {
       if (chartContainerRef.current && chartRef.current) {
+        const isMobile = window.innerWidth < 640;
         chartRef.current.applyOptions({
           width: chartContainerRef.current.clientWidth,
-          height: 400,
+          height: isMobile ? 250 : 400,
         });
       }
     };
@@ -242,7 +243,7 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
           </div>
         )}
       </div>
-      <div ref={chartContainerRef} className="w-full h-[400px]" />
+      <div ref={chartContainerRef} className="w-full h-[250px] sm:h-[400px]" />
     </div>
   );
 }

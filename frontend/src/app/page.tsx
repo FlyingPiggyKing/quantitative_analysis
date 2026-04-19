@@ -132,27 +132,20 @@ export default function Home() {
   const showProgressBar = activeTaskId && taskProgress && !isDismissed;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div className="text-center">
-            <h1 className="text-4xl font-bold text-white mb-2">Stock Analyzer</h1>
-            <p className="text-slate-400">输入股票代码查看K线图和技术指标</p>
-          </div>
-          <div className="flex items-center gap-4">
-            <span className="text-slate-300">Welcome, {user.username}</span>
-            <button
-              onClick={() => {
-                localStorage.removeItem("auth_token");
-                localStorage.removeItem("auth_user");
-                router.push("/login");
-                window.location.reload();
-              }}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded-lg transition-colors"
-            >
-              Logout
-            </button>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-4 sm:py-8">
+      <div className="w-full max-w-4xl mx-auto">
+        <div className="text-center mb-6 sm:mb-8">
+          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 text-center sm:text-left">Stock Analyzer</h1>
+          <p className="text-lg sm:text-xl font-light italic tracking-wide text-center sm:text-left">
+            by{" "}
+            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent font-medium">
+              DATA
+            </span>{" "}
+            and{" "}
+            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent font-medium">
+              AI
+            </span>
+          </p>
         </div>
 
         <form onSubmit={handleSearch} className="space-y-4 mb-8">
@@ -168,7 +161,7 @@ export default function Home() {
 
           <button
             type="submit"
-            className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white font-medium rounded-lg transition-colors"
+            className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium rounded-lg transition-colors min-h-[44px]"
           >
             查询
           </button>
@@ -177,10 +170,10 @@ export default function Home() {
             type="button"
             onClick={handleTrendAnalysis}
             disabled={isAnalyzing}
-            className={`w-full px-4 py-3 font-medium rounded-lg transition-colors ${
+            className={`w-full px-4 py-3 font-medium rounded-lg transition-colors min-h-[44px] ${
               isAnalyzing
                 ? "bg-slate-600 text-slate-400 cursor-not-allowed opacity-50"
-                : "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white"
             }`}
           >
             {isAnalyzing ? "分析中..." : "趋势分析"}
@@ -193,6 +186,20 @@ export default function Home() {
 
         <div className="text-center text-slate-500 text-sm">
           <p>示例代码: 000001 (平安银行), 600000 (浦发银行), 300059 (东方财富)</p>
+        </div>
+
+        <div className="mt-8 pt-8 border-t border-slate-800 flex justify-center">
+          <button
+            onClick={() => {
+              localStorage.removeItem("auth_token");
+              localStorage.removeItem("auth_user");
+              router.push("/login");
+              window.location.reload();
+            }}
+            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-sm rounded-lg transition-colors active:scale-95"
+          >
+            Logout
+          </button>
         </div>
       </div>
 
