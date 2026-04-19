@@ -34,6 +34,8 @@ def _get_mcp_client() -> MultiServerMCPClient:
                 "env": {
                     "MINIMAX_API_KEY": os.environ.get("MINIMAX_API_KEY", ""),
                     "MINIMAX_API_HOST": os.environ.get("MINIMAX_API_HOST", "https://api.minimaxi.com"),
+                    "LANGCHAIN_TRACING": "false",
+                    "LANGSMITH_TRACING": "false",
                 }
             }
         })
