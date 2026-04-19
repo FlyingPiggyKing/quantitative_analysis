@@ -20,6 +20,10 @@ done
 fuser -k 8000/tcp 2>/dev/null || true
 fuser -k 3000/tcp 2>/dev/null || true
 
+# 预安装 MiniMax MCP tool (避免运行时 resolving dependencies)
+echo "Installing minimax-coding-plan-mcp..."
+uv tool install minimax-coding-plan-mcp 2>/dev/null || true
+
 # 启动后端 (FastAPI/uvicorn)
 cd "$SCRIPT_DIR"
 nohup ./backend/.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 > "$SCRIPT_DIR/logs/backend.log" 2>&1 &

@@ -2,7 +2,7 @@
 import os
 import logging
 from dotenv import load_dotenv
-from typing import Dict, Any
+from typing import Dict, Any, Literal
 
 from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
@@ -25,30 +25,40 @@ load_dotenv()
 def search_with_fallback(
     query: str,
     max_results: int = 5,
+    time_range: Literal["day", "week", "month", "year"] = "month",
 ) -> str:
-    """Search the web with automatic fallback from Tavily to MiniMax MCP.
+    """Search the web with automatic fallback from MiniMax MCP to Tavily.
 
-    This tool tries Tavily first (primary), and if it fails or returns no results,
-    automatically falls back to MiniMax MCP search. Use this for stock news
-    and macro environment searches.
+    This tool tries MiniMax MCP first (primary), and if it fails or returns no results,
+    automatically falls back to Tavily search. Use this for stock news
+    and macro environment searches. News results are filtered to the specified time range.
 
     Args:
         query: The search query to look up
         max_results: Maximum number of results to return (default: 5)
+        time_range: Time range for results - "day", "week", "month", or "year" (default: "month")
     """
-    # Try Tavily first (primary search)
-    tavily_result = tavily_search.invoke({"query": query, "max_results": max_results})
+    # Try MiniMax MCP first (primary search)
+    mcp_result = minimax_mcp_search.invoke({
+        "query": query,
+        "max_results": max_results,
+        "time_range": time_range,
+    })
 
-    # Check if Tavily succeeded
-    if tavily_result and "error" not in tavily_result.lower() and tavily_result != "No search results found.":
-        return tavily_result
-
-    # Fallback to MiniMax MCP
-    logger.info("Tavily search failed or returned empty, trying MiniMax MCP...")
-    mcp_result = minimax_mcp_search.invoke({"query": query, "max_results": max_results})
-
+    # Check if MiniMax MCP succeeded
     if mcp_result and "error" not in mcp_result.lower() and mcp_result != "No search results found.":
         return mcp_result
+
+    # Fallback to Tavily
+    logger.info("MiniMax MCP search failed or returned empty, trying Tavily...")
+    tavily_result = tavily_search.invoke({
+        "query": query,
+        "max_results": max_results,
+        "time_range": time_range,
+    })
+
+    if tavily_result and "error" not in tavily_result.lower() and tavily_result != "No search results found.":
+        return tavily_result
 
     # Both failed
     return "No search results available from either source."
@@ -77,8 +87,8 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
 
 2. **Search for stock-specific news**: Use the search_with_fallback tool to search for recent news about the specific stock (symbol and name).
    - Search query format: "[stock name] [stock symbol] recent news"
-   - This will try Tavily first, then MiniMax MCP as fallback
-   - Collect up to 5 recent news items from the past 5 days
+   - This will try MiniMax MCP first, then Tavily as fallback
+   - Collect up to 5 recent news items from the past month
 
 3. **Search for macro environment**: Use the search_with_fallback tool to search for macro factors that might affect the stock:
    - Interest rate trends
