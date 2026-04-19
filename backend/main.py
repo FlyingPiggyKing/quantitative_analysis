@@ -8,7 +8,7 @@ from backend.api import stock, watchlist, trend_prediction, auth, captcha
 # Load .env file from backend directory
 env_path = Path(__file__).parent / ".env"
 if env_path.exists():
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
 
 app = FastAPI(
     title="Stock Analysis API",

@@ -10,7 +10,7 @@ from typing import Optional
 # Load .env before reading environment variables
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
 
 # Tushare token from environment variable
 TUSHARE_TOKEN = os.environ.get("TUSHARE_TOKEN", "")

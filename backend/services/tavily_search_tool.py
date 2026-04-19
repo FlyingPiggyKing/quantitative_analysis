@@ -9,7 +9,7 @@ from langchain.tools import tool
 # Load .env before initializing client
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
 
 tavily_client = TavilyClient(api_key=os.environ.get("TAVILY_API_KEY", ""))
 

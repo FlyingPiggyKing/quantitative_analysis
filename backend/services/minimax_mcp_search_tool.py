@@ -16,7 +16,7 @@ logger = logging.getLogger(__name__)
 # Load .env before initializing
 env_path = Path(__file__).parent.parent / ".env"
 if env_path.exists():
-    load_dotenv(env_path)
+    load_dotenv(env_path, override=True)
 
 # Global client instance
 _mcp_client: Optional[MultiServerMCPClient] = None
@@ -50,9 +50,6 @@ def _search_sync(query: str, max_results: int = 5, time_range: str = "month", re
         retry_count: Number of times to retry on failure (default 2)
     """
     last_error = None
-    api_key = os.environ.get("MINIMAX_API_KEY", "")
-    logger.info(f"MINIMAX_API_KEY present: {bool(api_key)}, length: {len(api_key)}")
-
     for attempt in range(retry_count + 1):
         try:
             client = _get_mcp_client()
