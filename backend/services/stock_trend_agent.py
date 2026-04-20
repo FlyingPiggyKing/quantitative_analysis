@@ -1,6 +1,7 @@
 """Stock trend analysis agent using DeepAgent with Tavily search."""
 import os
 import logging
+from datetime import date
 from dotenv import load_dotenv
 from typing import Dict, Any, Literal
 
@@ -19,6 +20,11 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv(override=True)
+
+
+def get_today_date() -> str:
+    """Return today's date in YYYY-MM-DD format."""
+    return date.today().isoformat()
 
 
 @tool(parse_docstring=True)
@@ -74,7 +80,9 @@ def _get_model():
     )
 
 
-SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to analyze a given stock and predict its price trend for the next 2 weeks based on BOTH technical data AND recent news.
+def get_system_prompt(today_date: str) -> str:
+    """Return the system prompt with today's date injected."""
+    return f"""You are a professional stock analyst agent. Today is {today_date}. Your task is to analyze a given stock and predict its price trend for the next 2 weeks based on BOTH technical data AND recent news.
 
 ## Your Process
 
@@ -119,43 +127,43 @@ SYSTEM_PROMPT = """You are a professional stock analyst agent. Your task is to a
 Your final response MUST be a valid JSON object with these fields. Here is a complete example:
 
 ```json
-{
+{{
     "trend_direction": "up",
     "confidence": 78,
-    "情绪分析": {
+    "情绪分析": {{
         "news": [
-            {
+            {{
                 "title": "药明康德发布2024年业绩预告",
                 "source": "东方财富网",
                 "date": "2024-01-15",
                 "summary": "公司预计2024年净利润同比增长15%-20%，受益于全球生物医药研发外包需求持续增长。"
-            },
-            {
+            }},
+            {{
                 "title": "CXO行业获大行看好",
                 "source": "野村证券",
                 "date": "2024-01-14",
                 "summary": "野村证券发布研报称CXO行业估值具备吸引力，维持药明康德增持评级，目标价108元。"
-            }
+            }}
         ],
         "summary": "市场情绪整体偏多，机构投资者看好CXO行业前景，公司业绩稳健增长提供支撑。"
-    },
-    "技术分析": {
-        "macd": {"value": "0.35/0.28", "signal": "金叉", "interpretation": "MACD在零轴上方形成金叉，短期多头信号明显"},
-        "rsi": {"value": "65.5", "zone": "正常", "interpretation": "RSI处于正常区间，未出现超买超卖"},
-        "ma": {"position": "价格在5日、20日均线上方", "interpretation": "均线多头排列，短期趋势向好"},
-        "volume": {"ratio": "1.3", "interpretation": "成交量放大，市场参与度提升"},
-        "valuation": {"pe": "28.5", "pb": "5.2", "turnover": "2.5%", "interpretation": "估值处于历史中枢偏低位置"}
-    },
-    "趋势判断": {
+    }},
+    "技术分析": {{
+        "macd": {{"value": "0.35/0.28", "signal": "金叉", "interpretation": "MACD在零轴上方形成金叉，短期多头信号明显"}},
+        "rsi": {{"value": "65.5", "zone": "正常", "interpretation": "RSI处于正常区间，未出现超买超卖"}},
+        "ma": {{"position": "价格在5日、20日均线上方", "interpretation": "均线多头排列，短期趋势向好"}},
+        "volume": {{"ratio": "1.3", "interpretation": "成交量放大，市场参与度提升"}},
+        "valuation": {{"pe": "28.5", "pb": "5.2", "turnover": "2.5%", "interpretation": "估值处于历史中枢偏低位置"}}
+    }},
+    "趋势判断": {{
         "forecast": "市场环境\n外围市场整体平稳，美联储降息预期升温，流动性环境有利成长股\n\n技术面分析\nMACD金叉确认，均线多头排列，成交量配合放大，108元一线为近期重要阻力位\n\n短期展望\n预计股价在102-110区间震荡偏强运行，若突破108元可能进一步上探110元",
         "suggestion": "持有",
         "reasoning": "市场环境\n机构看多情绪较高，外资持续流入提供支撑\n\n技术面分析\n技术指标向好，但RSI已接近70，短期可能有回调压力\n\n操作建议\n建议持有为主，逢低可适度加仓，突破108元后考虑加仓"
-    }
-}
+    }}
+}}
 ```
 
 **Key Requirements:**
-1. `forecast` and `reasoning` MUST use exactly 3 paragraphs separated by `\n\n`
+1. `forecast` and `reasoning` MUST use exactly 3 paragraphs separated by `\\n\\n`
 2. Each paragraph has a title (like "市场环境", "技术面分析", "操作建议") followed by content
 3. Use Chinese for all content
 4. Output valid JSON only - no markdown code blocks, no explanatory text
@@ -229,7 +237,7 @@ def create_stock_trend_agent():
 
     agent = create_deep_agent(
         model=model,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=get_system_prompt(get_today_date()),
         tools=[search_with_fallback],
     )
 
