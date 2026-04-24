@@ -43,11 +43,12 @@ class TaskQueue:
         self._tasks: Dict[str, AnalysisTask] = {}
         self._lock = threading.Lock()
 
-    def submit_analysis_task(self, symbols: List[Dict[str, str]]) -> str:
+    def submit_analysis_task(self, symbols: List[Dict[str, str]], force: bool = False) -> str:
         """Submit a batch analysis task.
 
         Args:
             symbols: List of dicts with 'symbol' and 'name' keys
+            force: If False, skip stocks with valid cached results today
 
         Returns:
             task_id: UUID for tracking the task
@@ -61,11 +62,11 @@ class TaskQueue:
                 progress=f"0/{len(symbols)}",
             )
 
-        self._executor.submit(self._run_analysis, task_id, symbols)
+        self._executor.submit(self._run_analysis, task_id, symbols, force)
 
         return task_id
 
-    def _run_analysis(self, task_id: str, symbols: List[Dict[str, str]]):
+    def _run_analysis(self, task_id: str, symbols: List[Dict[str, str]], force: bool = False):
         """Run analysis in background thread."""
         with self._lock:
             task = self._tasks[task_id]
@@ -77,6 +78,18 @@ class TaskQueue:
         for i, stock in enumerate(symbols):
             symbol = stock["symbol"]
             name = stock["name"]
+
+            # Check cache if not forcing
+            if not force:
+                cached = TrendPredictionService.get_today_prediction(symbol)
+                if cached:
+                    logger.info(f"[Task {task_id}] Skipping {name} ({symbol}) - cached result exists")
+                    results.append(cached)
+                    with self._lock:
+                        task = self._tasks[task_id]
+                        task.current = i + 1
+                        task.progress = f"{i + 1}/{len(symbols)}"
+                    continue
 
             try:
                 logger.info(f"[Task {task_id}] Analyzing {name} ({symbol})")
@@ -152,9 +165,9 @@ def get_task_queue() -> TaskQueue:
     return _task_queue
 
 
-def submit_analysis_task(symbols: List[Dict[str, str]]) -> str:
+def submit_analysis_task(symbols: List[Dict[str, str]], force: bool = False) -> str:
     """Submit a batch analysis task to the global queue."""
-    return get_task_queue().submit_analysis_task(symbols)
+    return get_task_queue().submit_analysis_task(symbols, force=force)
 
 
 def get_task_status(task_id: str) -> Optional[AnalysisTask]:

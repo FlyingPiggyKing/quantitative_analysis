@@ -154,3 +154,50 @@ export async function pollTaskStatus(
     poll();
   });
 }
+
+export async function runForcedSingleAnalysis(symbol: string): Promise<TrendPrediction> {
+  const res = await fetch(`${API_BASE}/api/trend-predictions/${symbol}?force=true`, {
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  if (res.status === 429) {
+    const data = await res.json().catch(() => ({}));
+    const retryAfter = data.retry_after || parseInt(res.headers.get("retry_after") || "0", 10);
+    const error = new Error(`Rate limit exceeded. Try again in ${retryAfter} seconds.`) as Error & { retryAfter?: number };
+    error.retryAfter = retryAfter;
+    throw error;
+  }
+  if (!res.ok) {
+    throw new Error("Failed to run forced analysis");
+  }
+  return res.json();
+}
+
+const COOLDOWN_KEY_PREFIX = "analysis_cooldown";
+
+function getCooldownKey(userId: string, symbol: string): string {
+  return `${COOLDOWN_KEY_PREFIX}_${userId}_${symbol}`;
+}
+
+export function setCooldownEndTime(userId: string, symbol: string, endTime: number): void {
+  if (typeof window === "undefined") return;
+  const key = getCooldownKey(userId, symbol);
+  localStorage.setItem(key, endTime.toString());
+}
+
+export function getCooldownEndTime(userId: string, symbol: string): number | null {
+  if (typeof window === "undefined") return null;
+  const key = getCooldownKey(userId, symbol);
+  const value = localStorage.getItem(key);
+  if (value === null) return null;
+  const endTime = parseInt(value, 10);
+  if (isNaN(endTime)) return null;
+  return endTime;
+}
+
+export function clearCooldownEndTime(userId: string, symbol: string): void {
+  if (typeof window === "undefined") return;
+  const key = getCooldownKey(userId, symbol);
+  localStorage.removeItem(key);
+}

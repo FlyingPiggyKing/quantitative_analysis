@@ -41,6 +41,20 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_predictions_symbol_analyzed
             ON predictions(symbol, analyzed_at DESC)
         """)
+
+        # Create user_analysis_triggers table for rate limiting
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS user_analysis_triggers (
+                user_id TEXT NOT NULL,
+                symbol TEXT NOT NULL,
+                triggered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (user_id, symbol)
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_triggers_lookup
+            ON user_analysis_triggers(user_id, symbol, triggered_at)
+        """)
         conn.commit()
     finally:
         conn.close()
@@ -204,6 +218,50 @@ class TrendPredictionService:
             conn.close()
 
     @staticmethod
+    def get_today_prediction(symbol: str) -> Optional[dict]:
+        """Get today's cached prediction for a symbol if it exists and is valid (confidence > 0).
+
+        Returns None if no prediction exists for today or if the existing prediction
+        has confidence = 0 (failed analysis).
+        """
+        import json as json_lib
+        init_db()
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            today = datetime.now().strftime("%Y-%m-%d")
+            row = cursor.execute(
+                """SELECT symbol, name, trend_direction, confidence, summary, analyzed_at, extended_analysis
+                   FROM predictions
+                   WHERE symbol = ? AND date(analyzed_at) = ? AND confidence > 0
+                   ORDER BY analyzed_at DESC
+                   LIMIT 1""",
+                (symbol, today),
+            ).fetchone()
+
+            if row:
+                result = {
+                    "symbol": row["symbol"],
+                    "name": row["name"],
+                    "trend_direction": row["trend_direction"],
+                    "confidence": row["confidence"],
+                    "summary": row["summary"],
+                    "analyzed_at": row["analyzed_at"],
+                }
+                if row["extended_analysis"]:
+                    try:
+                        extended = json_lib.loads(row["extended_analysis"])
+                        result["情绪分析"] = extended.get("情绪分析")
+                        result["技术分析"] = extended.get("技术分析")
+                        result["趋势判断"] = extended.get("趋势判断")
+                    except (json_lib.JSONDecodeError, ValueError):
+                        pass
+                return result
+            return None
+        finally:
+            conn.close()
+
+    @staticmethod
     def get_predictions_by_symbol(symbol: str, limit: int = 7) -> List[dict]:
         """Get recent predictions for a stock (for history/trends)."""
         import json as json_lib
@@ -240,5 +298,74 @@ class TrendPredictionService:
                         pass
                 results.append(result)
             return results
+        finally:
+            conn.close()
+
+    @staticmethod
+    def check_rate_limit(user_id: str, symbol: str) -> bool:
+        """Check if user is rate limited for force analysis on a symbol.
+
+        Returns True if rate limited (within 1 hour of last trigger), False otherwise.
+        """
+        from datetime import timedelta
+        init_db()
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cutoff = (datetime.now() - timedelta(hours=1)).isoformat()
+            row = cursor.execute(
+                """SELECT triggered_at FROM user_analysis_triggers
+                   WHERE user_id = ? AND symbol = ? AND triggered_at >= ?
+                   ORDER BY triggered_at DESC LIMIT 1""",
+                (user_id, symbol, cutoff),
+            ).fetchone()
+            return row is not None
+        finally:
+            conn.close()
+
+    @staticmethod
+    def record_trigger(user_id: str, symbol: str):
+        """Record a force analysis trigger for rate limiting.
+
+        Uses upsert behavior - updates triggered_at if record exists.
+        """
+        init_db()
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cursor.execute(
+                """INSERT INTO user_analysis_triggers (user_id, symbol, triggered_at)
+                   VALUES (?, ?, ?)
+                   ON CONFLICT(user_id, symbol) DO UPDATE SET triggered_at = excluded.triggered_at""",
+                (user_id, symbol, datetime.now().isoformat()),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+
+    @staticmethod
+    def get_rate_limit_remaining_seconds(user_id: str, symbol: str) -> int:
+        """Get seconds until rate limit expires for user/symbol combo.
+
+        Returns 0 if no active cooldown.
+        """
+        from datetime import timedelta
+        init_db()
+        conn = get_db_connection()
+        try:
+            cursor = conn.cursor()
+            cutoff = (datetime.now() - timedelta(hours=1)).isoformat()
+            row = cursor.execute(
+                """SELECT triggered_at FROM user_analysis_triggers
+                   WHERE user_id = ? AND symbol = ? AND triggered_at >= ?
+                   ORDER BY triggered_at DESC LIMIT 1""",
+                (user_id, symbol, cutoff),
+            ).fetchone()
+            if row is None:
+                return 0
+            last_trigger = datetime.fromisoformat(row["triggered_at"])
+            expires_at = last_trigger + timedelta(hours=1)
+            remaining = (expires_at - datetime.now()).total_seconds()
+            return max(0, int(remaining))
         finally:
             conn.close()

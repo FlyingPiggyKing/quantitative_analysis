@@ -8,7 +8,7 @@ import IndicatorPanel from "@/components/IndicatorPanel";
 import TrendAnalysisPanel from "@/components/TrendAnalysisPanel";
 import PETrendSparkline from "@/components/PETrendSparkline";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
-import { getTrendPrediction, TrendPrediction, runBatchAnalysisAsync, pollTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
+import { getTrendPrediction, TrendPrediction, runForcedSingleAnalysis, getCooldownEndTime, setCooldownEndTime } from "@/services/trendPrediction";
 import { fetchStockValuation, ValuationRecord } from "@/services/stock";
 import { useAuth } from "@/services/auth";
 
@@ -55,9 +55,10 @@ export default function StockDetailPage() {
   const [isInWatchlist, setIsInWatchlist] = useState(false);
   const [watchlistLoading, setWatchlistLoading] = useState(false);
   const [trendPrediction, setTrendPrediction] = useState<TrendPrediction | null>(null);
-  const [trendLoading, setTrendLoading] = useState(false);
   const [analysisRunning, setAnalysisRunning] = useState(false);
-  const [taskProgress, setTaskProgress] = useState<string | null>(null);
+  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [cooldownEndTime, setCooldownEndTimeState] = useState<number | null>(null);
+  const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -115,19 +116,18 @@ export default function StockDetailPage() {
     fetchData();
   }, [symbol]);
 
-  // Fetch trend prediction
+  // Fetch existing trend prediction (non-force, just to display cached data)
   useEffect(() => {
     if (!symbol) return;
 
     const fetchTrend = async () => {
-      setTrendLoading(true);
       try {
         const pred = await getTrendPrediction(symbol);
-        setTrendPrediction(pred);
+        if (pred) {
+          setTrendPrediction(pred);
+        }
       } catch (err) {
         console.error("Failed to fetch trend:", err);
-      } finally {
-        setTrendLoading(false);
       }
     };
 
@@ -150,6 +150,43 @@ export default function StockDetailPage() {
     checkStatus();
   }, [symbol, stockInfo]);
 
+  // Initialize cooldown state from localStorage
+  useEffect(() => {
+    if (!symbol || !user) return;
+
+    const storedEndTime = getCooldownEndTime(user.user_id, symbol);
+    if (storedEndTime && storedEndTime > Date.now()) {
+      setCooldownEndTimeState(storedEndTime);
+    } else if (storedEndTime && storedEndTime <= Date.now()) {
+      // Cooldown expired, clear it
+      setCooldownEndTime(user.user_id, symbol, 0);
+    }
+  }, [symbol, user]);
+
+  // Update countdown every second when cooldown is active
+  useEffect(() => {
+    if (!cooldownEndTime) {
+      setCooldownRemaining(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const remaining = cooldownEndTime - Date.now();
+      if (remaining <= 0) {
+        setCooldownRemaining(null);
+        setCooldownEndTimeState(null);
+        return;
+      }
+      const minutes = Math.floor(remaining / 60000);
+      const seconds = Math.floor((remaining % 60000) / 1000);
+      setCooldownRemaining(`${minutes}:${seconds.toString().padStart(2, "0")}`);
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    return () => clearInterval(interval);
+  }, [cooldownEndTime]);
+
   const handleWatchlistToggle = async () => {
     if (!stockInfo) return;
 
@@ -171,45 +208,32 @@ export default function StockDetailPage() {
   };
 
   const handleRunAnalysis = async () => {
-    if (!stockInfo) return;
-
     setAnalysisRunning(true);
-    setTaskProgress(null);
+    setAnalysisError(null);
     try {
-      const response = await runBatchAnalysisAsync();
-      if (!response.task_id) {
-        alert("没有股票需要分析");
-        setAnalysisRunning(false);
-        return;
+      const result = await runForcedSingleAnalysis(symbol);
+      setTrendPrediction(result);
+      // Set cooldown for 1 hour after successful trigger
+      if (user) {
+        const endTime = Date.now() + 60 * 60 * 1000;
+        setCooldownEndTime(user.user_id, symbol, endTime);
+        setCooldownEndTimeState(endTime);
       }
-
-      // Store task ID for progress bar on index page - do this immediately
-      // so user can navigate to index and see progress
-      localStorage.setItem("active_analysis_task_id", response.task_id);
-      localStorage.removeItem("progress_bar_dismissed");
-
-      // Poll status and update button progress
-      pollTaskStatus(
-        response.task_id,
-        (status: TaskStatusResponse) => {
-          setTaskProgress(status.progress);
-        },
-        2000
-      ).then(() => {
-        // Refresh trend prediction after completion
-        getTrendPrediction(symbol).then(setTrendPrediction);
-      }).catch((err) => {
-        console.error("Analysis failed:", err);
-      }).finally(() => {
-        // Clear running state when polling completes
-        setAnalysisRunning(false);
-        setTaskProgress(null);
-        // Clear the stored task ID since analysis is done
-        localStorage.removeItem("active_analysis_task_id");
-      });
     } catch (err) {
       console.error("Failed to run analysis:", err);
-      alert(err instanceof Error ? err.message : "分析失败");
+      const error = err as Error & { retryAfter?: number };
+      if (error.retryAfter) {
+        // Handle rate limit error
+        const endTime = Date.now() + error.retryAfter * 1000;
+        if (user) {
+          setCooldownEndTime(user.user_id, symbol, endTime);
+          setCooldownEndTimeState(endTime);
+        }
+        setAnalysisError(`操作过于频繁，请在 ${error.retryAfter} 秒后重试`);
+      } else {
+        setAnalysisError(err instanceof Error ? err.message : "分析失败");
+      }
+    } finally {
       setAnalysisRunning(false);
     }
   };
@@ -339,22 +363,28 @@ export default function StockDetailPage() {
         </section>
 
         {/* Trend Analysis */}
-        <section className="bg-slate-800 rounded-lg p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-4">
+        <section className="bg-slate-800 rounded-lg p-3 sm:p-4 relative">
+          <div className="flex items-center mb-4">
             <h2 className="text-lg font-medium text-white">趋势分析</h2>
-            {!trendPrediction && !trendLoading && (
-              <button
-                onClick={handleRunAnalysis}
-                disabled={analysisRunning}
-                className="px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm rounded-lg disabled:opacity-50 min-h-[44px]"
-              >
-                {analysisRunning ? (taskProgress ? `分析中... ${taskProgress}` : "分析中...") : "运行分析"}
-              </button>
-            )}
           </div>
 
-          {trendLoading ? (
-            <div className="text-slate-400 text-center py-4">加载中...</div>
+          {/* Force Analysis button - top right corner */}
+          <button
+            onClick={handleRunAnalysis}
+            disabled={analysisRunning || cooldownRemaining !== null}
+            className="absolute top-3 right-3 sm:top-4 sm:right-4 px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm rounded-lg disabled:opacity-50 min-h-[44px]"
+          >
+            {analysisRunning ? "分析中..." : cooldownRemaining ? `剩余 ${cooldownRemaining}` : "立刻分析"}
+          </button>
+
+          {analysisRunning ? (
+            <div className="text-slate-400 text-center py-4">
+              <div className="animate-pulse">分析进行中，请稍候...</div>
+            </div>
+          ) : analysisError ? (
+            <div className="text-red-400 text-center py-4">
+              {analysisError}
+            </div>
           ) : trendPrediction ? (
             <div className="space-y-3">
               <div className="flex items-center gap-4">
