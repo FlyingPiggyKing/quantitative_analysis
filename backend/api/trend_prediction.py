@@ -102,7 +102,9 @@ async def get_prediction(
     returns the cached result without re-analysis.
     If force=true, performs fresh analysis regardless of cache.
     Rate limit: only one force analysis per user per stock per hour.
+    Requires authentication for force=true.
     """
+    user_id = None
     if force:
         # Auth required for force analysis
         from backend.api.auth import get_current_user
@@ -128,8 +130,14 @@ async def get_prediction(
         if cached:
             logger.info(f"Returning cached prediction for {symbol} (force=False)")
             return cached
+        # No cache available and force=false, return error for guests
+        # Authenticated users should use force=true to trigger new analysis
+        raise HTTPException(
+            status_code=404,
+            detail="No prediction available. Please login and use force analysis.",
+        )
 
-    # Look up name from watchlist first
+    # Look up name from watchlist first, fallback to stock info API
     name = symbol
     try:
         from backend.services.watchlist_service import WatchlistService
@@ -140,6 +148,16 @@ async def get_prediction(
                 break
     except Exception:
         pass
+
+    # If name still equals symbol, try to get from stock info API
+    if name == symbol:
+        try:
+            from backend.services.akshare_service import AkshareService
+            stock_info = AkshareService.get_stock_info(symbol)
+            if stock_info and "name" in stock_info and stock_info["name"]:
+                name = stock_info["name"]
+        except Exception:
+            pass
 
     # Run fresh analysis
     prediction = analyze_stock_trend(symbol, name)

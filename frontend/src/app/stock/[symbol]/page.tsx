@@ -7,6 +7,7 @@ import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
 import TrendAnalysisPanel from "@/components/TrendAnalysisPanel";
 import PETrendSparkline from "@/components/PETrendSparkline";
+import AuthModal from "@/components/AuthModal";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
 import { getTrendPrediction, TrendPrediction, runForcedSingleAnalysis, getCooldownEndTime, setCooldownEndTime } from "@/services/trendPrediction";
 import { fetchStockValuation, ValuationRecord } from "@/services/stock";
@@ -59,13 +60,10 @@ export default function StockDetailPage() {
   const [analysisError, setAnalysisError] = useState<string | null>(null);
   const [cooldownEndTime, setCooldownEndTimeState] = useState<number | null>(null);
   const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null);
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [authModalMessage, setAuthModalMessage] = useState("");
 
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
+  // Allow guest access - no redirect to login
 
   useEffect(() => {
     const fetchData = async () => {
@@ -134,9 +132,9 @@ export default function StockDetailPage() {
     fetchTrend();
   }, [symbol]);
 
-  // Check watchlist status
+  // Check watchlist status (only for authenticated users)
   useEffect(() => {
-    if (!symbol || !stockInfo) return;
+    if (!symbol || !stockInfo || !user) return;
 
     const checkStatus = async () => {
       try {
@@ -148,7 +146,7 @@ export default function StockDetailPage() {
     };
 
     checkStatus();
-  }, [symbol, stockInfo]);
+  }, [symbol, stockInfo, user]);
 
   // Initialize cooldown state from localStorage
   useEffect(() => {
@@ -190,6 +188,13 @@ export default function StockDetailPage() {
   const handleWatchlistToggle = async () => {
     if (!stockInfo) return;
 
+    // Show auth modal for guests
+    if (!user) {
+      setAuthModalMessage("登录后即可添加自选股");
+      setShowAuthModal(true);
+      return;
+    }
+
     setWatchlistLoading(true);
     try {
       if (isInWatchlist) {
@@ -208,6 +213,13 @@ export default function StockDetailPage() {
   };
 
   const handleRunAnalysis = async () => {
+    // Show auth modal for guests
+    if (!user) {
+      setAuthModalMessage("登录后即可使用趋势分析功能");
+      setShowAuthModal(true);
+      return;
+    }
+
     setAnalysisRunning(true);
     setAnalysisError(null);
     try {
@@ -456,6 +468,12 @@ export default function StockDetailPage() {
           </section>
         )}
       </main>
+
+      <AuthModal
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
+        message={authModalMessage}
+      />
     </div>
   );
 }

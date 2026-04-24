@@ -2,7 +2,9 @@
 
 import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import WatchList from "@/components/WatchList";
+import PresetStockList from "@/components/PresetStockList";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
 import { getTaskStatus, runBatchAnalysisAsync, TaskStatusResponse } from "@/services/trendPrediction";
 import { useAuth } from "@/services/auth";
@@ -29,13 +31,6 @@ export default function Home() {
       router.push(`/stock/${symbol.trim()}`);
     }
   };
-
-  // Redirect to login if not authenticated
-  useEffect(() => {
-    if (!isLoading && !user) {
-      router.push("/login");
-    }
-  }, [user, isLoading, router]);
 
   // Check for active task on mount
   useEffect(() => {
@@ -115,17 +110,13 @@ export default function Home() {
     }
   }, []);
 
-  // Show loading or redirect
+  // Show loading state
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
         <div className="text-white">Loading...</div>
       </div>
     );
-  }
-
-  if (!user) {
-    return null;
   }
 
   // Show progress bar if there's an active task and not dismissed
@@ -166,41 +157,55 @@ export default function Home() {
             查询
           </button>
 
-          <button
-            type="button"
-            onClick={handleTrendAnalysis}
-            disabled={isAnalyzing}
-            className={`w-full px-4 py-3 font-medium rounded-lg transition-colors min-h-[44px] ${
-              isAnalyzing
-                ? "bg-slate-600 text-slate-400 cursor-not-allowed opacity-50"
-                : "bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white"
-            }`}
-          >
-            {isAnalyzing ? "分析中..." : "趋势分析"}
-          </button>
+          {user && (
+            <button
+              type="button"
+              onClick={handleTrendAnalysis}
+              disabled={isAnalyzing}
+              className={`w-full px-4 py-3 font-medium rounded-lg transition-colors min-h-[44px] ${
+                isAnalyzing
+                  ? "bg-slate-600 text-slate-400 cursor-not-allowed opacity-50"
+                  : "bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white"
+              }`}
+            >
+              {isAnalyzing ? "分析中..." : "趋势分析"}
+            </button>
+          )}
         </form>
 
         <div className="mb-8">
-          <WatchList key={refreshTrigger} />
+          {user ? (
+            <WatchList key={refreshTrigger} />
+          ) : (
+            <PresetStockList />
+          )}
         </div>
 
-        <div className="text-center text-slate-500 text-sm">
-          <p>示例代码: 000001 (平安银行), 600000 (浦发银行), 300059 (东方财富)</p>
-        </div>
-
-        <div className="mt-8 pt-8 border-t border-slate-800 flex justify-center">
-          <button
-            onClick={() => {
-              localStorage.removeItem("auth_token");
-              localStorage.removeItem("auth_user");
-              router.push("/login");
-              window.location.reload();
-            }}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-sm rounded-lg transition-colors active:scale-95"
-          >
-            Logout
-          </button>
-        </div>
+        {user ? (
+          <div className="mt-8 pt-8 border-t border-slate-800 flex justify-center">
+            <button
+              onClick={() => {
+                localStorage.removeItem("auth_token");
+                localStorage.removeItem("auth_user");
+                router.push("/login");
+                window.location.reload();
+              }}
+              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-sm rounded-lg transition-colors active:scale-95"
+            >
+              Logout
+            </button>
+          </div>
+        ) : (
+          <div className="mt-8 pt-8 border-t border-slate-800 text-center">
+            <p className="text-slate-500 text-sm mb-4">登录后可以添加自选股和查看更多功能</p>
+            <Link
+              href="/login"
+              className="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+            >
+              登录 / 注册
+            </Link>
+          </div>
+        )}
       </div>
 
       {showProgressBar && <AnalysisProgressBar progress={taskProgress} onDismiss={handleDismiss} onClearTask={handleClearTask} />}
