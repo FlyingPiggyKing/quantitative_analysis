@@ -154,12 +154,12 @@ export default function StockDetailPage() {
   useEffect(() => {
     if (!symbol || !user) return;
 
-    const storedEndTime = getCooldownEndTime(user.user_id, symbol);
+    const storedEndTime = getCooldownEndTime(String(user.id), symbol);
     if (storedEndTime && storedEndTime > Date.now()) {
       setCooldownEndTimeState(storedEndTime);
     } else if (storedEndTime && storedEndTime <= Date.now()) {
       // Cooldown expired, clear it
-      setCooldownEndTime(user.user_id, symbol, 0);
+      setCooldownEndTime(String(user.id), symbol, 0);
     }
   }, [symbol, user]);
 
@@ -216,7 +216,7 @@ export default function StockDetailPage() {
       // Set cooldown for 1 hour after successful trigger
       if (user) {
         const endTime = Date.now() + 60 * 60 * 1000;
-        setCooldownEndTime(user.user_id, symbol, endTime);
+        setCooldownEndTime(String(user.id), symbol, endTime);
         setCooldownEndTimeState(endTime);
       }
     } catch (err) {
@@ -226,7 +226,7 @@ export default function StockDetailPage() {
         // Handle rate limit error
         const endTime = Date.now() + error.retryAfter * 1000;
         if (user) {
-          setCooldownEndTime(user.user_id, symbol, endTime);
+          setCooldownEndTime(String(user.id), symbol, endTime);
           setCooldownEndTimeState(endTime);
         }
         setAnalysisError(`操作过于频繁，请在 ${error.retryAfter} 秒后重试`);
