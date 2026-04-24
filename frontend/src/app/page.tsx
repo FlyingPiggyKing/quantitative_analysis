@@ -197,10 +197,18 @@ export default function Home() {
           </div>
         ) : (
           <div className="mt-8 pt-8 border-t border-slate-800 text-center">
-            <p className="text-slate-500 text-sm mb-4">登录后可以添加自选股和查看更多功能</p>
+            <div className="bg-gradient-to-r from-slate-800/50 via-slate-800 to-slate-800/50 rounded-xl p-6 mb-6 border border-slate-700/50">
+              <div className="flex items-center justify-center gap-2 mb-2">
+                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                </svg>
+                <span className="text-lg font-medium text-white">升级您的投资体验</span>
+              </div>
+              <p className="text-slate-400 text-sm">登录后可以添加自选股和查看更多功能</p>
+            </div>
             <Link
               href="/login"
-              className="inline-block px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg transition-colors"
+              className="inline-block px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all hover:shadow-lg hover:shadow-blue-500/25 active:scale-95"
             >
               登录 / 注册
             </Link>

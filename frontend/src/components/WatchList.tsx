@@ -46,30 +46,34 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
           console.error("Failed to fetch predictions:", err);
         }
 
-        // Fetch valuation data for each stock
+        // Fetch valuation data for all stocks in a single batch request
         const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
         const valMap: Record<string, ValuationData> = {};
-        await Promise.all(
-          data.items.map(async (item) => {
-            try {
-              const res = await fetch(`${API_BASE}/api/stock/${item.symbol}/valuation?days=90`);
-              const valData = await res.json();
-              if (valData.latest) {
-                valMap[item.symbol] = {
-                  pe: valData.latest.pe_ttm,
-                  pb: valData.latest.pb,
-                  turnover_rate: valData.latest.turnover_rate,
-                  pe_history: (valData.data || []).map((r: { trade_date: string; pe_ttm: number | null }) => ({
-                    date: r.trade_date,
-                    pe: r.pe_ttm,
-                  })),
-                };
-              }
-            } catch (err) {
-              console.error(`Failed to fetch valuation for ${item.symbol}:`, err);
+        try {
+          const symbols = data.items.map((item) => item.symbol).join(",");
+          const res = await fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=90`);
+          const batchData = await res.json();
+          // Process results
+          for (const valData of batchData.results || []) {
+            if (valData.latest) {
+              valMap[valData.symbol] = {
+                pe: valData.latest.pe_ttm,
+                pb: valData.latest.pb,
+                turnover_rate: valData.latest.turnover_rate,
+                pe_history: (valData.data || []).map((r: { trade_date: string; pe_ttm: number | null }) => ({
+                  date: r.trade_date,
+                  pe: r.pe_ttm,
+                })),
+              };
             }
-          })
-        );
+          }
+          // Log errors for debugging but don't fail - partial data is acceptable
+          if (batchData.errors && batchData.errors.length > 0) {
+            console.warn("Some valuations failed to load:", batchData.errors);
+          }
+        } catch (err) {
+          console.error("Failed to fetch batch valuation:", err);
+        }
         setValuations(valMap);
       } catch (err) {
         console.error("Failed to fetch watchlist:", err);

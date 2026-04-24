@@ -5,7 +5,7 @@ from dotenv import load_dotenv
 import tushare as ts
 import pandas as pd
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 # Load .env before reading environment variables
 env_path = Path(__file__).parent.parent / ".env"
@@ -273,6 +273,62 @@ class AkshareService:
             }
         except Exception as e:
             return {"symbol": symbol, "error": str(e)}
+
+    @staticmethod
+    def get_daily_basic_batch(symbols: List[str], days: int = 30) -> dict:
+        """Get daily basic metrics for multiple symbols in a single batch request.
+
+        Makes one API call per symbol concurrently in the backend to reduce
+        frontend-to-backend latency from N requests to 1.
+        """
+        import concurrent.futures
+
+        results = []
+        errors = []
+
+        def fetch_single(symbol: str) -> dict:
+            return AkshareService.get_daily_basic(symbol, days)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_symbol = {executor.submit(fetch_single, s): s for s in symbols}
+            for future in concurrent.futures.as_completed(future_to_symbol):
+                symbol = future_to_symbol[future]
+                try:
+                    data = future.result()
+                    if "error" in data:
+                        errors.append({"symbol": symbol, "error": data["error"]})
+                    else:
+                        results.append(data)
+                except Exception as e:
+                    errors.append({"symbol": symbol, "error": str(e)})
+
+        return {"results": results, "errors": errors}
+
+    @staticmethod
+    def get_stock_info_batch(symbols: List[str]) -> dict:
+        """Get basic stock information for multiple symbols in a single batch request."""
+        import concurrent.futures
+
+        results = []
+        errors = []
+
+        def fetch_single(symbol: str) -> dict:
+            return AkshareService.get_stock_info(symbol)
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=10) as executor:
+            future_to_symbol = {executor.submit(fetch_single, s): s for s in symbols}
+            for future in concurrent.futures.as_completed(future_to_symbol):
+                symbol = future_to_symbol[future]
+                try:
+                    data = future.result()
+                    if "error" in data:
+                        errors.append({"symbol": symbol, "error": data["error"]})
+                    else:
+                        results.append(data)
+                except Exception as e:
+                    errors.append({"symbol": symbol, "error": str(e)})
+
+        return {"results": results, "errors": errors}
 
     @staticmethod
     def get_valuation_data(symbol: str, days: int = 100) -> dict:

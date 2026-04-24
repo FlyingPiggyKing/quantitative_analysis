@@ -30,41 +30,66 @@ export default function PresetStockList() {
     const fetchPresetStocks = async () => {
       setLoading(true);
 
-      const results = await Promise.all(
-        PRESET_STOCKS.map(async (stock) => {
-          try {
-            const [infoRes, valRes] = await Promise.all([
-              fetch(`${API_BASE}/api/stock/${stock.symbol}`),
-              fetch(`${API_BASE}/api/stock/${stock.symbol}/valuation?days=30`),
-            ]);
+      try {
+        // Fetch info and valuation in batch for all preset stocks
+        const symbols = PRESET_STOCKS.map((s) => s.symbol).join(",");
 
-            const infoData = await infoRes.json();
-            const valData = await valRes.json();
+        const [infoRes, valRes] = await Promise.all([
+          fetch(`${API_BASE}/api/stock/batch/info?symbols=${symbols}`),
+          fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=30`),
+        ]);
 
-            return {
-              info: infoData,
-              valuation: valData.latest
-                ? {
-                    pe: valData.latest.pe_ttm,
-                    pb: valData.latest.pb,
-                    turnover_rate: valData.latest.turnover_rate,
-                  }
-                : null,
-              loading: false,
-            };
-          } catch (err) {
-            console.error(`Failed to fetch ${stock.symbol}:`, err);
-            return {
-              info: { symbol: stock.symbol, name: stock.name, error: "数据加载失败" },
-              valuation: null,
-              loading: false,
-            };
-          }
-        })
-      );
+        const infoData = await infoRes.json();
+        const valData = await valRes.json();
 
-      setStocks(results);
-      setLoading(false);
+        // Build info lookup
+        const infoMap: Record<string, any> = {};
+        for (const item of infoData.results || []) {
+          infoMap[item.symbol] = item;
+        }
+        for (const err of infoData.errors || []) {
+          console.warn(`Failed to fetch info for ${err.symbol}:`, err.error);
+        }
+
+        // Build valuation lookup
+        const valMap: Record<string, any> = {};
+        for (const item of valData.results || []) {
+          valMap[item.symbol] = item;
+        }
+        for (const err of valData.errors || []) {
+          console.warn(`Failed to fetch valuation for ${err.symbol}:`, err.error);
+        }
+
+        // Combine results
+        const results = PRESET_STOCKS.map((stock) => {
+          const info = infoMap[stock.symbol] || { symbol: stock.symbol, name: stock.name };
+          const val = valMap[stock.symbol];
+          return {
+            info,
+            valuation: val?.latest
+              ? {
+                  pe: val.latest.pe_ttm,
+                  pb: val.latest.pb,
+                  turnover_rate: val.latest.turnover_rate,
+                }
+              : null,
+            loading: false,
+          };
+        });
+
+        setStocks(results);
+      } catch (err) {
+        console.error("Failed to fetch preset stocks:", err);
+        setStocks(
+          PRESET_STOCKS.map((stock) => ({
+            info: { symbol: stock.symbol, name: stock.name, error: "数据加载失败" },
+            valuation: null,
+            loading: false,
+          }))
+        );
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchPresetStocks();
