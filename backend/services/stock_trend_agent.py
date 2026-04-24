@@ -1,5 +1,6 @@
 """Stock trend analysis agent using DeepAgent with Tavily search."""
 import os
+import sys
 import logging
 from datetime import date
 from dotenv import load_dotenv
@@ -20,6 +21,103 @@ logger = logging.getLogger(__name__)
 
 # Load environment variables
 load_dotenv(override=True)
+
+MAX_RETRIES = 2  # Total 3 attempts (initial + 2 retries)
+
+
+def _extract_json_object(content: str) -> str | None:
+    """Extract the first complete JSON object from content using bracket counting."""
+    import re
+    import sys
+
+    print(f"[DEBUG] Input content length: {len(content)}", file=sys.stderr, flush=True)
+    print(f"[DEBUG] Content starts with: {content[:100]}", file=sys.stderr, flush=True)
+
+    # Remove <think>... markers BEFORE extraction to avoid false braces inside thinking
+    cleaned = re.sub(r'<think>.*?</think>', '', content, flags=re.DOTALL)
+    print(f"[DEBUG] After stripping markers, length: {len(cleaned)}", file=sys.stderr, flush=True)
+    print(f"[DEBUG] Cleaned starts with: {cleaned[:100]}", file=sys.stderr, flush=True)
+
+    # Find the first '{'
+    start = cleaned.find('{')
+    if start == -1:
+        print(f"[DEBUG] No '{{' found in cleaned content", file=sys.stderr, flush=True)
+        return None
+
+    print(f"[DEBUG] Found '{{' at position {start}", file=sys.stderr, flush=True)
+
+    # Count brackets to find the matching closing '}'
+    depth = 0
+    in_string = False
+    escape_next = False
+    i = start
+
+    while i < len(cleaned):
+        c = cleaned[i]
+
+        if escape_next:
+            escape_next = False
+            i += 1
+            continue
+
+        if c == '\\':
+            escape_next = True
+            i += 1
+            continue
+
+        if c == '"' and not escape_next:
+            in_string = not in_string
+            i += 1
+            continue
+
+        if in_string:
+            i += 1
+            continue
+
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                result = cleaned[start:i+1]
+                print(f"[DEBUG] Found complete JSON at positions {start}-{i}, length {len(result)}", file=sys.stderr, flush=True)
+                print(f"[DEBUG] JSON preview: {result[:200]}", file=sys.stderr, flush=True)
+                return result
+
+        i += 1
+
+    print(f"[DEBUG] Bracket counting finished without finding closing '}}'. Final depth={depth}, in_string={in_string}", file=sys.stderr, flush=True)
+    print(f"[DEBUG] Content around end: {cleaned[max(0,len(cleaned)-100):]}", file=sys.stderr, flush=True)
+    return None
+
+
+def _is_valid_prediction(prediction: dict) -> bool:
+    """Check if prediction dict has the required fields from the LLM."""
+    # Note: 'symbol', 'name', 'summary' are added by analyze_stock_trend, not the LLM
+    # The LLM only guarantees 'trend_direction' and 'confidence'
+    required_fields = ['trend_direction', 'confidence']
+    return all(field in prediction and prediction[field] is not None for field in required_fields)
+
+
+def _parse_agent_output(content: str, symbol: str, name: str) -> dict | None:
+    """Extract and parse JSON from agent output. Returns None if parsing fails."""
+    import json
+
+    # Extract JSON using bracket counting (handles embedded thinking markers)
+    json_str = _extract_json_object(content)
+    if not json_str:
+        return None
+
+    try:
+        prediction = json.loads(json_str)
+        # Validate required fields
+        if not _is_valid_prediction(prediction):
+            print(f"[DEBUG] _is_valid_prediction failed. Fields present: {list(prediction.keys())}", file=sys.stderr, flush=True)
+            return None
+        return prediction
+    except json.JSONDecodeError as e:
+        print(f"[DEBUG] JSON decode error: {e}", file=sys.stderr, flush=True)
+        return None
 
 
 def get_today_date() -> str:
@@ -73,7 +171,7 @@ def search_with_fallback(
 def _get_model():
     """Initialize the MiniMax ChatOpenAI model."""
     return ChatOpenAI(
-        model="MiniMax-M2.7",
+        model="MiniMax-M2.7-highspeed",
         openai_api_key=os.environ.get("MINIMAX_API_KEY"),
         openai_api_base="https://api.minimax.chat/v1",
         temperature=0,
@@ -312,36 +410,31 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
 然后基于搜索结果，给出你的预测。
 """
 
-    try:
-        logger.info(f"Invoking agent for {symbol}...")
-        result = agent.invoke({
-            "messages": [{"role": "user", "content": user_message}]
-        })
-        logger.info(f"Agent invocation complete for {symbol}")
+    # Step 3: Invoke agent with retry logic
+    attempt = 0
+    last_error_content = None
 
-        messages = result.get("messages", [])
-        if not messages:
-            return {
-                "symbol": symbol,
-                "name": name,
-                "trend_direction": "neutral",
-                "confidence": 0,
-                "summary": f"分析失败：无法获取响应{technical_data_note}",
-            }
+    while attempt <= MAX_RETRIES:
+        try:
+            logger.info(f"Invoking agent for {symbol} (attempt {attempt + 1}/{MAX_RETRIES + 1})...")
+            result = agent.invoke({
+                "messages": [{"role": "user", "content": user_message}]
+            })
+            logger.info(f"Agent invocation complete for {symbol}")
 
-        # Get the final response
-        final_msg = messages[-1]
-        content = final_msg.content
+            messages = result.get("messages", [])
+            if not messages:
+                logger.warning(f"No messages returned for {symbol}, attempt {attempt + 1}")
+                last_error_content = "No messages returned"
+                attempt += 1
+                continue
 
-        # Try to parse as JSON
-        import json
-        import re
+            final_msg = messages[-1]
+            content = final_msg.content
 
-        # Look for JSON in the response
-        json_match = re.search(r'\{.*\}', content, re.DOTALL)
-        if json_match:
-            try:
-                prediction = json.loads(json_match.group())
+            # Try to parse with marker stripping and validation
+            prediction = _parse_agent_output(content, symbol, name)
+            if prediction:
                 # Return the full structured response with backward-compatible fields
                 return {
                     "symbol": symbol,
@@ -353,44 +446,26 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
                     "技术分析": prediction.get("技术分析"),
                     "趋势判断": prediction.get("趋势判断"),
                 }
-            except json.JSONDecodeError:
-                pass
 
-        # Fallback: try to extract original fields if structured parsing fails
-        fallback_match = re.search(r'"trend_direction"\s*:\s*"([^"]+)"', content)
-        fallback_confidence = re.search(r'"confidence"\s*:\s*(\d+)', content)
-        if fallback_match:
-            try:
-                return {
-                    "symbol": symbol,
-                    "name": name,
-                    "trend_direction": fallback_match.group(1),
-                    "confidence": int(fallback_confidence.group(1)) if fallback_confidence else 0,
-                    "summary": content[:500] if content else "无法解析分析结果",
-                    "情绪分析": None,
-                    "技术分析": None,
-                    "趋势判断": None,
-                }
-            except (json.JSONDecodeError, ValueError):
-                pass
+            # Parsing failed, log and retry
+            logger.warning(f"Failed to parse agent output for {symbol}, attempt {attempt + 1}. Content preview: {content[:200]}")
+            last_error_content = content
+            attempt += 1
 
-        # If all parsing fails, return the content as summary
-        return {
-            "symbol": symbol,
-            "name": name,
-            "trend_direction": "neutral",
-            "confidence": 0,
-            "summary": content[:500] if content else "无法解析分析结果",
-            "情绪分析": None,
-            "技术分析": None,
-            "趋势判断": None,
-        }
+        except Exception as e:
+            logger.error(f"Agent invocation error for {symbol}, attempt {attempt + 1}: {e}")
+            last_error_content = str(e)
+            attempt += 1
 
-    except Exception as e:
-        return {
-            "symbol": symbol,
-            "name": name,
-            "trend_direction": "neutral",
-            "confidence": 0,
-            "summary": f"分析错误: {str(e)}",
-        }
+    # All retries exhausted
+    logger.error(f"All {MAX_RETRIES + 1} attempts failed for {symbol}. Last error: {last_error_content}")
+    return {
+        "symbol": symbol,
+        "name": name,
+        "trend_direction": "neutral",
+        "confidence": 0,
+        "summary": "Analysis could not produce valid output after retries. Please try again later.",
+        "情绪分析": None,
+        "技术分析": None,
+        "趋势判断": None,
+    }

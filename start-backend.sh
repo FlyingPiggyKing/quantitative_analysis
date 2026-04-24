@@ -7,5 +7,8 @@ cd "$(dirname "$0")"
 # export https_proxy=http://127.0.0.1:10887
 # export http_proxy=http://127.0.0.1:10887
 
+# Set PYTHONPATH so 'backend' module can be imported
+export PYTHONPATH="$(pwd)"
+
 # Start backend using the virtual environment
-./backend/.venv/bin/python -m uvicorn backend.main:app --port 8000 "$@"
+./backend/.venv/bin/python -m uvicorn backend.main:app --host 0.0.0.0 --port 8000 "$@"

@@ -75,13 +75,26 @@ class TrendPredictionService:
             ).fetchone()
 
             if existing:
-                # Update existing
-                cursor.execute(
-                    """UPDATE predictions
-                       SET trend_direction = ?, confidence = ?, summary = ?, analyzed_at = ?, extended_analysis = ?
-                       WHERE symbol = ? AND date(analyzed_at) = ?""",
-                    (trend_direction, confidence, summary, analyzed_at, extended_json, symbol, today),
-                )
+                # Only update if new result is better (higher confidence or non-neutral when existing is neutral)
+                # Don't overwrite successful results with failures
+                existing_confidence = cursor.execute(
+                    "SELECT confidence FROM predictions WHERE symbol = ? AND date(analyzed_at) = ?",
+                    (symbol, today),
+                ).fetchone()[0]
+
+                should_update = True
+                if confidence == 0 and existing_confidence > 0:
+                    # Don't overwrite a valid result with a failure
+                    should_update = False
+                    logger.info(f"Skipping update for {symbol} - existing confidence {existing_confidence} is better than new {confidence}")
+
+                if should_update:
+                    cursor.execute(
+                        """UPDATE predictions
+                           SET trend_direction = ?, confidence = ?, summary = ?, analyzed_at = ?, extended_analysis = ?
+                           WHERE symbol = ? AND date(analyzed_at) = ?""",
+                        (trend_direction, confidence, summary, analyzed_at, extended_json, symbol, today),
+                    )
             else:
                 # Insert new
                 cursor.execute(
