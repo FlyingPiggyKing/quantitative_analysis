@@ -216,11 +216,14 @@ export default function PresetStockList() {
                 <span className="text-blue-400 font-medium">{info.symbol}</span>
                 <span className="text-white ml-2">{info.name || info.symbol}</span>
               </div>
-              {predictions[info.symbol] ? (
-                <TrendIndicator prediction={predictions[info.symbol]} />
-              ) : (
-                <span className="text-slate-500 text-sm">-</span>
-              )}
+              <div className="text-right">
+                <div className="text-slate-500 text-xs mb-1">AI下周走势</div>
+                {predictions[info.symbol] ? (
+                  <TrendIndicator prediction={predictions[info.symbol]} />
+                ) : (
+                  <span className="text-slate-500 text-sm">-</span>
+                )}
+              </div>
             </div>
             <div className="flex items-center gap-4 text-sm text-slate-400">
               <div>
