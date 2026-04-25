@@ -52,6 +52,7 @@ export interface TrendPrediction {
   confidence: number;
   summary: string;
   analyzed_at: string;
+  is_fallback?: boolean;
   情绪分析?: SentimentAnalysis | null;
   技术分析?: TechnicalAnalysis | null;
   趋势判断?: TrendJudgment | null;

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { PRESET_STOCKS } from "@/config/presetStocks";
+import { TrendPrediction, getTrendPredictions } from "@/services/trendPrediction";
 
 interface StockInfo {
   symbol: string;
@@ -20,11 +21,36 @@ interface ValuationData {
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+function TrendIndicator({ prediction }: { prediction: TrendPrediction }) {
+  const { trend_direction, confidence } = prediction;
+
+  if (trend_direction === "up") {
+    return (
+      <span className="text-emerald-400">
+        ↑ {confidence}%
+      </span>
+    );
+  } else if (trend_direction === "down") {
+    return (
+      <span className="text-red-400">
+        ↓ {confidence}%
+      </span>
+    );
+  } else {
+    return (
+      <span className="text-slate-400">
+        - {confidence}%
+      </span>
+    );
+  }
+}
+
 export default function PresetStockList() {
   const [stocks, setStocks] = useState<
     Array<{ info: StockInfo; valuation: ValuationData | null; loading: boolean }>
   >([]);
   const [loading, setLoading] = useState(true);
+  const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
 
   useEffect(() => {
     const fetchPresetStocks = async () => {
@@ -34,13 +60,21 @@ export default function PresetStockList() {
         // Fetch info and valuation in batch for all preset stocks
         const symbols = PRESET_STOCKS.map((s) => s.symbol).join(",");
 
-        const [infoRes, valRes] = await Promise.all([
+        const [infoRes, valRes, predRes] = await Promise.all([
           fetch(`${API_BASE}/api/stock/batch/info?symbols=${symbols}`),
           fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=30`),
+          getTrendPredictions(),
         ]);
 
         const infoData = await infoRes.json();
         const valData = await valRes.json();
+
+        // Build predictions lookup
+        const predMap: Record<string, TrendPrediction> = {};
+        for (const pred of predRes) {
+          predMap[pred.symbol] = pred;
+        }
+        setPredictions(predMap);
 
         // Build info lookup
         const infoMap: Record<string, any> = {};
@@ -120,6 +154,7 @@ export default function PresetStockList() {
               <th className="text-right py-2 px-3">市盈率(PE)</th>
               <th className="text-right py-2 px-3">市净率(PB)</th>
               <th className="text-right py-2 px-3">换手率</th>
+              <th className="text-right py-2 px-3">AI下周预测</th>
             </tr>
           </thead>
           <tbody>
@@ -155,6 +190,13 @@ export default function PresetStockList() {
                     ? `${valuation.turnover_rate.toFixed(2)}%`
                     : "-"}
                 </td>
+                <td className="py-2 px-3 text-right">
+                  {predictions[info.symbol] ? (
+                    <TrendIndicator prediction={predictions[info.symbol]} />
+                  ) : (
+                    <span className="text-slate-500">-</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>
@@ -174,6 +216,11 @@ export default function PresetStockList() {
                 <span className="text-blue-400 font-medium">{info.symbol}</span>
                 <span className="text-white ml-2">{info.name || info.symbol}</span>
               </div>
+              {predictions[info.symbol] ? (
+                <TrendIndicator prediction={predictions[info.symbol]} />
+              ) : (
+                <span className="text-slate-500 text-sm">-</span>
+              )}
             </div>
             <div className="flex items-center gap-4 text-sm text-slate-400">
               <div>

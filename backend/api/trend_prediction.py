@@ -29,6 +29,7 @@ class PredictionResponse(BaseModel):
     confidence: int
     summary: str
     analyzed_at: str
+    is_fallback: bool = False
     情绪分析: Optional[dict] = None
     技术分析: Optional[dict] = None
     趋势判断: Optional[dict] = None
@@ -129,9 +130,15 @@ async def get_prediction(
         cached = TrendPredictionService.get_today_prediction(symbol)
         if cached:
             logger.info(f"Returning cached prediction for {symbol} (force=False)")
+            cached["is_fallback"] = False
             return cached
-        # No cache available and force=false, return error for guests
-        # Authenticated users should use force=true to trigger new analysis
+        # No prediction for today — fall back to most recent prediction
+        latest = TrendPredictionService.get_latest_prediction(symbol)
+        if latest:
+            logger.info(f"No today's prediction for {symbol}, falling back to latest from {latest.get('analyzed_at')}")
+            latest["is_fallback"] = True
+            return latest
+        # No predictions at all
         raise HTTPException(
             status_code=404,
             detail="No prediction available. Please login and use force analysis.",
@@ -178,6 +185,7 @@ async def get_prediction(
         summary=prediction.get("summary", ""),
         extended_analysis=extended_analysis,
     )
+    saved["is_fallback"] = False
     return saved
 
 
