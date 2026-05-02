@@ -7,6 +7,7 @@ const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 export interface WatchlistItem {
   symbol: string;
   name: string;
+  market: "A" | "US";
   added_at: string;
 }
 
@@ -36,16 +37,28 @@ async function fetchWithAuth(url: string, options: RequestInit = {}) {
   return res;
 }
 
-export async function getWatchlist(page: number = 1, pageSize: number = 10): Promise<WatchlistResponse> {
-  const res = await fetchWithAuth(`${API_BASE}/api/watchlist?page=${page}&page_size=${pageSize}`);
+export async function getWatchlist(
+  page: number = 1,
+  pageSize: number = 10,
+  market?: "A" | "US"
+): Promise<WatchlistResponse> {
+  let url = `${API_BASE}/api/watchlist?page=${page}&page_size=${pageSize}`;
+  if (market) {
+    url += `&market=${market}`;
+  }
+  const res = await fetchWithAuth(url);
   return res.json();
 }
 
-export async function addToWatchlist(symbol: string, name: string): Promise<WatchlistItem> {
+export async function addToWatchlist(
+  symbol: string,
+  name: string,
+  market: "A" | "US" = "A"
+): Promise<WatchlistItem> {
   const res = await fetchWithAuth(`${API_BASE}/api/watchlist`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ symbol, name }),
+    body: JSON.stringify({ symbol, name, market }),
   });
   return res.json();
 }

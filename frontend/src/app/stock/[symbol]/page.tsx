@@ -201,7 +201,7 @@ export default function StockDetailPage() {
         await removeFromWatchlist(symbol);
         setIsInWatchlist(false);
       } else {
-        await addToWatchlist(symbol, stockInfo.name || symbol);
+        await addToWatchlist(symbol, stockInfo.name || symbol, stockInfo.market as "A" | "US" || "A");
         setIsInWatchlist(true);
       }
     } catch (err) {

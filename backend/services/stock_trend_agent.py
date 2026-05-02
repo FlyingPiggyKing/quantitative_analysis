@@ -13,7 +13,7 @@ from langsmith import traceable
 
 from backend.services.tavily_search_tool import tavily_search
 from backend.services.minimax_mcp_search_tool import minimax_mcp_search
-from backend.services.akshare_service import AkshareService
+from backend.services.akshare_service import AShareService, USStockService, AkshareService, calculate_indicators, _is_us_stock_symbol
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -178,9 +178,25 @@ def _get_model():
     )
 
 
-def get_system_prompt(today_date: str) -> str:
+def get_system_prompt(today_date: str, market: str = "A") -> str:
     """Return the system prompt with today's date injected."""
+    if market == "US":
+        market_context = """## US Stock Market Context
+- Currency: USD (美元)
+- Exchanges: NYSE, NASDAQ
+- Trading hours: 9:30 AM - 4:00 PM EST (Eastern Time)
+- Key indices: S&P 500, NASDAQ Composite, Dow Jones Industrial Average
+"""
+    else:
+        market_context = """## A-Share Market Context
+- Currency: CNY (人民币)
+- Exchanges: Shanghai Stock Exchange (SSE), Shenzhen Stock Exchange (SZSE)
+- Trading hours: 9:30 AM - 3:00 PM CST (China Standard Time)
+"""
+
     return f"""You are a professional stock analyst agent. Today is {today_date}. Your task is to analyze a given stock and predict its price trend for the next 2 weeks based on BOTH technical data AND recent news.
+
+{market_context}
 
 ## Your Process
 
@@ -268,9 +284,10 @@ Your final response MUST be a valid JSON object with these fields. Here is a com
 """
 
 
-def format_data_context(recent_prices: list, indicators: dict, valuation_data: dict = None) -> str:
+def format_data_context(recent_prices: list, indicators: dict, valuation_data: dict = None, market: str = "A") -> str:
     """Format quantitative data as readable text for LLM context."""
     lines = []
+    currency = "USD" if market == "US" else "CNY"
 
     # Recent price trend
     if recent_prices:
@@ -278,7 +295,7 @@ def format_data_context(recent_prices: list, indicators: dict, valuation_data: d
         last = recent_prices[-1]
         change = ((last['close'] - first['close']) / first['close']) * 100
         lines.append(f"近10日走势: 从{first['close']}到{last['close']}, 涨跌幅{change:.2f}%")
-        lines.append(f"最新收盘价: {last['close']}, 最高: {last['high']}, 最低: {last['low']}")
+        lines.append(f"最新收盘价: {last['close']} {currency}, 最高: {last['high']}, 最低: {last['low']}")
 
         # Volume trend
         avg_vol = sum(p['volume'] for p in recent_prices) / len(recent_prices)
@@ -329,13 +346,13 @@ def format_data_context(recent_prices: list, indicators: dict, valuation_data: d
     return "\n".join(lines)
 
 
-def create_stock_trend_agent():
+def create_stock_trend_agent(market: str = "A"):
     """Create a DeepAgent for stock trend analysis with fallback search tools."""
     model = _get_model()
 
     agent = create_deep_agent(
         model=model,
-        system_prompt=get_system_prompt(get_today_date()),
+        system_prompt=get_system_prompt(get_today_date(), market),
         tools=[search_with_fallback],
     )
 
@@ -347,36 +364,43 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     """Analyze stock trend using DeepAgent with fallback search.
 
     Uses Tavily as primary search with MiniMax MCP as fallback when
-    Tavily is unavailable.
+    Tavily is unavailable. Automatically routes to USStockService for US stocks.
 
     Args:
-        symbol: Stock symbol (e.g., "000001")
-        name: Stock name (e.g., "平安银行")
+        symbol: Stock symbol (e.g., "000001" for A-share, "GOOGL" for US)
+        name: Stock name (e.g., "平安银行" or "Google")
 
     Returns:
         Dictionary containing trend_direction, confidence, and summary
     """
-    logger.info(f"Starting trend analysis for {name} ({symbol})")
+    # Determine market and select appropriate service
+    is_us = _is_us_stock_symbol(symbol)
+    market = "US" if is_us else "A"
+
+    if is_us:
+        stock_service = USStockService
+        logger.info(f"Starting US stock trend analysis for {name} ({symbol})")
+    else:
+        stock_service = AShareService
+        logger.info(f"Starting A-share trend analysis for {name} ({symbol})")
 
     # Step 1: Fetch K-line data and technical indicators
     kline_data = []
     indicators = {}
-    technical_data_note = ""
 
     try:
-        kline_result = AkshareService.get_kline_data(symbol, days=60)
+        kline_result = stock_service.get_kline_data(symbol, days=60)
         kline_data = kline_result.get("data", [])
 
         if kline_data:
-            indicators = AkshareService.calculate_indicators(kline_data)
+            indicators = calculate_indicators(kline_data)
     except Exception as e:
         logger.warning(f"Failed to fetch technical data for {symbol}: {e}")
-        technical_data_note = "（技术数据不可用）"
 
     # Fetch valuation metrics (PE TTM, PB, turnover rate)
     valuation_data = None
     try:
-        valuation_result = AkshareService.get_daily_basic(symbol, days=30)
+        valuation_result = stock_service.get_daily_basic(symbol, days=30)
         if "error" not in valuation_result:
             valuation_data = valuation_result
     except Exception as e:
@@ -386,10 +410,10 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     data_context = ""
     if kline_data and indicators and not indicators.get("error"):
         recent_prices = kline_data[-10:] if len(kline_data) >= 10 else kline_data
-        data_context = format_data_context(recent_prices, indicators, valuation_data)
+        data_context = format_data_context(recent_prices, indicators, valuation_data, market)
 
     # Step 3: Build user message
-    agent = create_stock_trend_agent()
+    agent = create_stock_trend_agent(market)
     logger.info(f"Agent created for {symbol}, invoking...")
 
     if data_context:

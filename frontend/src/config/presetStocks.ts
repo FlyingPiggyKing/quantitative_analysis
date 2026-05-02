@@ -8,4 +8,14 @@ export const PRESET_STOCKS = [
   { symbol: "600938", name: "中海油服" },
 ] as const;
 
+// US preset stocks for guest users
+export const US_PRESET_STOCKS = [
+  { symbol: "GOOGL", name: "谷歌" },
+  { symbol: "MSFT", name: "微软" },
+  { symbol: "NVDA", name: "英伟达" },
+  { symbol: "TSLA", name: "特斯拉" },
+  { symbol: "KO", name: "可口可乐" },
+] as const;
+
 export type PresetStock = typeof PRESET_STOCKS[number];
+export type USPresetStock = typeof US_PRESET_STOCKS[number];
