@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect, useRef, ReactNode } from "react";
 import Link from "next/link";
 import { PRESET_STOCKS, US_PRESET_STOCKS } from "@/config/presetStocks";
 import { TrendPrediction, getTrendPredictions } from "@/services/trendPrediction";
@@ -203,8 +203,13 @@ function ASharePresetList() {
   const [valMap, setValMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    // Guard against React 19 double-invoke in dev mode
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
     const fetchData = async () => {
       setLoading(true);
       try {
@@ -274,8 +279,13 @@ function USPresetList() {
   const [valMap, setValMap] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
+  const fetchedRef = useRef(false);
 
   useEffect(() => {
+    // Guard against React 19 double-invoke in dev mode
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
     const fetchData = async () => {
       setLoading(true);
       try {

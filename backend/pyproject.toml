@@ -10,6 +10,7 @@ dependencies = [
     "pydantic>=2.5.3",
     "pandas>=2.1.4",
     "tushare>=1.4.29",
+    "yfinance>=0.2.40",
     "python-dotenv>=1.0.0",
     "langchain>=1.0.0",
     "langchain-openai>=1.0.0",

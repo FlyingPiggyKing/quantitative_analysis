@@ -88,6 +88,8 @@ export default function StockDetailPage() {
         if (infoData.error) {
           const errorMsg = infoData.error.includes("Connection") || infoData.error.includes("Remote")
             ? `数据源连接失败，请稍后重试`
+            : infoData.error.includes("Rate limited")
+            ? `数据源请求过于频繁，请稍后再试`
             : `股票 ${symbol} 未找到`;
           setError(errorMsg);
           setLoading(false);
