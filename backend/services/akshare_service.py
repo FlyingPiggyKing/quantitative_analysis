@@ -24,6 +24,13 @@ _yf_proxy = os.environ.get("YF_PROXY")
 logger.info(f"[PROXY] YF_PROXY={_yf_proxy}")
 logger.info(f"[PROXY] Tushare: NO PROXY (direct connection to China)")
 
+# Set NO_PROXY to exclude services that should NOT use proxy
+# This is read from .env or uses a sensible default
+_no_proxy = os.environ.get("NO_PROXY", "api.smith.langchain.com,api.minimaxi.com,api.tavily.com,tavily.dev,localhost,127.0.0.1")
+os.environ["NO_PROXY"] = _no_proxy
+os.environ["no_proxy"] = _no_proxy
+logger.info(f"[PROXY] NO_PROXY={_no_proxy}")
+
 # Import yfinance AFTER dotenv is loaded
 import yfinance as yf
 from yfinance.exceptions import YFRateLimitError
