@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, ReactNode } from "react";
 import Link from "next/link";
 import { PRESET_STOCKS, US_PRESET_STOCKS } from "@/config/presetStocks";
-import { TrendPrediction, getTrendPredictions } from "@/services/trendPrediction";
+import { TrendPrediction, getTrendPredictions, fetchWithTimeout } from "@/services/trendPrediction";
 import StockMarketTabs from "./StockMarketTabs";
 
 interface StockInfo {
@@ -198,69 +198,80 @@ function PresetTable({ stocks, infoMap, valMap, predictions }: PresetTableProps)
   );
 }
 
-function ASharePresetList() {
+export function ASharePresetList() {
   const [infoMap, setInfoMap] = useState<Record<string, StockInfo>>({});
   const [valMap, setValMap] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [valLoading, setValLoading] = useState(true);
+  const [predLoading, setPredLoading] = useState(true);
   const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
   const fetchedRef = useRef(false);
 
   useEffect(() => {
-    // Guard against React 19 double-invoke in dev mode
     if (fetchedRef.current) return;
     fetchedRef.current = true;
 
     const fetchData = async () => {
-      setLoading(true);
       try {
         const symbols = PRESET_STOCKS.map((s) => s.symbol).join(",");
 
-        const [infoRes, valRes, predRes] = await Promise.all([
-          fetch(`${API_BASE}/api/stock/batch/info?symbols=${symbols}`),
-          fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=30`),
-          getTrendPredictions(),
-        ]);
+        const infoRes = await fetch(`${API_BASE}/api/stock/batch/info?symbols=${symbols}`);
+        const valRes = await fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=30`);
 
-        const infoData = await infoRes.json();
-        const valData = await valRes.json();
+        // Process info data
+        if (infoRes.ok) {
+          const infoData = await infoRes.json();
+          const iMap: Record<string, any> = {};
+          for (const item of infoData.results || []) {
+            iMap[item.symbol] = item;
+          }
+          for (const err of infoData.errors || []) {
+            console.warn(`Failed to fetch info for ${err.symbol}:`, err.error);
+          }
+          setInfoMap(iMap);
+        }
+        setInfoLoading(false);
 
-        // Build predictions lookup
-        const predMap: Record<string, TrendPrediction> = {};
-        for (const pred of predRes) {
-          predMap[pred.symbol] = pred;
+        // Process valuation data
+        if (valRes.ok) {
+          const valData = await valRes.json();
+          const vMap: Record<string, any> = {};
+          for (const item of valData.results || []) {
+            vMap[item.symbol] = item;
+          }
+          for (const err of valData.errors || []) {
+            console.warn(`Failed to fetch valuation for ${err.symbol}:`, err.error);
+          }
+          setValMap(vMap);
         }
-        setPredictions(predMap);
+        setValLoading(false);
 
-        // Build info lookup
-        const iMap: Record<string, any> = {};
-        for (const item of infoData.results || []) {
-          iMap[item.symbol] = item;
+        // Fetch predictions with timeout (non-blocking)
+        setPredLoading(true);
+        const predRes = await fetchWithTimeout(getTrendPredictions(), 5000);
+        if (predRes) {
+          const predMap: Record<string, TrendPrediction> = {};
+          for (const pred of predRes) {
+            predMap[pred.symbol] = pred;
+          }
+          setPredictions(predMap);
         }
-        for (const err of infoData.errors || []) {
-          console.warn(`Failed to fetch info for ${err.symbol}:`, err.error);
-        }
-        setInfoMap(iMap);
-
-        // Build valuation lookup
-        const vMap: Record<string, any> = {};
-        for (const item of valData.results || []) {
-          vMap[item.symbol] = item;
-        }
-        for (const err of valData.errors || []) {
-          console.warn(`Failed to fetch valuation for ${err.symbol}:`, err.error);
-        }
-        setValMap(vMap);
+        setPredLoading(false);
       } catch (err) {
         console.error("Failed to fetch A-share preset stocks:", err);
-      } finally {
-        setLoading(false);
+        setInfoLoading(false);
+        setValLoading(false);
+        setPredLoading(false);
       }
     };
 
     fetchData();
   }, []);
 
-  if (loading) {
+  // Display stock data when info and val are loaded, regardless of predictions
+  const isDataLoading = infoLoading || valLoading;
+
+  if (isDataLoading) {
     return <div className="text-slate-400 text-center py-4">加载中...</div>;
   }
 
@@ -274,69 +285,80 @@ function ASharePresetList() {
   );
 }
 
-function USPresetList() {
+export function USPresetList() {
   const [infoMap, setInfoMap] = useState<Record<string, StockInfo>>({});
   const [valMap, setValMap] = useState<Record<string, any>>({});
-  const [loading, setLoading] = useState(true);
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [valLoading, setValLoading] = useState(true);
+  const [predLoading, setPredLoading] = useState(true);
   const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
   const fetchedRef = useRef(false);
 
   useEffect(() => {
-    // Guard against React 19 double-invoke in dev mode
     if (fetchedRef.current) return;
     fetchedRef.current = true;
 
     const fetchData = async () => {
-      setLoading(true);
       try {
         const symbols = US_PRESET_STOCKS.map((s) => s.symbol).join(",");
 
-        const [infoRes, valRes, predRes] = await Promise.all([
-          fetch(`${API_BASE}/api/stock/batch/info?symbols=${symbols}`),
-          fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=30`),
-          getTrendPredictions(),
-        ]);
+        const infoRes = await fetch(`${API_BASE}/api/stock/batch/info?symbols=${symbols}`);
+        const valRes = await fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=30`);
 
-        const infoData = await infoRes.json();
-        const valData = await valRes.json();
+        // Process info data
+        if (infoRes.ok) {
+          const infoData = await infoRes.json();
+          const iMap: Record<string, any> = {};
+          for (const item of infoData.results || []) {
+            iMap[item.symbol] = item;
+          }
+          for (const err of infoData.errors || []) {
+            console.warn(`Failed to fetch info for ${err.symbol}:`, err.error);
+          }
+          setInfoMap(iMap);
+        }
+        setInfoLoading(false);
 
-        // Build predictions lookup
-        const predMap: Record<string, TrendPrediction> = {};
-        for (const pred of predRes) {
-          predMap[pred.symbol] = pred;
+        // Process valuation data
+        if (valRes.ok) {
+          const valData = await valRes.json();
+          const vMap: Record<string, any> = {};
+          for (const item of valData.results || []) {
+            vMap[item.symbol] = item;
+          }
+          for (const err of valData.errors || []) {
+            console.warn(`Failed to fetch valuation for ${err.symbol}:`, err.error);
+          }
+          setValMap(vMap);
         }
-        setPredictions(predMap);
+        setValLoading(false);
 
-        // Build info lookup
-        const iMap: Record<string, any> = {};
-        for (const item of infoData.results || []) {
-          iMap[item.symbol] = item;
+        // Fetch predictions with timeout (non-blocking)
+        setPredLoading(true);
+        const predRes = await fetchWithTimeout(getTrendPredictions(), 5000);
+        if (predRes) {
+          const predMap: Record<string, TrendPrediction> = {};
+          for (const pred of predRes) {
+            predMap[pred.symbol] = pred;
+          }
+          setPredictions(predMap);
         }
-        for (const err of infoData.errors || []) {
-          console.warn(`Failed to fetch info for ${err.symbol}:`, err.error);
-        }
-        setInfoMap(iMap);
-
-        // Build valuation lookup
-        const vMap: Record<string, any> = {};
-        for (const item of valData.results || []) {
-          vMap[item.symbol] = item;
-        }
-        for (const err of valData.errors || []) {
-          console.warn(`Failed to fetch valuation for ${err.symbol}:`, err.error);
-        }
-        setValMap(vMap);
+        setPredLoading(false);
       } catch (err) {
         console.error("Failed to fetch US preset stocks:", err);
-      } finally {
-        setLoading(false);
+        setInfoLoading(false);
+        setValLoading(false);
+        setPredLoading(false);
       }
     };
 
     fetchData();
   }, []);
 
-  if (loading) {
+  // Display stock data when info and val are loaded, regardless of predictions
+  const isDataLoading = infoLoading || valLoading;
+
+  if (isDataLoading) {
     return <div className="text-slate-400 text-center py-4">加载中...</div>;
   }
 

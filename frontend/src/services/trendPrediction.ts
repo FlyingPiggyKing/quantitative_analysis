@@ -88,6 +88,13 @@ export async function getTrendPredictions(): Promise<TrendPrediction[]> {
   return res.json();
 }
 
+export async function fetchWithTimeout<T>(promise: Promise<T>, timeoutMs: number): Promise<T | null> {
+  const timeoutPromise = new Promise<T | null>((resolve) =>
+    setTimeout(() => resolve(null), timeoutMs)
+  );
+  return Promise.race([promise, timeoutPromise]);
+}
+
 export async function getTrendPrediction(symbol: string): Promise<TrendPrediction | null> {
   const res = await fetch(`${API_BASE}/api/trend-predictions/${symbol}`);
   if (res.status === 404) {
