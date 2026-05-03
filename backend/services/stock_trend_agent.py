@@ -3,6 +3,7 @@ import os
 import sys
 import logging
 import requests
+import xml.etree.ElementTree as ET
 from datetime import date
 from dotenv import load_dotenv
 from typing import Dict, Any, Literal
