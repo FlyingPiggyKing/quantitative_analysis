@@ -2,6 +2,7 @@
 import os
 import sys
 import logging
+import requests
 from datetime import date
 from dotenv import load_dotenv
 from typing import Dict, Any, Literal
@@ -123,6 +124,100 @@ def _parse_agent_output(content: str, symbol: str, name: str) -> dict | None:
 def get_today_date() -> str:
     """Return today's date in YYYY-MM-DD format."""
     return date.today().isoformat()
+
+
+def fetch_yahoo_finance_rss(symbol: str, proxy_url: str = None) -> list:
+    """Fetch Yahoo Finance RSS feed for a given stock symbol.
+
+    Args:
+        symbol: Stock symbol (e.g., "EBAY", "GOOGL")
+        proxy_url: Optional proxy URL (e.g., "http://127.0.0.1:10887")
+
+    Returns:
+        List of dicts with: title, description, link, pubDate
+        Returns empty list if fetch fails.
+    """
+    import xml.etree.ElementTree as ET
+    import requests
+
+    url = f"https://feeds.finance.yahoo.com/rss/2.0/headline?s={symbol}&region=US&lang=en-US"
+
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36"
+    }
+
+    try:
+        proxies = {"http": proxy_url, "https": proxy_url} if proxy_url else None
+        response = requests.get(url, headers=headers, proxies=proxies, timeout=15)
+
+        if response.status_code != 200:
+            logger.warning(f"Yahoo Finance RSS returned status {response.status_code} for {symbol}")
+            return []
+
+        # Parse XML
+        root = ET.fromstring(response.content)
+        items = []
+
+        for item in root.findall(".//item"):
+            title = _get_element_text(item, "title")
+            description = _get_element_text(item, "description")
+            link = _get_element_text(item, "link")
+            pub_date = _get_element_text(item, "pubDate")
+
+            if title:
+                items.append({
+                    "title": title,
+                    "description": description or "",
+                    "link": link or "",
+                    "pubDate": pub_date or ""
+                })
+
+        # Sort by date descending (newest first)
+        items.sort(key=lambda x: x["pubDate"] or "", reverse=True)
+        logger.info(f"Fetched {len(items)} RSS items for {symbol}")
+        return items
+
+    except Exception as e:
+        logger.warning(f"Failed to fetch Yahoo Finance RSS for {symbol}: {e}")
+        return []
+
+
+def _get_element_text(element: ET.Element, tag: str) -> str:
+    """Get text content from XML element."""
+    child = element.find(tag)
+    return child.text.strip() if child is not None and child.text else ""
+
+
+def _format_rss_news_for_agent(rss_items: list, name: str, symbol: str) -> str:
+    """Format RSS news items for Agent consumption.
+
+    Args:
+        rss_items: List of RSS item dicts with title, description, link, pubDate
+        name: Stock name
+        symbol: Stock symbol
+
+    Returns:
+        Formatted string for Agent prompt
+    """
+    lines = []
+    for i, item in enumerate(rss_items, 1):
+        title = item.get("title", "")
+        description = item.get("description", "")
+        pub_date = item.get("pubDate", "")
+
+        # Clean description (remove HTML tags if any)
+        import re
+        description = re.sub(r'<[^>]+>', '', description)
+        description = description.strip() if description else ""
+
+        lines.append(f"新闻 {i}: {title}")
+        if description:
+            lines.append(f"摘要: {description[:200]}...")
+        if pub_date:
+            lines.append(f"日期: {pub_date}")
+        lines.append("")
+
+    return "\n".join(lines)
 
 
 @tool(parse_docstring=True)
@@ -412,26 +507,73 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
         recent_prices = kline_data[-10:] if len(kline_data) >= 10 else kline_data
         data_context = format_data_context(recent_prices, indicators, valuation_data, market)
 
-    # Step 3: Build user message
+    # Step 3: Build user message based on market
     agent = create_stock_trend_agent(market)
     logger.info(f"Agent created for {symbol}, invoking...")
 
-    if data_context:
-        user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势。
+    today_date = get_today_date()
+
+    if market == "US":
+        # US stocks: Use Yahoo Finance RSS + MiniMax search workflow
+        proxy_url = os.environ.get("YF_PROXY")
+        rss_items = fetch_yahoo_finance_rss(symbol, proxy_url)
+
+        if rss_items:
+            # RSS succeeded - use RSS + MiniMax workflow
+            logger.info(f"RSS returned {len(rss_items)} items for {symbol}")
+
+            # Format RSS items for user message
+            rss_news_text = _format_rss_news_for_agent(rss_items, name, symbol)
+
+            if data_context:
+                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
 
 ## 技术数据
 {data_context}
 
-请使用 search_with_fallback 工具搜索最新新闻，然后结合以上技术数据给出预测。
+## Yahoo Finance 最新新闻列表
+{rss_news_text}
+
+请根据以上新闻列表，选取最重要的5条新闻（根据与 {name} 的相关性和时效性），然后使用 search_with_fallback 工具分别搜索每条新闻获取更多详情，最后结合技术数据和新闻给出预测。
+"""
+            else:
+                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+## Yahoo Finance 最新新闻列表
+{rss_news_text}
+
+请根据以上新闻列表，选取最重要的5条新闻（根据与 {name} 的相关性和时效性），然后使用 search_with_fallback 工具分别搜索每条新闻获取更多详情，最后给出预测。
+"""
+        else:
+            # RSS failed - fall back to existing search
+            logger.warning(f"RSS fetch failed for {symbol}, using fallback search")
+            if data_context:
+                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+## 技术数据
+{data_context}
+
+请使用 search_with_fallback 工具优先搜索 Yahoo Finance (site:finance.yahoo.com) 关于 {name} ({symbol}) 的新闻，再搜索今天 '{today_date}' 最新新闻，然后结合以上技术数据给出预测。
+"""
+            else:
+                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+请使用 search_with_fallback 工具优先搜索 Yahoo Finance (site:finance.yahoo.com) 关于 {name} ({symbol}) 的新闻。
 """
     else:
-        user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势。
+        # A-shares: use existing generic search logic (unchanged)
+        if data_context:
+            user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
 
-请使用 search_with_fallback 工具搜索：
-1. 关于 {name} ({symbol}) 的最新新闻
-2. 相关的宏观经济和行业信息
+## 技术数据
+{data_context}
 
-然后基于搜索结果，给出你的预测。
+请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻，然后结合以上技术数据给出预测。
+"""
+        else:
+            user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻。
 """
 
     # Step 3: Invoke agent with retry logic
