@@ -227,6 +227,37 @@ interface MarketWatchlistProps {
   onPageSizeChange: (size: number) => void;
 }
 
+async function fetchValuationByMarket(
+  apiBase: string,
+  symbols: string[]
+): Promise<Record<string, ValuationData>> {
+  if (symbols.length === 0) return {};
+  const valMap: Record<string, ValuationData> = {};
+  try {
+    const res = await fetch(`${apiBase}/api/stock/batch/valuation?symbols=${symbols.join(",")}&days=90`);
+    const batchData = await res.json();
+    for (const valData of batchData.results || []) {
+      if (valData.latest) {
+        valMap[valData.symbol] = {
+          pe: valData.latest.pe_ttm,
+          pb: valData.latest.pb,
+          turnover_rate: valData.latest.turnover_rate,
+          pe_history: (valData.data || []).map((r: { trade_date: string; pe_ttm: number | null }) => ({
+            date: r.trade_date,
+            pe: r.pe_ttm,
+          })),
+        };
+      }
+    }
+    if (batchData.errors && batchData.errors.length > 0) {
+      console.warn("Some valuations failed to load:", batchData.errors);
+    }
+  } catch (err) {
+    console.error("Failed to fetch valuation:", err);
+  }
+  return valMap;
+}
+
 function MarketWatchlist({
   market,
   page,
@@ -264,8 +295,10 @@ function MarketWatchlist({
 export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }: WatchListProps) {
   const [aShareItems, setAShareItems] = useState<WatchlistItem[]>([]);
   const [usItems, setUsItems] = useState<WatchlistItem[]>([]);
-  const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
-  const [valuations, setValuations] = useState<Record<string, ValuationData>>({});
+  const [aSharePredictions, setASharePredictions] = useState<Record<string, TrendPrediction>>({});
+  const [usPredictions, setUsPredictions] = useState<Record<string, TrendPrediction>>({});
+  const [aShareValuations, setAShareValuations] = useState<Record<string, ValuationData>>({});
+  const [usValuations, setUsValuations] = useState<Record<string, ValuationData>>({});
   const [loading, setLoading] = useState(true);
   const [aSharePage, setASharePage] = useState(1);
   const [usPage, setUsPage] = useState(1);
@@ -290,45 +323,44 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
         setUsItems(usData.items);
         setUsTotalPages(usData.total_pages);
 
-        // Fetch trend predictions
-        try {
-          const preds = await getTrendPredictions();
-          const predMap: Record<string, TrendPrediction> = {};
-          preds.forEach((p) => {
-            predMap[p.symbol] = p;
-          });
-          setPredictions(predMap);
-        } catch (err) {
-          console.error("Failed to fetch predictions:", err);
+        // Extract symbols by market
+        const aShareSymbols = aShareData.items.map(item => item.symbol);
+        const usSymbols = usData.items.map(item => item.symbol);
+
+        // Fetch valuations independently using Promise.allSettled
+        const [aShareValResult, usValResult] = await Promise.allSettled([
+          fetchValuationByMarket(API_BASE, aShareSymbols),
+          fetchValuationByMarket(API_BASE, usSymbols),
+        ]);
+
+        if (aShareValResult.status === "fulfilled") {
+          setAShareValuations(aShareValResult.value);
+        }
+        if (usValResult.status === "fulfilled") {
+          setUsValuations(usValResult.value);
         }
 
-        // Fetch all symbols for batch valuation
-        const allSymbols = [...aShareData.items, ...usData.items].map(item => item.symbol);
-        if (allSymbols.length > 0) {
-          const valMap: Record<string, ValuationData> = {};
-          try {
-            const res = await fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${allSymbols.join(",")}&days=90`);
-            const batchData = await res.json();
-            for (const valData of batchData.results || []) {
-              if (valData.latest) {
-                valMap[valData.symbol] = {
-                  pe: valData.latest.pe_ttm,
-                  pb: valData.latest.pb,
-                  turnover_rate: valData.latest.turnover_rate,
-                  pe_history: (valData.data || []).map((r: { trade_date: string; pe_ttm: number | null }) => ({
-                    date: r.trade_date,
-                    pe: r.pe_ttm,
-                  })),
-                };
-              }
+        // Fetch all predictions (API doesn't support filtering by symbols)
+        // Split by market client-side
+        try {
+          const allPreds = await getTrendPredictions();
+          const aSharePredMap: Record<string, TrendPrediction> = {};
+          const usPredMap: Record<string, TrendPrediction> = {};
+          // Use aShareItems and usItems which were set earlier in this function
+          const aShareSet = new Set(aShareData.items.map(i => i.symbol));
+          const usSet = new Set(usData.items.map(i => i.symbol));
+          allPreds.forEach((p) => {
+            if (aShareSet.has(p.symbol)) {
+              aSharePredMap[p.symbol] = p;
             }
-            if (batchData.errors && batchData.errors.length > 0) {
-              console.warn("Some valuations failed to load:", batchData.errors);
+            if (usSet.has(p.symbol)) {
+              usPredMap[p.symbol] = p;
             }
-          } catch (err) {
-            console.error("Failed to fetch batch valuation:", err);
-          }
-          setValuations(valMap);
+          });
+          setASharePredictions(aSharePredMap);
+          setUsPredictions(usPredMap);
+        } catch (err) {
+          console.error("Failed to fetch predictions:", err);
         }
       } catch (err) {
         console.error("Failed to fetch watchlist:", err);
@@ -372,8 +404,8 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
       pageSize={pageSize}
       totalPages={aShareTotalPages}
       items={aShareItems}
-      valuations={valuations}
-      predictions={predictions}
+      valuations={aShareValuations}
+      predictions={aSharePredictions}
       onPageChange={handleASharePageChange}
       onPageSizeChange={handlePageSizeChange}
     />
@@ -386,8 +418,8 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
       pageSize={pageSize}
       totalPages={usTotalPages}
       items={usItems}
-      valuations={valuations}
-      predictions={predictions}
+      valuations={usValuations}
+      predictions={usPredictions}
       onPageChange={handleUsPageChange}
       onPageSizeChange={handlePageSizeChange}
     />
