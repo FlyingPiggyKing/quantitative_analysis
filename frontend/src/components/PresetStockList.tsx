@@ -359,7 +359,7 @@ export function USPresetList() {
   const isDataLoading = infoLoading || valLoading;
 
   if (isDataLoading) {
-    return <div className="text-slate-400 text-center py-4">加载中...</div>;
+    return <div className="text-slate-400 text-center py-4">{"美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中..."}</div>;
   }
 
   return (

@@ -252,10 +252,16 @@ export default function StockDetailPage() {
     }
   };
 
+  // Determine if US stock based on symbol pattern
+  const isUSStock = !symbol.match(/^\d{6}$/);
+  const loadingMessage = isUSStock
+    ? "美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中..."
+    : "加载中...";
+
   if (loading || isLoading) {
     return (
       <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-lg">加载中...</div>
+        <div className="text-white text-lg">{loadingMessage}</div>
       </div>
     );
   }

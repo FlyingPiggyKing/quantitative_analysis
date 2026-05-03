@@ -355,9 +355,12 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
   };
 
   if (loading) {
+    const loadingMessage = activeTab === "US"
+      ? "美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中..."
+      : "加载中...";
     return (
       <div className="bg-slate-800 rounded-lg p-4">
-        <div className="text-slate-400 text-center">加载中...</div>
+        <div className="text-slate-400 text-center">{loadingMessage}</div>
       </div>
     );
   }
