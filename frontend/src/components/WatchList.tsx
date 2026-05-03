@@ -16,6 +16,8 @@ interface ValuationData {
 
 interface WatchListProps {
   refreshTrigger?: number;
+  activeTab?: "A" | "US";
+  onTabChange?: (tab: "A" | "US") => void;
 }
 
 interface StockTableProps {
@@ -259,7 +261,7 @@ function MarketWatchlist({
   );
 }
 
-export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
+export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }: WatchListProps) {
   const [aShareItems, setAShareItems] = useState<WatchlistItem[]>([]);
   const [usItems, setUsItems] = useState<WatchlistItem[]>([]);
   const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
@@ -391,7 +393,12 @@ export default function WatchList({ refreshTrigger = 0 }: WatchListProps) {
   return (
     <div>
       <h2 className="text-lg font-medium text-white mb-4">我的自选</h2>
-      <StockMarketTabs aShareContent={aShareContent} usContent={usContent} />
+      <StockMarketTabs
+        aShareContent={aShareContent}
+        usContent={usContent}
+        activeTab={activeTab}
+        onTabChange={onTabChange}
+      />
     </div>
   );
 }

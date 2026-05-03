@@ -147,7 +147,7 @@ export default function Home() {
               type="text"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-              placeholder={stockTab === "A" ? "输入股票代码，如 000001" : "输入美股代码，如：MSFT"}
+              placeholder={stockTab === "A" ? "输入股票代码，如 000001" : "输入美股代码，如 MSFT"}
               className="w-full px-4 py-3 text-lg bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -177,7 +177,11 @@ export default function Home() {
 
         <div className="mb-8">
           {user ? (
-            <WatchList key={refreshTrigger} />
+            <WatchList
+              key={refreshTrigger}
+              activeTab={stockTab}
+              onTabChange={setStockTab}
+            />
           ) : (
             <StockMarketTabs
               aShareContent={<ASharePresetList />}
