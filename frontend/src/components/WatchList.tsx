@@ -217,6 +217,7 @@ function Pagination({ page, pageSize, totalPages, onPageChange, onPageSizeChange
 
 interface MarketWatchlistProps {
   market: "A" | "US";
+  loading: boolean;
   page: number;
   pageSize: number;
   totalPages: number;
@@ -233,8 +234,10 @@ async function fetchValuationByMarket(
 ): Promise<Record<string, ValuationData>> {
   if (symbols.length === 0) return {};
   const valMap: Record<string, ValuationData> = {};
+  console.log(`[Valuation] Sending request for ${symbols.join(",")} at`, new Date().toISOString());
   try {
     const res = await fetch(`${apiBase}/api/stock/batch/valuation?symbols=${symbols.join(",")}&days=90`);
+    console.log(`[Valuation] Received response for ${symbols.join(",")} at`, new Date().toISOString());
     const batchData = await res.json();
     for (const valData of batchData.results || []) {
       if (valData.latest) {
@@ -260,6 +263,7 @@ async function fetchValuationByMarket(
 
 function MarketWatchlist({
   market,
+  loading,
   page,
   pageSize,
   totalPages,
@@ -271,6 +275,17 @@ function MarketWatchlist({
 }: MarketWatchlistProps) {
   // Filter items by market
   const marketItems = items.filter(item => item.market === market);
+
+  if (loading) {
+    const loadingMessage = market === "US"
+      ? "美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中..."
+      : "加载中...";
+    return (
+      <div className="bg-slate-800 rounded-lg p-4">
+        <div className="text-slate-400 text-center whitespace-pre-line">{loadingMessage}</div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -299,7 +314,8 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
   const [usPredictions, setUsPredictions] = useState<Record<string, TrendPrediction>>({});
   const [aShareValuations, setAShareValuations] = useState<Record<string, ValuationData>>({});
   const [usValuations, setUsValuations] = useState<Record<string, ValuationData>>({});
-  const [loading, setLoading] = useState(true);
+  const [aShareLoading, setAShareLoading] = useState(true);
+  const [usLoading, setUsLoading] = useState(true);
   const [aSharePage, setASharePage] = useState(1);
   const [usPage, setUsPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
@@ -308,69 +324,94 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+  // Fetch A-share data independently
   useEffect(() => {
-    const fetchData = async () => {
-      setLoading(true);
+    let cancelled = false;
+    const fetchAShareData = async () => {
+      setAShareLoading(true);
       try {
-        // Fetch A-share and US watchlists in parallel
-        const [aShareData, usData] = await Promise.all([
-          getWatchlist(aSharePage, pageSize, "A"),
-          getWatchlist(usPage, pageSize, "US"),
-        ]);
-
+        const aShareData = await getWatchlist(aSharePage, pageSize, "A");
+        console.log("[A-Share] Watchlist items:", aShareData.items.map(i => i.symbol), "at", new Date().toISOString());
+        if (cancelled) return;
         setAShareItems(aShareData.items);
         setAShareTotalPages(aShareData.total_pages);
-        setUsItems(usData.items);
-        setUsTotalPages(usData.total_pages);
 
-        // Extract symbols by market
         const aShareSymbols = aShareData.items.map(item => item.symbol);
-        const usSymbols = usData.items.map(item => item.symbol);
-
-        // Fetch valuations independently using Promise.allSettled
-        const [aShareValResult, usValResult] = await Promise.allSettled([
-          fetchValuationByMarket(API_BASE, aShareSymbols),
-          fetchValuationByMarket(API_BASE, usSymbols),
-        ]);
-
-        if (aShareValResult.status === "fulfilled") {
-          setAShareValuations(aShareValResult.value);
-        }
-        if (usValResult.status === "fulfilled") {
-          setUsValuations(usValResult.value);
-        }
-
-        // Fetch all predictions (API doesn't support filtering by symbols)
-        // Split by market client-side
-        try {
-          const allPreds = await getTrendPredictions();
-          const aSharePredMap: Record<string, TrendPrediction> = {};
-          const usPredMap: Record<string, TrendPrediction> = {};
-          // Use aShareItems and usItems which were set earlier in this function
-          const aShareSet = new Set(aShareData.items.map(i => i.symbol));
-          const usSet = new Set(usData.items.map(i => i.symbol));
-          allPreds.forEach((p) => {
-            if (aShareSet.has(p.symbol)) {
-              aSharePredMap[p.symbol] = p;
-            }
-            if (usSet.has(p.symbol)) {
-              usPredMap[p.symbol] = p;
-            }
-          });
-          setASharePredictions(aSharePredMap);
-          setUsPredictions(usPredMap);
-        } catch (err) {
-          console.error("Failed to fetch predictions:", err);
-        }
+        console.log("[A-Share] Calling fetchValuationByMarket at", new Date().toISOString());
+        const aShareVal = await fetchValuationByMarket(API_BASE, aShareSymbols);
+        console.log("[A-Share] fetchValuationByMarket returned at", new Date().toISOString());
+        if (cancelled) return;
+        setAShareValuations(aShareVal);
       } catch (err) {
-        console.error("Failed to fetch watchlist:", err);
+        console.error("Failed to fetch A-share watchlist:", err);
       } finally {
-        setLoading(false);
+        if (!cancelled) {
+          setAShareLoading(false);
+        }
       }
     };
 
-    fetchData();
-  }, [aSharePage, usPage, pageSize, refreshTrigger]);
+    fetchAShareData();
+    return () => { cancelled = true; };
+  }, [aSharePage, pageSize, refreshTrigger, API_BASE]);
+
+  // Fetch US data independently
+  useEffect(() => {
+    let cancelled = false;
+    const fetchUsData = async () => {
+      setUsLoading(true);
+      try {
+        const usData = await getWatchlist(usPage, pageSize, "US");
+        console.log("[US] Watchlist items:", usData.items.map(i => i.symbol), "at", new Date().toISOString());
+        if (cancelled) return;
+        setUsItems(usData.items);
+        setUsTotalPages(usData.total_pages);
+
+        const usSymbols = usData.items.map(item => item.symbol);
+        console.log("[US] Calling fetchValuationByMarket at", new Date().toISOString());
+        const usVal = await fetchValuationByMarket(API_BASE, usSymbols);
+        console.log("[US] fetchValuationByMarket returned at", new Date().toISOString());
+        if (cancelled) return;
+        setUsValuations(usVal);
+      } catch (err) {
+        console.error("Failed to fetch US watchlist:", err);
+      } finally {
+        if (!cancelled) {
+          setUsLoading(false);
+        }
+      }
+    };
+
+    fetchUsData();
+    return () => { cancelled = true; };
+  }, [usPage, pageSize, refreshTrigger, API_BASE]);
+
+  // Fetch predictions (non-blocking, shared across markets)
+  useEffect(() => {
+    const fetchPredictions = async () => {
+      try {
+        const allPreds = await getTrendPredictions();
+        const aSharePredMap: Record<string, TrendPrediction> = {};
+        const usPredMap: Record<string, TrendPrediction> = {};
+        const aShareSet = new Set(aShareItems.map(i => i.symbol));
+        const usSet = new Set(usItems.map(i => i.symbol));
+        allPreds.forEach((p) => {
+          if (aShareSet.has(p.symbol)) {
+            aSharePredMap[p.symbol] = p;
+          }
+          if (usSet.has(p.symbol)) {
+            usPredMap[p.symbol] = p;
+          }
+        });
+        setASharePredictions(aSharePredMap);
+        setUsPredictions(usPredMap);
+      } catch (err) {
+        console.error("Failed to fetch predictions:", err);
+      }
+    };
+
+    fetchPredictions();
+  }, [aShareItems, usItems]);
 
   const handleASharePageChange = (page: number) => {
     setASharePage(page);
@@ -386,20 +427,10 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
     setUsPage(1);
   };
 
-  if (loading) {
-    const loadingMessage = activeTab === "US"
-      ? "美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中..."
-      : "加载中...";
-    return (
-      <div className="bg-slate-800 rounded-lg p-4">
-        <div className="text-slate-400 text-center">{loadingMessage}</div>
-      </div>
-    );
-  }
-
   const aShareContent = (
     <MarketWatchlist
       market="A"
+      loading={aShareLoading}
       page={aSharePage}
       pageSize={pageSize}
       totalPages={aShareTotalPages}
@@ -414,6 +445,7 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
   const usContent = (
     <MarketWatchlist
       market="US"
+      loading={usLoading}
       page={usPage}
       pageSize={pageSize}
       totalPages={usTotalPages}
