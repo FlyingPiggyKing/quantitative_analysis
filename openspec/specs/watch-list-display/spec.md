@@ -14,7 +14,7 @@ WatchList 表格 SHALL 包含以下列（从左到右）：股票代码、股票
 ## ADDED Requirements
 
 ### Requirement: Market type in watchlist storage
-The system SHALL store market type ("A" for A-share, "US" for US stocks) with each watchlist entry.
+The system SHALL store market type ("A" for A-share, "US" for US stocks, "HK" for HK stocks) with each watchlist entry.
 
 #### Scenario: Add A-share stock to watchlist
 - **WHEN** user adds A-share stock (e.g., "600938") to watchlist
@@ -23,6 +23,10 @@ The system SHALL store market type ("A" for A-share, "US" for US stocks) with ea
 #### Scenario: Add US stock to watchlist
 - **WHEN** user adds US stock (e.g., "GOOGL") to watchlist
 - **THEN** watchlist entry is created with symbol="GOOGL", name="Google", market="US"
+
+#### Scenario: Add HK stock to watchlist
+- **WHEN** user adds HK stock (e.g., "00700") to watchlist
+- **THEN** watchlist entry is created with symbol="00700", name="TENCENT", market="HK"
 
 #### Scenario: Legacy watchlist entries have null market
 - **WHEN** querying watchlist entries created before this change
@@ -34,6 +38,10 @@ The system SHALL filter watchlist display based on selected market tab.
 #### Scenario: Display A-share stocks when A股 tab selected
 - **WHEN** "A股" tab is selected
 - **THEN** show only stocks where market="A" OR market IS NULL
+
+#### Scenario: Display HK stocks when 港股 tab selected
+- **WHEN** "港股" tab is selected
+- **THEN** show only stocks where market="HK"
 
 #### Scenario: Display US stocks when 美股 tab selected
 - **WHEN** "美股" tab is selected
@@ -103,3 +111,12 @@ The system SHALL fetch trend predictions independently per market without blocki
 - **AND** A-share predictions are available but US predictions are slow or failing
 - **THEN** system displays A-share predictions immediately
 - **AND** US predictions show as loading or "-" placeholder
+
+### Requirement: Independent HK stock valuation data loading
+The system SHALL fetch HK stock valuation data independently without waiting for other market data to load.
+
+#### Scenario: HK valuation loads independently
+- **WHEN** user views WatchList with HK stocks
+- **AND** HK stock valuation data arrives
+- **THEN** system displays HK stock valuation data independently
+- **AND** A-share and US stock sections show their own loading states independently

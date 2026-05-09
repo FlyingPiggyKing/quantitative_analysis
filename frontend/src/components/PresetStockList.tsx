@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, ReactNode } from "react";
 import Link from "next/link";
-import { PRESET_STOCKS, US_PRESET_STOCKS } from "@/config/presetStocks";
+import { PRESET_STOCKS, US_PRESET_STOCKS, HK_PRESET_STOCKS } from "@/config/presetStocks";
 import { TrendPrediction, getTrendPredictions, fetchWithTimeout } from "@/services/trendPrediction";
 import StockMarketTabs from "./StockMarketTabs";
 
@@ -372,6 +372,93 @@ export function USPresetList() {
   );
 }
 
+export function HKPresetList() {
+  const [infoMap, setInfoMap] = useState<Record<string, StockInfo>>({});
+  const [valMap, setValMap] = useState<Record<string, any>>({});
+  const [infoLoading, setInfoLoading] = useState(true);
+  const [valLoading, setValLoading] = useState(true);
+  const [predLoading, setPredLoading] = useState(true);
+  const [predictions, setPredictions] = useState<Record<string, TrendPrediction>>({});
+  const fetchedRef = useRef(false);
+
+  useEffect(() => {
+    if (fetchedRef.current) return;
+    fetchedRef.current = true;
+
+    const fetchData = async () => {
+      try {
+        const symbols = HK_PRESET_STOCKS.map((s) => s.symbol).join(",");
+
+        const infoRes = await fetch(`${API_BASE}/api/stock/batch/info?symbols=${symbols}`);
+        const valRes = await fetch(`${API_BASE}/api/stock/batch/valuation?symbols=${symbols}&days=30`);
+
+        // Process info data
+        if (infoRes.ok) {
+          const infoData = await infoRes.json();
+          const iMap: Record<string, any> = {};
+          for (const item of infoData.results || []) {
+            iMap[item.symbol] = item;
+          }
+          for (const err of infoData.errors || []) {
+            console.warn(`Failed to fetch info for ${err.symbol}:`, err.error);
+          }
+          setInfoMap(iMap);
+        }
+        setInfoLoading(false);
+
+        // Process valuation data
+        if (valRes.ok) {
+          const valData = await valRes.json();
+          const vMap: Record<string, any> = {};
+          for (const item of valData.results || []) {
+            vMap[item.symbol] = item;
+          }
+          for (const err of valData.errors || []) {
+            console.warn(`Failed to fetch valuation for ${err.symbol}:`, err.error);
+          }
+          setValMap(vMap);
+        }
+        setValLoading(false);
+
+        // Fetch predictions with timeout (non-blocking)
+        setPredLoading(true);
+        const predRes = await fetchWithTimeout(getTrendPredictions(), 5000);
+        if (predRes) {
+          const predMap: Record<string, TrendPrediction> = {};
+          for (const pred of predRes) {
+            predMap[pred.symbol] = pred;
+          }
+          setPredictions(predMap);
+        }
+        setPredLoading(false);
+      } catch (err) {
+        console.error("Failed to fetch HK preset stocks:", err);
+        setInfoLoading(false);
+        setValLoading(false);
+        setPredLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // Display stock data when info and val are loaded, regardless of predictions
+  const isDataLoading = infoLoading || valLoading;
+
+  if (isDataLoading) {
+    return <div className="text-slate-400 text-center py-4">加载中...</div>;
+  }
+
+  return (
+    <PresetTable
+      stocks={HK_PRESET_STOCKS as unknown as Array<{ symbol: string; name: string }>}
+      infoMap={infoMap}
+      valMap={valMap}
+      predictions={predictions}
+    />
+  );
+}
+
 export default function PresetStockList() {
   return (
     <div>
@@ -382,6 +469,7 @@ export default function PresetStockList() {
       <StockMarketTabs
         aShareContent={<ASharePresetList />}
         usContent={<USPresetList />}
+        hkContent={<HKPresetList />}
       />
     </div>
   );

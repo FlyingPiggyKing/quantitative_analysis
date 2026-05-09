@@ -17,5 +17,15 @@ export const US_PRESET_STOCKS = [
   { symbol: "KO", name: "可口可乐" },
 ] as const;
 
+// HK preset stocks for guest users
+export const HK_PRESET_STOCKS = [
+  { symbol: "00700", name: "腾讯" },
+  { symbol: "09988", name: "阿里巴巴" },
+  { symbol: "00100", name: "百济神州" },
+  { symbol: "01810", name: "小米" },
+  { symbol: "09992", name: "阿里巴巴" },
+] as const;
+
 export type PresetStock = typeof PRESET_STOCKS[number];
 export type USPresetStock = typeof US_PRESET_STOCKS[number];
+export type HKPresetStock = typeof HK_PRESET_STOCKS[number];

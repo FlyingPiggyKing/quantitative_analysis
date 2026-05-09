@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import WatchList from "@/components/WatchList";
 import StockMarketTabs from "@/components/StockMarketTabs";
-import { ASharePresetList, USPresetList } from "@/components/PresetStockList";
+import { ASharePresetList, USPresetList, HKPresetList } from "@/components/PresetStockList";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
 import { getTaskStatus, runBatchAnalysisAsync, TaskStatusResponse } from "@/services/trendPrediction";
 import { useAuth } from "@/services/auth";
@@ -19,7 +19,7 @@ export default function Home() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [taskProgress, setTaskProgress] = useState<TaskStatusResponse | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
-  const [stockTab, setStockTab] = useState<"A" | "US">("A");
+  const [stockTab, setStockTab] = useState<"A" | "US" | "HK">("A");
 
   const isAnalyzing = activeTaskId !== null &&
     taskProgress !== null &&
@@ -147,7 +147,11 @@ export default function Home() {
               type="text"
               value={symbol}
               onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-              placeholder={stockTab === "A" ? "输入股票代码，如 000001" : "输入美股代码，如 MSFT"}
+              placeholder={
+                stockTab === "A" ? "输入股票代码，如 000001" :
+                stockTab === "HK" ? "输入港股代码，如 00700" :
+                "输入美股代码，如 MSFT"
+              }
               className="w-full px-4 py-3 text-lg bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
@@ -186,6 +190,7 @@ export default function Home() {
             <StockMarketTabs
               aShareContent={<ASharePresetList />}
               usContent={<USPresetList />}
+              hkContent={<HKPresetList />}
               activeTab={stockTab}
               onTabChange={setStockTab}
             />

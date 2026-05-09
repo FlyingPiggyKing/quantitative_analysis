@@ -16,8 +16,8 @@ interface ValuationData {
 
 interface WatchListProps {
   refreshTrigger?: number;
-  activeTab?: "A" | "US";
-  onTabChange?: (tab: "A" | "US") => void;
+  activeTab?: "A" | "US" | "HK";
+  onTabChange?: (tab: "A" | "US" | "HK") => void;
 }
 
 interface StockTableProps {
@@ -216,7 +216,7 @@ function Pagination({ page, pageSize, totalPages, onPageChange, onPageSizeChange
 }
 
 interface MarketWatchlistProps {
-  market: "A" | "US";
+  market: "A" | "US" | "HK";
   loading: boolean;
   page: number;
   pageSize: number;
@@ -310,17 +310,23 @@ function MarketWatchlist({
 export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }: WatchListProps) {
   const [aShareItems, setAShareItems] = useState<WatchlistItem[]>([]);
   const [usItems, setUsItems] = useState<WatchlistItem[]>([]);
+  const [hkItems, setHkItems] = useState<WatchlistItem[]>([]);
   const [aSharePredictions, setASharePredictions] = useState<Record<string, TrendPrediction>>({});
   const [usPredictions, setUsPredictions] = useState<Record<string, TrendPrediction>>({});
+  const [hkPredictions, setHkPredictions] = useState<Record<string, TrendPrediction>>({});
   const [aShareValuations, setAShareValuations] = useState<Record<string, ValuationData>>({});
   const [usValuations, setUsValuations] = useState<Record<string, ValuationData>>({});
+  const [hkValuations, setHkValuations] = useState<Record<string, ValuationData>>({});
   const [aShareLoading, setAShareLoading] = useState(true);
   const [usLoading, setUsLoading] = useState(true);
+  const [hkLoading, setHkLoading] = useState(true);
   const [aSharePage, setASharePage] = useState(1);
   const [usPage, setUsPage] = useState(1);
+  const [hkPage, setHkPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [aShareTotalPages, setAShareTotalPages] = useState(1);
   const [usTotalPages, setUsTotalPages] = useState(1);
+  const [hkTotalPages, setHkTotalPages] = useState(1);
 
   const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
@@ -386,6 +392,37 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
     return () => { cancelled = true; };
   }, [usPage, pageSize, refreshTrigger, API_BASE]);
 
+  // Fetch HK data independently
+  useEffect(() => {
+    let cancelled = false;
+    const fetchHkData = async () => {
+      setHkLoading(true);
+      try {
+        const hkData = await getWatchlist(hkPage, pageSize, "HK");
+        console.log("[HK] Watchlist items:", hkData.items.map(i => i.symbol), "at", new Date().toISOString());
+        if (cancelled) return;
+        setHkItems(hkData.items);
+        setHkTotalPages(hkData.total_pages);
+
+        const hkSymbols = hkData.items.map(item => item.symbol);
+        console.log("[HK] Calling fetchValuationByMarket at", new Date().toISOString());
+        const hkVal = await fetchValuationByMarket(API_BASE, hkSymbols);
+        console.log("[HK] fetchValuationByMarket returned at", new Date().toISOString());
+        if (cancelled) return;
+        setHkValuations(hkVal);
+      } catch (err) {
+        console.error("Failed to fetch HK watchlist:", err);
+      } finally {
+        if (!cancelled) {
+          setHkLoading(false);
+        }
+      }
+    };
+
+    fetchHkData();
+    return () => { cancelled = true; };
+  }, [hkPage, pageSize, refreshTrigger, API_BASE]);
+
   // Fetch predictions (non-blocking, shared across markets)
   useEffect(() => {
     const fetchPredictions = async () => {
@@ -393,8 +430,10 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
         const allPreds = await getTrendPredictions();
         const aSharePredMap: Record<string, TrendPrediction> = {};
         const usPredMap: Record<string, TrendPrediction> = {};
+        const hkPredMap: Record<string, TrendPrediction> = {};
         const aShareSet = new Set(aShareItems.map(i => i.symbol));
         const usSet = new Set(usItems.map(i => i.symbol));
+        const hkSet = new Set(hkItems.map(i => i.symbol));
         allPreds.forEach((p) => {
           if (aShareSet.has(p.symbol)) {
             aSharePredMap[p.symbol] = p;
@@ -402,16 +441,20 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
           if (usSet.has(p.symbol)) {
             usPredMap[p.symbol] = p;
           }
+          if (hkSet.has(p.symbol)) {
+            hkPredMap[p.symbol] = p;
+          }
         });
         setASharePredictions(aSharePredMap);
         setUsPredictions(usPredMap);
+        setHkPredictions(hkPredMap);
       } catch (err) {
         console.error("Failed to fetch predictions:", err);
       }
     };
 
     fetchPredictions();
-  }, [aShareItems, usItems]);
+  }, [aShareItems, usItems, hkItems]);
 
   const handleASharePageChange = (page: number) => {
     setASharePage(page);
@@ -421,10 +464,15 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
     setUsPage(page);
   };
 
+  const handleHkPageChange = (page: number) => {
+    setHkPage(page);
+  };
+
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize);
     setASharePage(1);
     setUsPage(1);
+    setHkPage(1);
   };
 
   const aShareContent = (
@@ -457,12 +505,28 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
     />
   );
 
+  const hkContent = (
+    <MarketWatchlist
+      market="HK"
+      loading={hkLoading}
+      page={hkPage}
+      pageSize={pageSize}
+      totalPages={hkTotalPages}
+      items={hkItems}
+      valuations={hkValuations}
+      predictions={hkPredictions}
+      onPageChange={handleHkPageChange}
+      onPageSizeChange={handlePageSizeChange}
+    />
+  );
+
   return (
     <div>
       <h2 className="text-lg font-medium text-white mb-4">我的自选</h2>
       <StockMarketTabs
         aShareContent={aShareContent}
         usContent={usContent}
+        hkContent={hkContent}
         activeTab={activeTab}
         onTabChange={onTabChange}
       />

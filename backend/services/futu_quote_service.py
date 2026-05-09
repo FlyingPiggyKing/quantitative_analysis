@@ -127,6 +127,45 @@ def _futu_code_to_symbol(futu_code: str) -> str:
     return futu_code
 
 
+def _symbol_to_hk_futu_code(symbol: str) -> str:
+    """Convert HK stock symbol to Futu format (e.g., 00700 -> HK.00700)."""
+    symbol = symbol.strip()
+    if symbol.startswith("HK."):
+        return symbol
+    if "." in symbol:
+        return symbol
+    # Preserve leading zeros — do not convert to int
+    return f"HK.{symbol}"
+
+
+def _hk_futu_code_to_symbol(futu_code: str) -> str:
+    """Convert Futu HK code to standard symbol (e.g., HK.00700 -> 00700)."""
+    if "." in futu_code:
+        parts = futu_code.split(".")
+        if len(parts) == 2 and parts[0] == "HK":
+            return parts[1]
+    return futu_code
+
+
+def _is_hk_stock_symbol(symbol: str) -> bool:
+    """Check if a symbol appears to be a HK stock (4-5 digits, not 6-digit A-share)."""
+    symbol = symbol.strip()
+    if len(symbol) in (4, 5) and symbol.isdigit():
+        return True
+    return False
+
+
+def _get_futu_code(symbol: str) -> tuple:
+    """Get Futu code and market for any symbol.
+
+    Returns (futu_code, market) where market is 'HK' or 'US'.
+    """
+    symbol = symbol.strip()
+    if _is_hk_stock_symbol(symbol):
+        return (_symbol_to_hk_futu_code(symbol), "HK")
+    return (_symbol_to_futu_code(symbol), "US")
+
+
 class FutuQuoteService:
     """Service wrapper for US stock data via Futu OpenAPI."""
 
@@ -164,7 +203,7 @@ class FutuQuoteService:
         def fetch_snapshot() -> dict:
             logger.info(f"[Futu] Fetching snapshot for {symbol}")
             ctx = FutuQuoteService._get_quote_context()
-            futu_code = _symbol_to_futu_code(symbol)
+            futu_code, market = _get_futu_code(symbol)
 
             ret, data = ctx.get_market_snapshot([futu_code])
             if ret != 0:
@@ -178,6 +217,7 @@ class FutuQuoteService:
             return {
                 "symbol": symbol.upper(),
                 "name": row.get("name", ""),
+                "market": market,
                 "pe_ttm": _to_python_type(row.get("pe_ttm_ratio")),
                 "pb": _to_python_type(row.get("pb_ratio")),
                 "turnover_rate": _to_python_type(row.get("turnover_rate")),
@@ -213,7 +253,7 @@ class FutuQuoteService:
             return {
                 "symbol": symbol.upper(),
                 "name": result.get("name", "未知"),
-                "market": "US",
+                "market": result.get("market", "US"),
                 "sector": "未知",  # Futu snapshot doesn't provide sector directly
             }
 
@@ -243,6 +283,7 @@ class FutuQuoteService:
             return {
                 "symbol": symbol.upper(),
                 "name": result.get("name", "未知"),
+                "market": result.get("market", "US"),
                 "price": price,
                 "change_pct": change_pct,
                 "volume": result.get("volume", 0),
@@ -272,7 +313,7 @@ class FutuQuoteService:
         def fetch_kline() -> dict:
             logger.info(f"[Futu] Fetching K-line for {symbol} ({days} days)")
             ctx = FutuQuoteService._get_quote_context()
-            futu_code = _symbol_to_futu_code(symbol)
+            futu_code, market = _get_futu_code(symbol)
 
             # Map period to Futu KLType
             from futu import KLType, AuType

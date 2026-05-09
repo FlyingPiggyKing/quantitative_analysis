@@ -5,22 +5,24 @@ import { useState, ReactNode } from "react";
 interface StockMarketTabsProps {
   aShareContent: ReactNode;
   usContent: ReactNode;
-  activeTab?: "A" | "US";
-  onTabChange?: (tab: "A" | "US") => void;
-  defaultTab?: "A" | "US";
+  hkContent?: ReactNode;
+  activeTab?: "A" | "US" | "HK";
+  onTabChange?: (tab: "A" | "US" | "HK") => void;
+  defaultTab?: "A" | "US" | "HK";
 }
 
 export default function StockMarketTabs({
   aShareContent,
   usContent,
+  hkContent,
   activeTab: controlledActiveTab,
   onTabChange,
   defaultTab = "A"
 }: StockMarketTabsProps) {
-  const [internalActiveTab, setInternalActiveTab] = useState<"A" | "US">(defaultTab);
+  const [internalActiveTab, setInternalActiveTab] = useState<"A" | "US" | "HK">(defaultTab);
   const activeTab = controlledActiveTab !== undefined ? controlledActiveTab : internalActiveTab;
 
-  const handleTabChange = (tab: "A" | "US") => {
+  const handleTabChange = (tab: "A" | "US" | "HK") => {
     if (controlledActiveTab !== undefined && onTabChange) {
       onTabChange(tab);
     } else {
@@ -58,10 +60,25 @@ export default function StockMarketTabs({
             <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
           )}
         </button>
+        {hkContent && (
+          <button
+            onClick={() => handleTabChange("HK")}
+            className={`px-4 py-2 text-sm font-medium transition-colors relative ${
+              activeTab === "HK"
+                ? "text-blue-400"
+                : "text-slate-400 hover:text-slate-300"
+            }`}
+          >
+            港股
+            {activeTab === "HK" && (
+              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
-      {activeTab === "A" ? aShareContent : usContent}
+      {activeTab === "A" ? aShareContent : activeTab === "US" ? usContent : hkContent}
     </div>
   );
 }

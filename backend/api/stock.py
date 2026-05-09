@@ -1,21 +1,24 @@
 """Stock API routes."""
 from fastapi import APIRouter, Query
 from typing import List
-from backend.services.akshare_service import AShareService, USStockService, _is_us_stock_symbol, calculate_indicators
+from backend.services.akshare_service import AShareService, USStockService, HKStockService, _is_us_stock_symbol, _is_hk_stock_symbol, calculate_indicators
 
 router = APIRouter(prefix="/api/stock", tags=["stock"])
 
 
-def _split_by_market(symbols: List[str]) -> tuple[List[str], List[str]]:
-    """Split symbols into A-share and US stock lists."""
+def _split_by_market(symbols: List[str]) -> tuple[List[str], List[str], List[str]]:
+    """Split symbols into A-share, US stock, and HK stock lists."""
     a_share = []
     us_stocks = []
+    hk_stocks = []
     for s in symbols:
-        if _is_us_stock_symbol(s):
+        if _is_hk_stock_symbol(s):
+            hk_stocks.append(s)
+        elif _is_us_stock_symbol(s):
             us_stocks.append(s)
         else:
             a_share.append(s)
-    return a_share, us_stocks
+    return a_share, us_stocks, hk_stocks
 
 
 # Batch endpoints MUST be defined BEFORE /{symbol} to avoid route conflicts
@@ -26,13 +29,13 @@ async def get_batch_valuation(
 ):
     """Get daily valuation metrics for multiple stocks in a single request.
 
-    Supports mixed A-share and US stock symbols. Reduces N+1 query problem to 1 request.
+    Supports mixed A-share, US, and HK stock symbols. Reduces N+1 query problem to 1 request.
     """
     symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return {"results": [], "errors": [{"error": "No symbols provided"}]}
 
-    a_share_symbols, us_symbols = _split_by_market(symbol_list)
+    a_share_symbols, us_symbols, hk_symbols = _split_by_market(symbol_list)
 
     results = []
     errors = []
@@ -49,6 +52,12 @@ async def get_batch_valuation(
         results.extend(us_result.get("results", []))
         errors.extend(us_result.get("errors", []))
 
+    # Fetch HK stock valuations
+    if hk_symbols:
+        hk_result = HKStockService.get_daily_basic_batch(hk_symbols, days)
+        results.extend(hk_result.get("results", []))
+        errors.extend(hk_result.get("errors", []))
+
     return {"results": results, "errors": errors}
 
 
@@ -58,13 +67,13 @@ async def get_batch_info(
 ):
     """Get basic stock information for multiple stocks in a single request.
 
-    Supports mixed A-share and US stock symbols. Reduces N+1 query problem to 1 request.
+    Supports mixed A-share, US, and HK stock symbols. Reduces N+1 query problem to 1 request.
     """
     symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
     if not symbol_list:
         return {"results": [], "errors": [{"error": "No symbols provided"}]}
 
-    a_share_symbols, us_symbols = _split_by_market(symbol_list)
+    a_share_symbols, us_symbols, hk_symbols = _split_by_market(symbol_list)
 
     results = []
     errors = []
@@ -81,13 +90,21 @@ async def get_batch_info(
         results.extend(us_result.get("results", []))
         errors.extend(us_result.get("errors", []))
 
+    # Fetch HK stock info
+    if hk_symbols:
+        hk_result = HKStockService.get_stock_info_batch(hk_symbols)
+        results.extend(hk_result.get("results", []))
+        errors.extend(hk_result.get("errors", []))
+
     return {"results": results, "errors": errors}
 
 
 @router.get("/{symbol}")
 async def get_stock_info(symbol: str):
     """Get basic stock information."""
-    if _is_us_stock_symbol(symbol):
+    if _is_hk_stock_symbol(symbol):
+        return HKStockService.get_stock_info(symbol)
+    elif _is_us_stock_symbol(symbol):
         return USStockService.get_stock_info(symbol)
     else:
         return AShareService.get_stock_info(symbol)
@@ -101,7 +118,9 @@ async def get_kline(
     adjust: str = Query(default="qfq", pattern="^(qfq|hfq|no)$")
 ):
     """Get K-line data for a stock."""
-    if _is_us_stock_symbol(symbol):
+    if _is_hk_stock_symbol(symbol):
+        return HKStockService.get_kline_data(symbol, days, period, adjust)
+    elif _is_us_stock_symbol(symbol):
         return USStockService.get_kline_data(symbol, days, period, adjust)
     else:
         return AShareService.get_kline_data(symbol, days, period, adjust)
@@ -110,7 +129,9 @@ async def get_kline(
 @router.get("/{symbol}/realtime")
 async def get_realtime(symbol: str):
     """Get real-time quote for a stock."""
-    if _is_us_stock_symbol(symbol):
+    if _is_hk_stock_symbol(symbol):
+        return HKStockService.get_realtime_quote(symbol)
+    elif _is_us_stock_symbol(symbol):
         return USStockService.get_realtime_quote(symbol)
     else:
         return AShareService.get_realtime_quote(symbol)
@@ -119,7 +140,9 @@ async def get_realtime(symbol: str):
 @router.get("/{symbol}/indicators")
 async def get_indicators(symbol: str, days: int = Query(default=100, ge=30, le=500)):
     """Get technical indicators (MACD, RSI, MA) for a stock."""
-    if _is_us_stock_symbol(symbol):
+    if _is_hk_stock_symbol(symbol):
+        kline_result = HKStockService.get_kline_data(symbol, days)
+    elif _is_us_stock_symbol(symbol):
         kline_result = USStockService.get_kline_data(symbol, days)
     else:
         kline_result = AShareService.get_kline_data(symbol, days)
@@ -137,7 +160,9 @@ async def get_indicators(symbol: str, days: int = Query(default=100, ge=30, le=5
 @router.get("/{symbol}/valuation")
 async def get_valuation(symbol: str, days: int = Query(default=30, ge=1, le=365)):
     """Get daily valuation metrics (PE TTM, PB, turnover rate, market cap) for a stock."""
-    if _is_us_stock_symbol(symbol):
+    if _is_hk_stock_symbol(symbol):
+        return HKStockService.get_daily_basic(symbol, days)
+    elif _is_us_stock_symbol(symbol):
         return USStockService.get_daily_basic(symbol, days)
     else:
         return AShareService.get_daily_basic(symbol, days)

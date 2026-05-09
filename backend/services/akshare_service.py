@@ -434,6 +434,54 @@ class USStockService:
         return FutuQuoteService.get_stock_info_batch(symbols)
 
 
+class HKStockService:
+    """Service wrapper for HK stock data via Futu OpenAPI.
+
+    Delegates to FutuQuoteService for all data fetching.
+    """
+
+    @staticmethod
+    def get_stock_info(symbol: str) -> dict:
+        """Get basic HK stock information via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_stock_info(symbol)
+
+    @staticmethod
+    def get_kline_data(
+        symbol: str,
+        days: int = 100,
+        period: str = "daily",
+        adjust: str = "qfq"
+    ) -> dict:
+        """Get K-line data for a HK stock via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_kline_data(symbol, days, period, adjust)
+
+    @staticmethod
+    def get_realtime_quote(symbol: str) -> dict:
+        """Get real-time quote for a HK stock via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_realtime_quote(symbol)
+
+    @staticmethod
+    def get_daily_basic(symbol: str, days: int = 30) -> dict:
+        """Get daily basic metrics for HK stock via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_daily_basic(symbol, days)
+
+    @staticmethod
+    def get_daily_basic_batch(symbols: List[str], days: int = 30) -> dict:
+        """Get daily basic metrics for multiple HK stock symbols via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_daily_basic_batch(symbols, days)
+
+    @staticmethod
+    def get_stock_info_batch(symbols: List[str]) -> dict:
+        """Get basic HK stock information for multiple symbols via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_stock_info_batch(symbols)
+
+
 # Backward compatibility - AkshareService now points to AShareService
 AkshareService = AShareService
 
@@ -497,7 +545,9 @@ def _rsi(prices, period: int = 14) -> list:
 def get_valuation_data(symbol: str, days: int = 100) -> dict:
     """Get PE, PB, and turnover rate data from Tushare daily_basic endpoint."""
     # Delegate to appropriate service based on symbol
-    if symbol.upper().endswith(".US") or _is_us_stock_symbol(symbol):
+    if _is_hk_stock_symbol(symbol):
+        return HKStockService.get_daily_basic(symbol, days)
+    elif symbol.upper().endswith(".US") or _is_us_stock_symbol(symbol):
         return USStockService.get_daily_basic(symbol, days)
     else:
         return AShareService.get_daily_basic(symbol, days)
@@ -510,5 +560,14 @@ def _is_us_stock_symbol(symbol: str) -> bool:
     if symbol.endswith(".US"):
         return True
     if len(symbol) <= 5 and not symbol.isdigit():
+        return True
+    return False
+
+
+def _is_hk_stock_symbol(symbol: str) -> bool:
+    """Check if a symbol appears to be a HK stock (4-5 digits, not A-share)."""
+    symbol = symbol.strip()
+    # HK stocks are 4-5 digits (e.g., 00700, 9988), A-shares are 6 digits
+    if len(symbol) in (4, 5) and symbol.isdigit():
         return True
     return False

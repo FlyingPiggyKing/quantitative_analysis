@@ -30,3 +30,7 @@ The system SHALL display Chinese names for US preset stocks where appropriate.
 #### Scenario: Display Chinese names for US stocks
 - **WHEN** US preset stocks are displayed
 - **THEN** Google shows "谷歌", Microsoft shows "微软", NVIDIA shows "英伟达", Tesla shows "特斯拉", Coca-Cola shows "可口可乐"
+
+## Related Specifications
+
+- HK preset stocks (腾讯, 阿里巴巴, 美团, 小米, 比亚迪) are defined in `HK_PRESET_STOCKS` in `presetStocks.ts` and displayed in the 港股 tab. See `hk-stock-data` spec for backend API details.
