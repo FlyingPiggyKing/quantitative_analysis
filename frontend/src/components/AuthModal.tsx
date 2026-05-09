@@ -159,13 +159,16 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
           )}
 
           <div>
-            <div className="flex gap-3">
+            <div className="flex gap-3 items-stretch">
               {captcha && (
                 <img
                   src={captcha.image}
                   alt="CAPTCHA"
-                  className="h-12 sm:h-10 rounded-sm border border-vt-brass-700 cursor-pointer flex-shrink-0"
-                  style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4), 0 1px 0 rgba(241,214,138,0.08)" }}
+                  className="h-14 sm:h-12 w-auto rounded-sm border border-vt-brass-700 cursor-pointer flex-shrink-0"
+                  style={{
+                    boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4), 0 1px 0 rgba(241,214,138,0.08)",
+                    imageRendering: "crisp-edges",
+                  }}
                   onClick={fetchCaptcha}
                   title="点击刷新"
                 />
