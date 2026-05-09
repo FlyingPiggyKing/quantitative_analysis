@@ -28,28 +28,33 @@ def generate_code(length: int = CAPTCHA_LENGTH) -> str:
 
 def create_captcha_image(code: str) -> str:
     """Create a CAPTCHA image and return as base64 string."""
-    width, height = 150, 50
+    width, height = 240, 80
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
 
     try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 30)
+        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 56)
     except:
         font = ImageFont.load_default()
 
     # Draw text with slight rotation
-    x_start = 15
+    x_start = 24
     for i, char in enumerate(code):
         angle = random.randint(-15, 15)
-        char_x = x_start + i * 22 + random.randint(-3, 3)
-        char_y = random.randint(5, 15)
+        char_x = x_start + i * 35 + random.randint(-4, 4)
+        char_y = random.randint(4, 14)
         draw.text((char_x, char_y), char, fill="black", font=font)
 
     # Add some noise lines
     for _ in range(3):
         x1, y1 = random.randint(0, width), random.randint(0, height)
         x2, y2 = random.randint(0, width), random.randint(0, height)
-        draw.line([(x1, y1), (x2, y2)], fill="gray", width=1)
+        draw.line([(x1, y1), (x2, y2)], fill="gray", width=2)
+
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+    buffer.seek(0)
+    return base64.b64encode(buffer.getvalue()).decode()
 
     buffer = io.BytesIO()
     image.save(buffer, format="PNG")
