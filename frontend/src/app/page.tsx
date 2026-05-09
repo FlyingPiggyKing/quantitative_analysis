@@ -168,7 +168,7 @@ export default function Home() {
               type="button"
               onClick={handleTrendAnalysis}
               disabled={isAnalyzing}
-              className="vt-btn-emerald w-full px-4 py-3 text-base min-h-[44px]"
+              className="vt-btn-oxblood w-full px-4 py-3 text-base min-h-[44px]"
             >
               {isAnalyzing ? "分 析 中 …" : "趋 势 分 析"}
             </button>

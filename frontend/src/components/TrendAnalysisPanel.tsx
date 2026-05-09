@@ -148,7 +148,7 @@ function TechnicalSection({ data }: { data: TechnicalAnalysis }) {
             <span className="vt-engraved not-italic text-xs uppercase tracking-wider">MACD:</span>
             <span className="ml-1 text-vt-parchment font-[var(--font-geist-mono)]">{data.macd.value || "-"}</span>
             <span className={`ml-2 font-[var(--font-playfair)] ${
-              data.macd.signal?.includes("金叉") ? "text-vt-emerald-400" : "text-vt-oxblood-400"
+              data.macd.signal?.includes("金叉") ? "text-vt-oxblood-400" : "text-vt-emerald-400"
             }`}>
               {data.macd.signal || "-"}
             </span>
@@ -218,10 +218,10 @@ function TechnicalSection({ data }: { data: TechnicalAnalysis }) {
 
 function TrendJudgmentSection({ data }: { data: TrendJudgment }) {
   const suggestionColors: Record<string, string> = {
-    "加仓": "text-vt-emerald-400",
-    "减仓": "text-vt-oxblood-400",
+    "加仓": "text-vt-oxblood-400",
+    "减仓": "text-vt-emerald-400",
     "持有": "text-vt-brass-300",
-    "建仓": "text-vt-emerald-400",
+    "建仓": "text-vt-oxblood-400",
     "观望": "text-vt-parchment-dim",
   };
 

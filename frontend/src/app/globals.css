@@ -172,11 +172,12 @@ html { -webkit-overflow-scrolling: touch; }
     inset 0 -1px 0 rgba(0, 0, 0, 0.5);
 }
 
-/* Primary brass button — like a stamped metal plate */
+/* Primary brass button — stamped metal plate with raised dark relief lettering
+   (dark characters carved up from a polished brass surface, like an engraved bronze plaque) */
 .vt-btn-primary {
   font-family: var(--font-playfair), Georgia, serif;
-  font-weight: 600;
-  letter-spacing: 0.18em;
+  font-weight: 700;
+  letter-spacing: 0.2em;
   text-transform: uppercase;
   color: #1a1208;
   background:
@@ -189,7 +190,15 @@ html { -webkit-overflow-scrolling: touch; }
     inset 0 0 0 1px rgba(255, 220, 140, 0.25),
     0 2px 0 #3d2a08,
     0 4px 8px rgba(0, 0, 0, 0.55);
-  text-shadow: 0 1px 0 rgba(255, 230, 170, 0.55);
+  text-shadow:
+    /* Top highlight — bright gold catching the raised top of dark letters */
+    0 -1px 0 rgba(255, 245, 200, 0.85),
+    /* Hard cast shadow below — letter projects above the brass */
+    0 1px 0 rgba(45, 28, 5, 0.85),
+    0 2px 3px rgba(20, 12, 2, 0.55),
+    /* Side shadows: light from upper-left */
+    1px 0 1px rgba(45, 28, 5, 0.4),
+    -1px 0 1px rgba(45, 28, 5, 0.22);
   transition: transform 0.06s ease-out, box-shadow 0.12s ease-out, filter 0.12s;
 }
 .vt-btn-primary:hover {
@@ -200,6 +209,12 @@ html { -webkit-overflow-scrolling: touch; }
     inset 0 0 0 1px rgba(255, 220, 140, 0.35),
     0 2px 0 #3d2a08,
     0 6px 14px rgba(0, 0, 0, 0.6);
+  text-shadow:
+    0 -1px 0 rgba(255, 250, 215, 0.95),
+    0 1px 0 rgba(45, 28, 5, 0.9),
+    0 2px 4px rgba(20, 12, 2, 0.6),
+    1px 0 1px rgba(45, 28, 5, 0.4),
+    -1px 0 1px rgba(45, 28, 5, 0.22);
 }
 .vt-btn-primary:active {
   transform: translateY(2px);
@@ -208,6 +223,10 @@ html { -webkit-overflow-scrolling: touch; }
     inset 0 -1px 0 rgba(255, 220, 140, 0.3),
     0 0 0 #3d2a08,
     0 1px 4px rgba(0, 0, 0, 0.5);
+  text-shadow:
+    /* Pressed: relief flattens */
+    0 -1px 0 rgba(255, 240, 195, 0.5),
+    0 1px 1px rgba(45, 28, 5, 0.55);
 }
 
 /* Secondary / "engraved" button — dark with brass rim */
@@ -280,6 +299,76 @@ html { -webkit-overflow-scrolling: touch; }
   color: var(--vt-parchment-dim);
   cursor: not-allowed;
   filter: grayscale(0.6);
+  opacity: 0.6;
+}
+
+/* Oxblood / 朱漆红 variant — vermilion lacquer over deep wood,
+   tuned to match --vt-oxblood-400 (#c75a4a) used by the UP badge.
+   Text rendered as gilded relief carving (金漆浮雕): gold characters
+   raised above the red lacquer surface, like a traditional 匾额 plaque. */
+.vt-btn-oxblood {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #f1d68a;
+  background:
+    linear-gradient(180deg, #e58172 0%, #c75a4a 35%, #8a3528 75%, #561c12 100%);
+  border: 1px solid #320a05;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 215, 200, 0.5),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(241, 214, 138, 0.22),
+    0 2px 0 #280703,
+    0 4px 8px rgba(0, 0, 0, 0.55);
+  text-shadow:
+    /* Top highlight — light catches the raised top of the carved letter */
+    0 -1px 0 rgba(255, 240, 195, 0.55),
+    /* Hard cast shadow below — letter projects above the surface */
+    0 1px 0 rgba(38, 8, 3, 0.92),
+    0 2px 3px rgba(15, 3, 2, 0.7),
+    /* Side shadows: light from upper-left, so right side darker */
+    1px 0 1px rgba(38, 8, 3, 0.5),
+    -1px 0 1px rgba(38, 8, 3, 0.3),
+    /* Soft gilded luminance — gold leaf catching ambient light */
+    0 0 8px rgba(241, 214, 138, 0.32);
+  transition: transform 0.06s ease-out, filter 0.12s, box-shadow 0.12s;
+}
+.vt-btn-oxblood:hover {
+  filter: brightness(1.08);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 225, 210, 0.65),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(241, 214, 138, 0.4),
+    0 2px 0 #280703,
+    0 6px 14px rgba(0, 0, 0, 0.6);
+  text-shadow:
+    0 -1px 0 rgba(255, 245, 210, 0.7),
+    0 1px 0 rgba(38, 8, 3, 0.95),
+    0 2px 4px rgba(15, 3, 2, 0.75),
+    1px 0 1px rgba(38, 8, 3, 0.5),
+    -1px 0 1px rgba(38, 8, 3, 0.3),
+    0 0 12px rgba(241, 214, 138, 0.5);
+}
+.vt-btn-oxblood:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.5),
+    0 0 0 #280703,
+    0 1px 4px rgba(0, 0, 0, 0.5);
+  text-shadow:
+    /* When pressed, the relief flattens — soften shadows */
+    0 -1px 0 rgba(255, 235, 190, 0.35),
+    0 1px 1px rgba(38, 8, 3, 0.6),
+    0 0 4px rgba(241, 214, 138, 0.25);
+}
+.vt-btn-oxblood:disabled,
+.vt-btn-oxblood[disabled] {
+  background: linear-gradient(180deg, #2a2520 0%, #1a1612 100%);
+  color: var(--vt-parchment-dim);
+  cursor: not-allowed;
+  filter: grayscale(0.5);
   opacity: 0.6;
 }
 
@@ -361,29 +450,8 @@ html { -webkit-overflow-scrolling: touch; }
     0 -1px 0 rgba(241, 214, 138, 0.15);
 }
 
-/* AI Prediction — UP (bullish brass-emerald glow) */
+/* AI Prediction — UP (bullish red, A-share convention: 红涨) */
 .vt-pred-up {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  font-family: var(--font-playfair), Georgia, serif;
-  font-weight: 800;
-  font-size: 1.05rem;
-  letter-spacing: 0.05em;
-  padding: 0.18rem 0.6rem;
-  border-radius: 3px;
-  color: #d8f0c8;
-  background: linear-gradient(180deg, rgba(110, 169, 106, 0.22) 0%, rgba(47, 84, 48, 0.18) 100%);
-  border: 1px solid rgba(110, 169, 106, 0.55);
-  box-shadow:
-    inset 0 1px 0 rgba(220, 240, 200, 0.18),
-    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
-    0 0 12px rgba(110, 169, 106, 0.35);
-  text-shadow: 0 0 8px rgba(160, 220, 140, 0.6), 0 1px 0 rgba(0, 0, 0, 0.6);
-}
-
-/* AI Prediction — DOWN (oxblood vintage red) */
-.vt-pred-down {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
@@ -401,6 +469,27 @@ html { -webkit-overflow-scrolling: touch; }
     inset 0 -1px 0 rgba(0, 0, 0, 0.4),
     0 0 12px rgba(199, 90, 74, 0.35);
   text-shadow: 0 0 8px rgba(245, 160, 140, 0.55), 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* AI Prediction — DOWN (bearish vintage emerald, A-share convention: 绿跌) */
+.vt-pred-down {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  padding: 0.18rem 0.6rem;
+  border-radius: 3px;
+  color: #d8f0c8;
+  background: linear-gradient(180deg, rgba(110, 169, 106, 0.22) 0%, rgba(47, 84, 48, 0.18) 100%);
+  border: 1px solid rgba(110, 169, 106, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(220, 240, 200, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(110, 169, 106, 0.35);
+  text-shadow: 0 0 8px rgba(160, 220, 140, 0.6), 0 1px 0 rgba(0, 0, 0, 0.6);
 }
 
 /* AI Prediction — NEUTRAL (brass) */
