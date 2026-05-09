@@ -31,20 +31,23 @@ function TrendIndicator({ prediction }: { prediction: TrendPrediction }) {
 
   if (trend_direction === "up") {
     return (
-      <span className="text-emerald-400">
-        ↑ {confidence}%
+      <span className="vt-pred-up vt-pulse">
+        <span className="text-lg leading-none">▲</span>
+        {confidence}%
       </span>
     );
   } else if (trend_direction === "down") {
     return (
-      <span className="text-red-400">
-        ↓ {confidence}%
+      <span className="vt-pred-down vt-pulse">
+        <span className="text-lg leading-none">▼</span>
+        {confidence}%
       </span>
     );
   } else {
     return (
-      <span className="text-slate-400">
-        - {confidence}%
+      <span className="vt-pred-flat">
+        <span className="text-lg leading-none">◆</span>
+        {confidence}%
       </span>
     );
   }
@@ -53,8 +56,8 @@ function TrendIndicator({ prediction }: { prediction: TrendPrediction }) {
 function StockTable({ items, valuations, predictions }: StockTableProps) {
   if (items.length === 0) {
     return (
-      <div className="text-slate-400 text-center py-8">
-        暂无自选股票，搜索股票后点击"加入自选"
+      <div className="vt-engraved text-center py-8">
+        暂无自选股票，搜索股票后点击&ldquo;加入自选&rdquo;
       </div>
     );
   }
@@ -65,14 +68,14 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-slate-400 border-b border-slate-700">
-              <th className="text-left py-2 px-3">股票代码</th>
-              <th className="text-left py-2 px-3">股票名称</th>
-              <th className="text-left py-2 px-3">PE趋势</th>
-              <th className="text-right py-2 px-3">市盈率(PE)</th>
-              <th className="text-right py-2 px-3">市净率(PB)</th>
-              <th className="text-right py-2 px-3">换手率</th>
-              <th className="text-left py-2 px-3">AI下周预测</th>
+            <tr className="border-b border-vt-ink-700">
+              <th className="text-left py-2 px-3 vt-tab text-xs">股票代码</th>
+              <th className="text-left py-2 px-3 vt-tab text-xs">股票名称</th>
+              <th className="text-left py-2 px-3 vt-tab text-xs">PE趋势</th>
+              <th className="text-right py-2 px-3 vt-tab text-xs">市盈率(PE)</th>
+              <th className="text-right py-2 px-3 vt-tab text-xs">市净率(PB)</th>
+              <th className="text-right py-2 px-3 vt-tab text-xs">换手率</th>
+              <th className="text-center py-2 px-3 vt-pred-col-header">AI下周预测</th>
             </tr>
           </thead>
           <tbody>
@@ -81,12 +84,12 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
               return (
                 <tr
                   key={item.symbol}
-                  className="text-white border-b border-slate-700/50 hover:bg-slate-700/30"
+                  className="text-vt-parchment border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors"
                 >
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3 font-[var(--font-geist-mono)]">
                     <Link
                       href={`/stock/${item.symbol}`}
-                      className="text-blue-400 hover:text-blue-300"
+                      className="text-vt-brass-300 hover:text-vt-brass-400 tracking-wider"
                     >
                       {item.symbol}
                     </Link>
@@ -94,7 +97,7 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
                   <td className="py-2 px-3">
                     <Link
                       href={`/stock/${item.symbol}`}
-                      className="hover:text-blue-300"
+                      className="text-vt-parchment hover:text-vt-brass-300 transition-colors"
                     >
                       {item.name}
                     </Link>
@@ -102,20 +105,20 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
                   <td className="py-2 px-3">
                     <PETrendSparkline peHistory={val?.pe_history ?? []} />
                   </td>
-                  <td className="py-2 px-3 text-right">
+                  <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
                     {val?.pe != null ? val.pe.toFixed(2) : "-"}
                   </td>
-                  <td className="py-2 px-3 text-right">
+                  <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
                     {val?.pb != null ? val.pb.toFixed(2) : "-"}
                   </td>
-                  <td className="py-2 px-3 text-right">
+                  <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
                     {val?.turnover_rate != null ? `${val.turnover_rate.toFixed(2)}%` : "-"}
                   </td>
-                  <td className="py-2 px-3">
+                  <td className="py-2 px-3 text-center">
                     {predictions[item.symbol] ? (
                       <TrendIndicator prediction={predictions[item.symbol]} />
                     ) : (
-                      <span className="text-slate-500">-</span>
+                      <span className="text-vt-parchment-dim">—</span>
                     )}
                   </td>
                 </tr>
@@ -133,31 +136,34 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
             <Link
               key={item.symbol}
               href={`/stock/${item.symbol}`}
-              className="block bg-slate-700/50 rounded-lg p-3 min-h-[44px] active:opacity-70 transition-opacity"
+              className="vt-card block p-3 min-h-[44px] active:opacity-80 transition-opacity"
             >
               <div className="flex justify-between items-start mb-2">
                 <div>
-                  <span className="text-blue-400 font-medium">{item.symbol}</span>
-                  <span className="text-white ml-2">{item.name}</span>
+                  <span className="text-vt-brass-300 font-[var(--font-geist-mono)] tracking-wider">{item.symbol}</span>
+                  <span className="text-vt-parchment ml-2">{item.name}</span>
                 </div>
-                {predictions[item.symbol] ? (
-                  <TrendIndicator prediction={predictions[item.symbol]} />
-                ) : (
-                  <span className="text-slate-500 text-sm">-</span>
-                )}
+                <div className="text-right">
+                  <div className="vt-pred-col-header text-[0.6rem] mb-1">AI预测</div>
+                  {predictions[item.symbol] ? (
+                    <TrendIndicator prediction={predictions[item.symbol]} />
+                  ) : (
+                    <span className="text-vt-parchment-dim text-sm">—</span>
+                  )}
+                </div>
               </div>
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
                   <PETrendSparkline peHistory={val?.pe_history ?? []} mobile />
-                  <span className="text-slate-400 text-xs">PE趋势</span>
+                  <span className="text-vt-parchment-dim text-xs tracking-wider">PE趋势</span>
                 </div>
-                <div className="text-slate-400">
-                  <span className="text-white">{val?.pe != null ? val.pe.toFixed(2) : "-"}</span>
-                  <span className="text-slate-500 text-xs ml-1">PE</span>
+                <div>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)]">{val?.pe != null ? val.pe.toFixed(2) : "-"}</span>
+                  <span className="text-vt-parchment-dim text-xs ml-1">PE</span>
                 </div>
-                <div className="text-slate-400">
-                  <span className="text-white">{val?.pb != null ? val.pb.toFixed(2) : "-"}</span>
-                  <span className="text-slate-500 text-xs ml-1">PB</span>
+                <div>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)]">{val?.pb != null ? val.pb.toFixed(2) : "-"}</span>
+                  <span className="text-vt-parchment-dim text-xs ml-1">PB</span>
                 </div>
               </div>
             </Link>
@@ -180,11 +186,12 @@ function Pagination({ page, pageSize, totalPages, onPageChange, onPageSizeChange
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between mt-4 gap-3">
       <div className="flex items-center gap-2">
-        <span className="text-slate-400 text-sm">每页显示:</span>
+        <label htmlFor="page-size" className="vt-engraved text-sm">每页显示:</label>
         <select
+          id="page-size"
           value={pageSize}
           onChange={(e) => onPageSizeChange(Number(e.target.value))}
-          className="bg-slate-700 text-white text-sm rounded px-2 py-1 border border-slate-600"
+          className="vt-select"
         >
           <option value={10}>10</option>
           <option value={20}>20</option>
@@ -196,19 +203,19 @@ function Pagination({ page, pageSize, totalPages, onPageChange, onPageSizeChange
         <button
           onClick={() => onPageChange(Math.max(1, page - 1))}
           disabled={page === 1}
-          className="px-3 py-1 bg-slate-700 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-600 active:scale-95 transition-transform min-h-[36px] min-w-[44px]"
+          className="vt-btn-secondary px-3 py-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed min-h-[36px] min-w-[44px]"
         >
-          上一页
+          上 一 页
         </button>
-        <span className="text-slate-400 text-sm">
-          第 {page} / {totalPages} 页
+        <span className="vt-engraved text-sm">
+          第 <span className="text-vt-brass-300 font-[var(--font-geist-mono)] not-italic">{page}</span> / <span className="text-vt-brass-300 font-[var(--font-geist-mono)] not-italic">{totalPages}</span> 页
         </span>
         <button
           onClick={() => onPageChange(Math.min(totalPages, page + 1))}
           disabled={page === totalPages}
-          className="px-3 py-1 bg-slate-700 text-white text-sm rounded disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-600 active:scale-95 transition-transform min-h-[36px] min-w-[44px]"
+          className="vt-btn-secondary px-3 py-1 text-xs disabled:opacity-40 disabled:cursor-not-allowed min-h-[36px] min-w-[44px]"
         >
-          下一页
+          下 一 页
         </button>
       </div>
     </div>
@@ -281,8 +288,8 @@ function MarketWatchlist({
       ? "美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中..."
       : "加载中...";
     return (
-      <div className="bg-slate-800 rounded-lg p-4">
-        <div className="text-slate-400 text-center whitespace-pre-line">{loadingMessage}</div>
+      <div className="vt-card p-4">
+        <div className="vt-engraved text-center whitespace-pre-line">{loadingMessage}</div>
       </div>
     );
   }
@@ -522,7 +529,9 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
 
   return (
     <div>
-      <h2 className="text-lg font-medium text-white mb-4">我的自选</h2>
+      <h2 className="font-[var(--font-playfair)] text-xl tracking-[0.18em] text-vt-parchment mb-4 uppercase">
+        <span className="text-vt-brass-400">❖</span> 我 的 自 选 <span className="text-vt-brass-400">❖</span>
+      </h2>
       <StockMarketTabs
         aShareContent={aShareContent}
         usContent={usContent}

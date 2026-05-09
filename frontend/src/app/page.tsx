@@ -115,8 +115,8 @@ export default function Home() {
   // Show loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center">
-        <div className="text-white">Loading...</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="vt-engraved text-lg">Loading…</div>
       </div>
     );
   }
@@ -125,20 +125,20 @@ export default function Home() {
   const showProgressBar = activeTaskId && taskProgress && !isDismissed;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 px-4 py-4 sm:py-8">
+    <div className="min-h-screen px-4 py-4 sm:py-8">
       <div className="w-full max-w-4xl mx-auto">
-        <div className="text-center mb-6 sm:mb-8">
-          <h1 className="text-2xl sm:text-4xl font-bold text-white mb-2 text-center sm:text-left">Stock Analyzer</h1>
-          <p className="text-lg sm:text-xl font-light italic tracking-wide text-center sm:text-left">
-            by{" "}
-            <span className="bg-gradient-to-r from-blue-400 via-purple-400 to-pink-400 bg-clip-text text-transparent font-medium">
-              DATA
-            </span>{" "}
-            and{" "}
-            <span className="bg-gradient-to-r from-cyan-400 via-blue-400 to-purple-400 bg-clip-text text-transparent font-medium">
-              AI
-            </span>
+        <div className="text-center mb-8 sm:mb-10">
+          <h1 className="vt-emboss text-4xl sm:text-6xl mb-3 text-center sm:text-left leading-none">
+            Stock Analyzer
+          </h1>
+          <p className="vt-engraved text-base sm:text-lg text-center sm:text-left">
+            — crafted by{" "}
+            <span className="text-vt-brass-300 not-italic font-semibold tracking-[0.25em]">DATA</span>{" "}
+            <span className="text-vt-parchment-dim">&amp;</span>{" "}
+            <span className="text-vt-brass-300 not-italic font-semibold tracking-[0.25em]">AI</span>{" "}
+            —
           </p>
+          <hr className="vt-rule mt-4 sm:mt-5 max-w-md mx-auto sm:mx-0" />
         </div>
 
         <form onSubmit={handleSearch} className="space-y-4 mb-8">
@@ -152,15 +152,15 @@ export default function Home() {
                 stockTab === "HK" ? "输入港股代码，如 00700" :
                 "输入美股代码，如 MSFT"
               }
-              className="w-full px-4 py-3 text-lg bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="vt-input w-full px-4 py-3 text-lg"
             />
           </div>
 
           <button
             type="submit"
-            className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 active:scale-[0.98] text-white font-medium rounded-lg transition-colors min-h-[44px]"
+            className="vt-btn-primary w-full px-4 py-3 text-base min-h-[44px]"
           >
-            查询
+            查 询
           </button>
 
           {user && (
@@ -168,13 +168,9 @@ export default function Home() {
               type="button"
               onClick={handleTrendAnalysis}
               disabled={isAnalyzing}
-              className={`w-full px-4 py-3 font-medium rounded-lg transition-colors min-h-[44px] ${
-                isAnalyzing
-                  ? "bg-slate-600 text-slate-400 cursor-not-allowed opacity-50"
-                  : "bg-green-600 hover:bg-green-700 active:scale-[0.98] text-white"
-              }`}
+              className="vt-btn-emerald w-full px-4 py-3 text-base min-h-[44px]"
             >
-              {isAnalyzing ? "分析中..." : "趋势分析"}
+              {isAnalyzing ? "分 析 中 …" : "趋 势 分 析"}
             </button>
           )}
         </form>
@@ -198,7 +194,7 @@ export default function Home() {
         </div>
 
         {user ? (
-          <div className="mt-8 pt-8 border-t border-slate-800 flex justify-center">
+          <div className="mt-8 pt-8 border-t border-vt-ink-700 flex justify-center">
             <button
               onClick={() => {
                 localStorage.removeItem("auth_token");
@@ -206,27 +202,29 @@ export default function Home() {
                 router.push("/");
                 window.location.reload();
               }}
-              className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white text-sm rounded-lg transition-colors active:scale-95"
+              className="vt-btn-secondary px-5 py-2 text-xs"
             >
               Logout
             </button>
           </div>
         ) : (
-          <div className="mt-8 pt-8 border-t border-slate-800 text-center">
-            <div className="bg-gradient-to-r from-slate-800/50 via-slate-800 to-slate-800/50 rounded-xl p-6 mb-6 border border-slate-700/50">
+          <div className="mt-8 pt-8 border-t border-vt-ink-700 text-center">
+            <div className="vt-panel relative px-6 py-6 mb-6 vt-ornament-tl vt-ornament-tr vt-ornament-bl vt-ornament-br">
               <div className="flex items-center justify-center gap-2 mb-2">
-                <svg className="w-5 h-5 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-vt-brass-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                 </svg>
-                <span className="text-lg font-medium text-white">升级您的投资体验</span>
+                <span className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase">
+                  升 级 您 的 投 资 体 验
+                </span>
               </div>
-              <p className="text-slate-400 text-sm">登录后可以添加自选股和查看更多功能</p>
+              <p className="vt-engraved text-sm">登录后可以添加自选股和查看更多功能</p>
             </div>
             <Link
               href="/login"
-              className="inline-block px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-medium rounded-lg transition-all hover:shadow-lg hover:shadow-blue-500/25 active:scale-95"
+              className="vt-btn-primary inline-block px-10 py-3 text-sm"
             >
-              登录 / 注册
+              登 录 / 注 册
             </Link>
           </div>
         )}

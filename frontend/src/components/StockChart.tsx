@@ -45,29 +45,29 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
-        background: { color: "#1e293b" },
-        textColor: "#94a3b8",
+        background: { color: "#14110d" },
+        textColor: "#b8a87d",
       },
       grid: {
-        vertLines: { color: "#334155" },
-        horzLines: { color: "#334155" },
+        vertLines: { color: "#2d251a" },
+        horzLines: { color: "#2d251a" },
       },
       crosshair: {
         mode: 1,
         vertLine: {
-          color: "#64748b",
-          labelBackgroundColor: "#475569",
+          color: "#c89c3a",
+          labelBackgroundColor: "#6b4f15",
         },
         horzLine: {
-          color: "#64748b",
-          labelBackgroundColor: "#475569",
+          color: "#c89c3a",
+          labelBackgroundColor: "#6b4f15",
         },
       },
       rightPriceScale: {
-        borderColor: "#334155",
+        borderColor: "#3a3022",
       },
       timeScale: {
-        borderColor: "#334155",
+        borderColor: "#3a3022",
         timeVisible: true,
       },
       handleScroll: {
@@ -77,19 +77,19 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
 
     chartRef.current = chart;
 
-    // Candlestick series (v5 API)
+    // Candlestick series (v5 API) — Chinese convention: up=red (oxblood), down=green (vintage emerald)
     const candlestickSeries = chart.addSeries(CandlestickSeries, {
-      upColor: "#ef4444",
-      downColor: "#22c55e",
-      borderUpColor: "#ef4444",
-      borderDownColor: "#22c55e",
-      wickUpColor: "#ef4444",
-      wickDownColor: "#22c55e",
+      upColor: "#c75a4a",
+      downColor: "#6ea96a",
+      borderUpColor: "#e07d6d",
+      borderDownColor: "#86c282",
+      wickUpColor: "#c75a4a",
+      wickDownColor: "#6ea96a",
     });
 
     // Volume series (v5 API)
     const volumeSeries = chart.addSeries(HistogramSeries, {
-      color: "#64748b",
+      color: "#6b4f15",
       priceFormat: {
         type: "volume",
       },
@@ -102,11 +102,11 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
       },
     });
 
-    // PE line series
+    // PE line series — bright brass
     let peSeries: ISeriesApi<"Line"> | null = null;
     if (peData && peData.length > 0) {
       peSeries = chart.addSeries(LineSeries, {
-        color: "#fbbf24",
+        color: "#e5c163",
         lineWidth: 2,
         priceScaleId: "pe",
       });
@@ -118,11 +118,11 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
       });
     }
 
-    // PB line series
+    // PB line series — vintage teal
     let pbSeries: ISeriesApi<"Line"> | null = null;
     if (pbData && pbData.length > 0) {
       pbSeries = chart.addSeries(LineSeries, {
-        color: "#8b5cf6",
+        color: "#5a9a92",
         lineWidth: 2,
         priceScaleId: "pb",
       });
@@ -147,7 +147,7 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
       const volumeData: HistogramData<Time>[] = data.map((d) => ({
         time: d.date as Time,
         value: d.volume,
-        color: d.close >= d.open ? "#22c55e80" : "#ef444480",
+        color: d.close >= d.open ? "#c75a4a80" : "#6ea96a80",
       }));
 
       candlestickSeries.setData(candleData);
@@ -230,16 +230,16 @@ export default function StockChart({ data, peData, pbData }: StockChartProps) {
       <div className="absolute top-2 left-2 z-10 flex gap-4 text-sm">
         {legendData.pe !== null && (
           <div className="flex items-center gap-1">
-            <span className="w-3 h-0.5 bg-yellow-400"></span>
-            <span className="text-slate-400">PE:</span>
-            <span className="text-white">{legendData.pe.toFixed(2)}</span>
+            <span className="w-3 h-0.5 bg-vt-brass-400"></span>
+            <span className="vt-engraved not-italic text-xs uppercase tracking-wider">PE:</span>
+            <span className="text-vt-parchment font-[var(--font-geist-mono)]">{legendData.pe.toFixed(2)}</span>
           </div>
         )}
         {legendData.pb !== null && (
           <div className="flex items-center gap-1">
-            <span className="w-3 h-0.5 bg-purple-500"></span>
-            <span className="text-slate-400">PB:</span>
-            <span className="text-white">{legendData.pb.toFixed(2)}</span>
+            <span className="w-3 h-0.5 bg-vt-teal-400"></span>
+            <span className="vt-engraved not-italic text-xs uppercase tracking-wider">PB:</span>
+            <span className="text-vt-parchment font-[var(--font-geist-mono)]">{legendData.pb.toFixed(2)}</span>
           </div>
         )}
       </div>

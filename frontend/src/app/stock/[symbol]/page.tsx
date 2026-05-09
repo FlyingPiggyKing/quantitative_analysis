@@ -260,18 +260,18 @@ export default function StockDetailPage() {
 
   if (loading || isLoading) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center">
-        <div className="text-white text-lg">{loadingMessage}</div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="vt-engraved text-lg whitespace-pre-line text-center">{loadingMessage}</div>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center">
-        <div className="text-red-400 text-lg mb-4">{error}</div>
-        <Link href="/" className="text-blue-400 hover:text-blue-300">
-          返回首页
+      <div className="min-h-screen flex flex-col items-center justify-center">
+        <div className="text-vt-oxblood-400 text-lg mb-4 font-[var(--font-playfair)] italic tracking-wide">{error}</div>
+        <Link href="/" className="vt-btn-secondary px-5 py-2 text-xs">
+          返 回 首 页
         </Link>
       </div>
     );
@@ -281,37 +281,48 @@ export default function StockDetailPage() {
   const latestChange = klineData.length > 0 ? klineData[klineData.length - 1].change_pct || 0 : 0;
 
   return (
-    <div className="min-h-screen bg-slate-900">
+    <div className="min-h-screen">
       {/* Header */}
-      <header className="bg-slate-800 border-b border-slate-700 px-4 py-3 sm:py-4">
+      <header
+        className="px-4 py-3 sm:py-4 border-b"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(34,28,20,0.95) 0%, rgba(20,17,13,0.95) 100%)",
+          borderBottomColor: "var(--vt-brass-700)",
+          boxShadow:
+            "inset 0 1px 0 rgba(241,214,138,0.08), 0 4px 12px rgba(0,0,0,0.5)",
+        }}
+      >
         <div className="max-w-6xl mx-auto">
           {/* Back link and title row */}
           <div className="flex items-center gap-3 mb-3">
-            <Link href="/" className="text-slate-400 hover:text-white active:scale-95 transition-transform">
+            <Link href="/" className="vt-engraved not-italic text-vt-parchment-dim hover:text-vt-brass-300 active:scale-95 transition-all">
               ← 返回
             </Link>
             <div className="flex-1 min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold text-white truncate">
-                {stockInfo?.name || symbol} ({symbol})
+              <h1 className="vt-emboss text-2xl sm:text-3xl truncate leading-tight">
+                {stockInfo?.name || symbol}{" "}
+                <span className="text-vt-brass-400 font-[var(--font-geist-mono)] text-xl sm:text-2xl tracking-widest" style={{ WebkitTextFillColor: "currentColor", background: "none" }}>
+                  ({symbol})
+                </span>
               </h1>
               {stockInfo?.sector && (
-                <p className="text-slate-400 text-xs sm:text-sm hidden sm:block">{stockInfo.sector}</p>
+                <p className="vt-engraved text-xs sm:text-sm hidden sm:block">{stockInfo.sector}</p>
               )}
             </div>
             <button
               onClick={handleWatchlistToggle}
               disabled={watchlistLoading}
-              className={`px-3 py-2 sm:px-4 sm:py-2 rounded-lg font-medium transition-colors active:scale-95 disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center ${
-                isInWatchlist
-                  ? "bg-red-600 hover:bg-red-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              className={`px-4 py-2 text-xs disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                isInWatchlist ? "vt-btn-secondary" : "vt-btn-primary"
               }`}
+              style={isInWatchlist ? { color: "var(--vt-oxblood-400)" } : undefined}
             >
               {watchlistLoading
-                ? "..."
+                ? "…"
                 : isInWatchlist
-                ? "移除"
-                : "自选"}
+                ? "移 除"
+                : "自 选"}
             </button>
           </div>
 
@@ -319,8 +330,18 @@ export default function StockDetailPage() {
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
             {klineData.length > 0 && (
               <div className="flex items-baseline gap-3">
-                <div className="text-2xl sm:text-3xl font-bold text-white">{latestPrice.toFixed(2)}</div>
-                <div className={`text-base sm:text-lg ${latestChange >= 0 ? "text-red-400" : "text-green-400"}`}>
+                <div
+                  className="text-3xl sm:text-4xl font-[var(--font-playfair)] font-bold text-vt-parchment"
+                  style={{ textShadow: "0 1px 0 rgba(241,214,138,0.18), 0 2px 4px rgba(0,0,0,0.6)" }}
+                >
+                  {latestPrice.toFixed(2)}
+                </div>
+                <div
+                  className={`text-base sm:text-lg font-[var(--font-geist-mono)] font-bold tracking-wide ${
+                    latestChange >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"
+                  }`}
+                  style={{ textShadow: "0 0 8px currentColor, 0 1px 0 rgba(0,0,0,0.6)" }}
+                >
                   {latestChange >= 0 ? "+" : ""}
                   {latestChange.toFixed(2)}%
                 </div>
@@ -328,11 +349,11 @@ export default function StockDetailPage() {
             )}
 
             {valuation && (
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-4 text-sm border-t sm:border-t-0 border-slate-700 pt-3 sm:pt-0">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-5 text-sm border-t sm:border-t-0 border-vt-ink-700 pt-3 sm:pt-0">
                 <div>
-                  <div className="text-slate-400 text-xs">PE(TTM)</div>
+                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>PE(TTM)</div>
                   <div className="flex items-center gap-1">
-                    <span className="text-white font-medium">{valuation.pe_ttm != null ? valuation.pe_ttm.toFixed(2) : "N/A"}</span>
+                    <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.pe_ttm != null ? valuation.pe_ttm.toFixed(2) : "N/A"}</span>
                     <PETrendSparkline
                       peHistory={valuationHistory.map((v) => ({ date: v.trade_date, pe: v.pe_ttm }))}
                       loading={false}
@@ -341,16 +362,16 @@ export default function StockDetailPage() {
                   </div>
                 </div>
                 <div>
-                  <div className="text-slate-400 text-xs">PB</div>
-                  <span className="text-white font-medium">{valuation.pb != null ? valuation.pb.toFixed(2) : "N/A"}</span>
+                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>PB</div>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.pb != null ? valuation.pb.toFixed(2) : "N/A"}</span>
                 </div>
                 <div>
-                  <div className="text-slate-400 text-xs">换手率</div>
-                  <span className="text-white font-medium">{valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}</span>
+                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>换手率</div>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}</span>
                 </div>
                 <div>
-                  <div className="text-slate-400 text-xs">总市值</div>
-                  <span className="text-white font-medium">{valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}</span>
+                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>总市值</div>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}</span>
                 </div>
               </div>
             )}
@@ -361,8 +382,10 @@ export default function StockDetailPage() {
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Chart */}
-        <section className="bg-slate-800 rounded-lg p-3 sm:p-4">
-          <h2 className="text-lg font-medium text-white mb-4">K线图</h2>
+        <section className="vt-panel p-3 sm:p-4">
+          <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
+            <span className="text-vt-brass-400">❖</span> K 线 图
+          </h2>
           {klineData.length > 0 ? (
             <StockChart
               data={klineData}
@@ -370,7 +393,7 @@ export default function StockDetailPage() {
               pbData={valuationHistory.map((v) => ({ date: v.trade_date, value: v.pb }))}
             />
           ) : (
-            <div className="h-[250px] sm:h-[400px] flex items-center justify-center text-slate-400">
+            <div className="h-[250px] sm:h-[400px] flex items-center justify-center vt-engraved">
               暂无数据
             </div>
           )}
@@ -378,43 +401,66 @@ export default function StockDetailPage() {
 
         {/* Indicators */}
         <section>
-          <h2 className="text-lg font-medium text-white mb-4">技术指标</h2>
+          <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
+            <span className="text-vt-brass-400">❖</span> 技 术 指 标
+          </h2>
           <IndicatorPanel indicators={indicators} loading={false} />
         </section>
 
         {/* Trend Analysis */}
-        <section className="bg-slate-800 rounded-lg p-3 sm:p-4 relative">
+        <section className="vt-panel relative p-3 sm:p-4 vt-ornament-tl vt-ornament-tr vt-ornament-bl vt-ornament-br">
           <div className="flex items-center mb-4">
-            <h2 className="text-lg font-medium text-white">趋势分析</h2>
+            <h2 className="vt-pred-col-header text-base sm:text-lg" style={{ fontSize: "1rem", letterSpacing: "0.22em" }}>
+              AI 趋 势 分 析
+            </h2>
           </div>
 
           {/* Force Analysis button - top right corner */}
           <button
             onClick={handleRunAnalysis}
             disabled={analysisRunning || cooldownRemaining !== null}
-            className="absolute top-3 right-3 sm:top-4 sm:right-4 px-3 py-2 sm:px-4 sm:py-2 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white text-sm rounded-lg disabled:opacity-50 min-h-[44px]"
+            className="vt-btn-primary absolute top-3 right-3 sm:top-4 sm:right-4 px-3 py-2 sm:px-4 sm:py-2 text-xs disabled:opacity-50 min-h-[44px]"
           >
-            {analysisRunning ? "分析中..." : cooldownRemaining ? `剩余 ${cooldownRemaining}` : "立刻分析"}
+            {analysisRunning ? "分 析 中…" : cooldownRemaining ? `剩余 ${cooldownRemaining}` : "立 刻 分 析"}
           </button>
 
           {analysisRunning ? (
-            <div className="text-slate-400 text-center py-4">
-              <div className="animate-pulse">分析进行中，请稍候...</div>
+            <div className="vt-engraved text-center py-6">
+              <div className="vt-pulse inline-block px-4 py-2 rounded">分析进行中，请稍候…</div>
             </div>
           ) : analysisError ? (
-            <div className="text-red-400 text-center py-4">
+            <div className="text-vt-oxblood-400 font-[var(--font-playfair)] italic tracking-wide text-center py-4">
               {analysisError}
             </div>
           ) : trendPrediction ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400 text-sm">预测方向:</span>
+            <div className="space-y-4">
+              {/* HERO Prediction display - large and eye-catching */}
+              <div
+                className="flex flex-wrap items-center justify-center gap-4 sm:gap-8 py-5 px-3 rounded-md"
+                style={{
+                  background:
+                    "radial-gradient(ellipse at center, rgba(200,156,58,0.10) 0%, rgba(0,0,0,0) 65%)",
+                  borderTop: "1px solid rgba(200,156,58,0.25)",
+                  borderBottom: "1px solid rgba(200,156,58,0.25)",
+                }}
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <span className="vt-prediction-label">预 测 方 向</span>
                   <TrendDirectionBadge direction={trendPrediction.trend_direction} />
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-slate-400 text-sm">置信度:</span>
-                  <span className="text-white font-medium">{trendPrediction.confidence}%</span>
+                <div className="flex flex-col items-center gap-1">
+                  <span className="vt-prediction-label">置 信 度</span>
+                  <span
+                    className="font-[var(--font-playfair)] font-extrabold text-3xl sm:text-4xl text-vt-brass-300"
+                    style={{
+                      textShadow:
+                        "0 0 12px rgba(229,193,99,0.55), 0 1px 0 rgba(0,0,0,0.6), 0 -1px 0 rgba(255,220,140,0.15)",
+                      letterSpacing: "0.02em",
+                    }}
+                  >
+                    {trendPrediction.confidence}
+                    <span className="text-xl sm:text-2xl text-vt-brass-400 ml-1">%</span>
+                  </span>
                 </div>
               </div>
 
@@ -423,17 +469,17 @@ export default function StockDetailPage() {
                 <TrendAnalysisPanel prediction={trendPrediction} />
               ) : (
                 <div>
-                  <p className="text-slate-400 text-sm mb-1">分析摘要:</p>
-                  <p className="text-white text-sm">{trendPrediction.summary}</p>
+                  <p className="vt-prediction-label mb-2">分 析 摘 要</p>
+                  <p className="text-vt-parchment text-sm leading-relaxed">{trendPrediction.summary}</p>
                 </div>
               )}
 
-              <div className="text-slate-500 text-xs">
+              <div className="vt-engraved text-xs">
                 分析时间: {new Date(trendPrediction.analyzed_at).toLocaleString("zh-CN")}
               </div>
             </div>
           ) : (
-            <div className="text-slate-400 text-center py-4">
+            <div className="vt-engraved text-center py-4">
               暂无分析数据
             </div>
           )}
@@ -441,31 +487,33 @@ export default function StockDetailPage() {
 
         {/* Data Table */}
         {klineData.length > 0 && (
-          <section className="bg-slate-800 rounded-lg p-3 sm:p-4">
-            <h2 className="text-lg font-medium text-white mb-4">近期行情</h2>
+          <section className="vt-panel p-3 sm:p-4">
+            <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
+              <span className="text-vt-brass-400">❖</span> 近 期 行 情
+            </h2>
             <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
               <table className="w-full text-sm min-w-[600px] sm:min-w-0">
                 <thead>
-                  <tr className="text-slate-400 border-b border-slate-700">
-                    <th className="text-left py-2 px-3">日期</th>
-                    <th className="text-right py-2 px-3">开盘</th>
-                    <th className="text-right py-2 px-3">收盘</th>
-                    <th className="text-right py-2 px-3">最高</th>
-                    <th className="text-right py-2 px-3">最低</th>
-                    <th className="text-right py-2 px-3">成交量</th>
-                    <th className="text-right py-2 px-3">涨跌幅</th>
+                  <tr className="border-b border-vt-ink-700">
+                    <th className="text-left py-2 px-3 vt-tab text-xs">日期</th>
+                    <th className="text-right py-2 px-3 vt-tab text-xs">开盘</th>
+                    <th className="text-right py-2 px-3 vt-tab text-xs">收盘</th>
+                    <th className="text-right py-2 px-3 vt-tab text-xs">最高</th>
+                    <th className="text-right py-2 px-3 vt-tab text-xs">最低</th>
+                    <th className="text-right py-2 px-3 vt-tab text-xs">成交量</th>
+                    <th className="text-right py-2 px-3 vt-tab text-xs">涨跌幅</th>
                   </tr>
                 </thead>
                 <tbody>
                   {klineData.slice(-10).reverse().map((row, idx) => (
-                    <tr key={idx} className="text-white border-b border-slate-700/50 hover:bg-slate-700/30">
-                      <td className="py-2 px-3">{row.date}</td>
-                      <td className="text-right py-2 px-3 font-mono">{row.open.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-mono">{row.close.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-mono">{row.high.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-mono">{row.low.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-mono">{(row.volume / 10000).toFixed(2)}万</td>
-                      <td className={`text-right py-2 px-3 font-mono ${row.change_pct! >= 0 ? "text-red-400" : "text-green-400"}`}>
+                    <tr key={idx} className="text-vt-parchment border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors">
+                      <td className="py-2 px-3 font-[var(--font-geist-mono)] text-vt-parchment-dim">{row.date}</td>
+                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.open.toFixed(2)}</td>
+                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.close.toFixed(2)}</td>
+                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.high.toFixed(2)}</td>
+                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.low.toFixed(2)}</td>
+                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{(row.volume / 10000).toFixed(2)}万</td>
+                      <td className={`text-right py-2 px-3 font-[var(--font-geist-mono)] font-bold ${row.change_pct! >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"}`}>
                         {row.change_pct!.toFixed(2)}%
                       </td>
                     </tr>
@@ -489,20 +537,32 @@ export default function StockDetailPage() {
 function TrendDirectionBadge({ direction }: { direction: string }) {
   if (direction === "up") {
     return (
-      <span className="inline-flex items-center px-2 py-1 bg-emerald-500/20 text-emerald-400 text-sm rounded">
-        ↑ 上涨
+      <span
+        className="vt-pred-up vt-pulse"
+        style={{ fontSize: "1.5rem", padding: "0.4rem 1rem" }}
+      >
+        <span className="text-2xl leading-none">▲</span>
+        看 涨
       </span>
     );
   } else if (direction === "down") {
     return (
-      <span className="inline-flex items-center px-2 py-1 bg-red-500/20 text-red-400 text-sm rounded">
-        ↓ 下跌
+      <span
+        className="vt-pred-down vt-pulse"
+        style={{ fontSize: "1.5rem", padding: "0.4rem 1rem" }}
+      >
+        <span className="text-2xl leading-none">▼</span>
+        看 跌
       </span>
     );
   } else {
     return (
-      <span className="inline-flex items-center px-2 py-1 bg-slate-500/20 text-slate-400 text-sm rounded">
-        - 中性
+      <span
+        className="vt-pred-flat"
+        style={{ fontSize: "1.5rem", padding: "0.4rem 1rem" }}
+      >
+        <span className="text-2xl leading-none">◆</span>
+        中 性
       </span>
     );
   }

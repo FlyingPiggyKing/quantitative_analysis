@@ -100,24 +100,26 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       {/* Backdrop */}
       <div
-        className="absolute inset-0 bg-black/60 backdrop-blur-sm"
+        className="absolute inset-0 backdrop-blur-sm"
+        style={{ background: "rgba(8,6,4,0.75)" }}
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative bg-slate-800 rounded-lg p-6 w-full max-w-sm mx-4 shadow-2xl border border-slate-700">
+      <div className="vt-panel relative p-6 w-full max-w-sm mx-4 vt-ornament-tl vt-ornament-tr vt-ornament-bl vt-ornament-br">
         <button
           onClick={onClose}
-          className="absolute top-3 right-3 text-slate-400 hover:text-white text-xl"
+          className="absolute top-3 right-3 text-vt-parchment-dim hover:text-vt-brass-300 text-xl transition-colors"
         >
           ×
         </button>
 
         <div className="text-center mb-6">
-          <h2 className="text-xl font-bold text-white mb-1">
-            {isLogin ? "登录" : "注册"}
+          <h2 className="vt-emboss text-3xl mb-2 leading-none">
+            {isLogin ? "登 录" : "注 册"}
           </h2>
-          <p className="text-slate-400 text-sm">{message}</p>
+          <p className="vt-engraved text-sm">{message}</p>
+          <hr className="vt-rule mt-3 max-w-[80%] mx-auto" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -126,7 +128,7 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
               type="text"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="vt-input w-full px-4 py-2"
               placeholder="用户名"
               required
             />
@@ -137,7 +139,7 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="vt-input w-full px-4 py-2"
               placeholder="密码"
               required
             />
@@ -149,7 +151,7 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
                 type="password"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="vt-input w-full px-4 py-2"
                 placeholder="确认密码"
                 required
               />
@@ -162,7 +164,8 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
                 <img
                   src={captcha.image}
                   alt="CAPTCHA"
-                  className="h-10 rounded border border-slate-600 cursor-pointer"
+                  className="h-10 rounded-sm border border-vt-brass-700 cursor-pointer"
+                  style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4), 0 1px 0 rgba(241,214,138,0.08)" }}
                   onClick={fetchCaptcha}
                   title="点击刷新"
                 />
@@ -171,7 +174,7 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
                 type="text"
                 value={captchaCode}
                 onChange={(e) => setCaptchaCode(e.target.value.toUpperCase())}
-                className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="vt-input flex-1 px-4 py-2"
                 placeholder="验证码"
                 maxLength={6}
                 required
@@ -180,15 +183,15 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
           </div>
 
           {error && (
-            <div className="text-red-400 text-sm text-center">{error}</div>
+            <div className="text-vt-oxblood-400 text-sm text-center font-[var(--font-playfair)] italic tracking-wide">{error}</div>
           )}
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-medium rounded-lg transition-colors"
+            className="vt-btn-primary w-full px-4 py-2 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {isLoading ? "请稍候..." : isLogin ? "登录" : "注册"}
+            {isLoading ? "请 稍 候 …" : isLogin ? "登 录" : "注 册"}
           </button>
         </form>
 
@@ -196,7 +199,7 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
           <button
             type="button"
             onClick={toggleMode}
-            className="text-blue-400 hover:text-blue-300 text-sm"
+            className="text-vt-brass-400 hover:text-vt-brass-300 text-sm font-[var(--font-playfair)] italic tracking-wide transition-colors"
           >
             {isLogin ? "没有账号？立即注册" : "已有账号？去登录"}
           </button>

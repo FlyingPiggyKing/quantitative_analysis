@@ -27,20 +27,23 @@ function TrendIndicator({ prediction }: { prediction: TrendPrediction }) {
 
   if (trend_direction === "up") {
     return (
-      <span className="text-emerald-400">
-        ↑ {confidence}%
+      <span className="vt-pred-up vt-pulse">
+        <span className="text-lg leading-none">▲</span>
+        {confidence}%
       </span>
     );
   } else if (trend_direction === "down") {
     return (
-      <span className="text-red-400">
-        ↓ {confidence}%
+      <span className="vt-pred-down vt-pulse">
+        <span className="text-lg leading-none">▼</span>
+        {confidence}%
       </span>
     );
   } else {
     return (
-      <span className="text-slate-400">
-        - {confidence}%
+      <span className="vt-pred-flat">
+        <span className="text-lg leading-none">◆</span>
+        {confidence}%
       </span>
     );
   }
@@ -58,30 +61,30 @@ function StockRow({ info, valuation, prediction, mobile = false }: StockCardProp
     return (
       <Link
         href={`/stock/${info.symbol}`}
-        className="block bg-slate-700/50 rounded-lg p-3 min-h-[44px] active:opacity-70 transition-opacity"
+        className="vt-card block p-3 min-h-[44px] active:opacity-80 transition-opacity"
       >
         <div className="flex justify-between items-start mb-2">
           <div>
-            <span className="text-blue-400 font-medium">{info.symbol}</span>
-            <span className="text-white ml-2">{info.name || info.symbol}</span>
+            <span className="text-vt-brass-300 font-[var(--font-geist-mono)] tracking-wider">{info.symbol}</span>
+            <span className="text-vt-parchment ml-2">{info.name || info.symbol}</span>
           </div>
           <div className="text-right">
-            <div className="text-slate-500 text-xs mb-1">AI下周走势</div>
+            <div className="vt-pred-col-header text-[0.6rem] mb-1">AI下周走势</div>
             {prediction ? (
               <TrendIndicator prediction={prediction} />
             ) : (
-              <span className="text-slate-500 text-sm">-</span>
+              <span className="text-vt-parchment-dim text-sm">—</span>
             )}
           </div>
         </div>
-        <div className="flex items-center gap-4 text-sm text-slate-400">
+        <div className="flex items-center gap-4 text-sm">
           <div>
-            <span className="text-white">{valuation?.pe != null ? valuation.pe.toFixed(2) : "-"}</span>
-            <span className="text-slate-500 text-xs ml-1">PE</span>
+            <span className="text-vt-parchment font-[var(--font-geist-mono)]">{valuation?.pe != null ? valuation.pe.toFixed(2) : "-"}</span>
+            <span className="text-vt-parchment-dim text-xs ml-1">PE</span>
           </div>
           <div>
-            <span className="text-white">{valuation?.pb != null ? valuation.pb.toFixed(2) : "-"}</span>
-            <span className="text-slate-500 text-xs ml-1">PB</span>
+            <span className="text-vt-parchment font-[var(--font-geist-mono)]">{valuation?.pb != null ? valuation.pb.toFixed(2) : "-"}</span>
+            <span className="text-vt-parchment-dim text-xs ml-1">PB</span>
           </div>
         </div>
       </Link>
@@ -90,12 +93,12 @@ function StockRow({ info, valuation, prediction, mobile = false }: StockCardProp
 
   return (
     <tr
-      className="text-white border-b border-slate-700/50 hover:bg-slate-700/30"
+      className="text-vt-parchment border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors"
     >
-      <td className="py-2 px-3">
+      <td className="py-2 px-3 font-[var(--font-geist-mono)]">
         <Link
           href={`/stock/${info.symbol}`}
-          className="text-blue-400 hover:text-blue-300"
+          className="text-vt-brass-300 hover:text-vt-brass-400 tracking-wider"
         >
           {info.symbol}
         </Link>
@@ -103,27 +106,27 @@ function StockRow({ info, valuation, prediction, mobile = false }: StockCardProp
       <td className="py-2 px-3">
         <Link
           href={`/stock/${info.symbol}`}
-          className="hover:text-blue-300"
+          className="text-vt-parchment hover:text-vt-brass-300 transition-colors"
         >
           {info.name || info.symbol}
         </Link>
       </td>
-      <td className="py-2 px-3 text-right">
+      <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
         {valuation?.pe != null ? valuation.pe.toFixed(2) : "-"}
       </td>
-      <td className="py-2 px-3 text-right">
+      <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
         {valuation?.pb != null ? valuation.pb.toFixed(2) : "-"}
       </td>
-      <td className="py-2 px-3 text-right">
+      <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
         {valuation?.turnover_rate != null
           ? `${valuation.turnover_rate.toFixed(2)}%`
           : "-"}
       </td>
-      <td className="py-2 px-3 text-right">
+      <td className="py-2 px-3 text-center">
         {prediction ? (
           <TrendIndicator prediction={prediction} />
         ) : (
-          <span className="text-slate-500">-</span>
+          <span className="text-vt-parchment-dim">—</span>
         )}
       </td>
     </tr>
@@ -144,13 +147,13 @@ function PresetTable({ stocks, infoMap, valMap, predictions }: PresetTableProps)
       <div className="hidden sm:block overflow-x-auto">
         <table className="w-full text-sm">
           <thead>
-            <tr className="text-slate-400 border-b border-slate-700">
-              <th className="text-left py-2 px-3">股票代码</th>
-              <th className="text-left py-2 px-3">股票名称</th>
-              <th className="text-right py-2 px-3">市盈率(PE)</th>
-              <th className="text-right py-2 px-3">市净率(PB)</th>
-              <th className="text-right py-2 px-3">换手率</th>
-              <th className="text-right py-2 px-3">AI下周预测</th>
+            <tr className="border-b border-vt-ink-700">
+              <th className="text-left py-2 px-3 vt-tab text-xs">股票代码</th>
+              <th className="text-left py-2 px-3 vt-tab text-xs">股票名称</th>
+              <th className="text-right py-2 px-3 vt-tab text-xs">市盈率(PE)</th>
+              <th className="text-right py-2 px-3 vt-tab text-xs">市净率(PB)</th>
+              <th className="text-right py-2 px-3 vt-tab text-xs">换手率</th>
+              <th className="text-center py-2 px-3 vt-pred-col-header">AI下周预测</th>
             </tr>
           </thead>
           <tbody>
@@ -272,7 +275,7 @@ export function ASharePresetList() {
   const isDataLoading = infoLoading || valLoading;
 
   if (isDataLoading) {
-    return <div className="text-slate-400 text-center py-4">加载中...</div>;
+    return <div className="vt-engraved text-center py-4">加载中…</div>;
   }
 
   return (
@@ -359,7 +362,7 @@ export function USPresetList() {
   const isDataLoading = infoLoading || valLoading;
 
   if (isDataLoading) {
-    return <div className="text-slate-400 text-center py-4">{"美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中..."}</div>;
+    return <div className="vt-engraved text-center py-4 whitespace-pre-line">{"美股数据刷新偏慢，请耐心等待，如数据不全，请再次刷新\n加载中…"}</div>;
   }
 
   return (
@@ -446,7 +449,7 @@ export function HKPresetList() {
   const isDataLoading = infoLoading || valLoading;
 
   if (isDataLoading) {
-    return <div className="text-slate-400 text-center py-4">加载中...</div>;
+    return <div className="vt-engraved text-center py-4">加载中…</div>;
   }
 
   return (
@@ -463,8 +466,10 @@ export default function PresetStockList() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-lg font-medium text-white">推荐股票</h2>
-        <span className="text-slate-500 text-sm">游客预览</span>
+        <h2 className="font-[var(--font-playfair)] text-xl tracking-[0.18em] text-vt-parchment uppercase">
+          <span className="text-vt-brass-400">❖</span> 推 荐 股 票 <span className="text-vt-brass-400">❖</span>
+        </h2>
+        <span className="vt-engraved text-sm">游客预览</span>
       </div>
       <StockMarketTabs
         aShareContent={<ASharePresetList />}

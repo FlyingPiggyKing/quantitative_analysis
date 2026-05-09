@@ -29,11 +29,11 @@ interface IndicatorPanelProps {
 export default function IndicatorPanel({ indicators, loading }: IndicatorPanelProps) {
   if (loading) {
     return (
-      <div className="bg-slate-800 rounded-lg p-4">
+      <div className="vt-panel p-4">
         <div className="animate-pulse space-y-3">
-          <div className="h-4 bg-slate-700 rounded w-1/4"></div>
-          <div className="h-4 bg-slate-700 rounded w-1/3"></div>
-          <div className="h-4 bg-slate-700 rounded w-1/2"></div>
+          <div className="h-4 bg-vt-ink-700 rounded w-1/4"></div>
+          <div className="h-4 bg-vt-ink-700 rounded w-1/3"></div>
+          <div className="h-4 bg-vt-ink-700 rounded w-1/2"></div>
         </div>
       </div>
     );
@@ -64,13 +64,13 @@ export default function IndicatorPanel({ indicators, loading }: IndicatorPanelPr
   }) => {
     const isCollapsed = collapsedSections[sectionKey];
     return (
-      <div className="bg-slate-800 rounded-lg p-4">
+      <div className="vt-panel p-4">
         <button
           onClick={() => toggleSection(sectionKey)}
-          className="w-full flex justify-between items-center min-h-[44px] active:opacity-70"
+          className="w-full flex justify-between items-center min-h-[44px] active:opacity-80"
         >
-          <h3 className="text-lg font-medium text-white">{title}</h3>
-          <span className="text-slate-400 text-xl">{isCollapsed ? "+" : "−"}</span>
+          <h3 className="font-[var(--font-playfair)] text-base tracking-[0.16em] text-vt-brass-300 uppercase">{title}</h3>
+          <span className="text-vt-brass-400 text-xl font-[var(--font-playfair)]">{isCollapsed ? "+" : "−"}</span>
         </button>
         <div className={`space-y-2 text-sm ${isCollapsed ? "hidden" : "block"}`}>
           {children}
@@ -81,8 +81,8 @@ export default function IndicatorPanel({ indicators, loading }: IndicatorPanelPr
 
   const IndicatorRow = ({ label, value, color }: { label: string; value: number | null; color?: string }) => (
     <div className="flex justify-between items-center">
-      <span className="text-slate-400">{label}</span>
-      <span className={`font-mono ${color || "text-white"}`}>
+      <span className="vt-engraved not-italic text-xs tracking-widest uppercase">{label}</span>
+      <span className={`font-[var(--font-geist-mono)] font-medium ${color || "text-vt-parchment"}`}>
         {value !== null ? value.toFixed(2) : "--"}
       </span>
     </div>
@@ -96,7 +96,7 @@ export default function IndicatorPanel({ indicators, loading }: IndicatorPanelPr
         <IndicatorRow
           label="MACD"
           value={indicators.macd.hist}
-          color={indicators.macd.hist >= 0 ? "text-red-400" : "text-green-400"}
+          color={indicators.macd.hist >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"}
         />
       </IndicatorCard>
 
@@ -104,17 +104,17 @@ export default function IndicatorPanel({ indicators, loading }: IndicatorPanelPr
         <IndicatorRow
           label="RSI(6)"
           value={indicators.rsi.rsi6}
-          color={indicators.rsi.rsi6 > 70 ? "text-red-400" : indicators.rsi.rsi6 < 30 ? "text-green-400" : "text-white"}
+          color={indicators.rsi.rsi6 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi6 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
         />
         <IndicatorRow
           label="RSI(12)"
           value={indicators.rsi.rsi12}
-          color={indicators.rsi.rsi12 > 70 ? "text-red-400" : indicators.rsi.rsi12 < 30 ? "text-green-400" : "text-white"}
+          color={indicators.rsi.rsi12 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi12 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
         />
         <IndicatorRow
           label="RSI(24)"
           value={indicators.rsi.rsi24}
-          color={indicators.rsi.rsi24 > 70 ? "text-red-400" : indicators.rsi.rsi24 < 30 ? "text-green-400" : "text-white"}
+          color={indicators.rsi.rsi24 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi24 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
         />
       </IndicatorCard>
 

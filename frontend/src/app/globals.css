@@ -1,8 +1,37 @@
 @import "tailwindcss";
 
+/* ==========================================================================
+   Vintage / Art-Deco Trading Floor Theme v1
+   - Dark background, brass/parchment accents, embossed surfaces
+   ========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* Core palette: deep ink, midnight, parchment, brass, oxblood */
+  --vt-ink-950: #0c0a08;          /* Near-black, warm */
+  --vt-ink-900: #14110d;          /* Deep ink */
+  --vt-ink-850: #1a1611;          /* Card base */
+  --vt-ink-800: #221c14;          /* Raised card */
+  --vt-ink-700: #2d251a;          /* Border / divider */
+  --vt-ink-600: #3a3022;          /* Hover surface */
+
+  --vt-parchment: #f4e9cf;        /* Warm bright text */
+  --vt-parchment-soft: #e8dcb9;   /* Soft text */
+  --vt-parchment-dim: #b8a87d;    /* Muted text */
+
+  --vt-brass-300: #f1d68a;        /* Bright brass / gold leaf */
+  --vt-brass-400: #e5c163;        /* Highlight brass */
+  --vt-brass-500: #c89c3a;        /* Primary brass */
+  --vt-brass-600: #9c7621;        /* Deep brass */
+  --vt-brass-700: #6b4f15;        /* Antique brass shadow */
+
+  --vt-oxblood-400: #c75a4a;      /* Down / danger */
+  --vt-oxblood-500: #a8392a;
+  --vt-emerald-400: #6ea96a;      /* Up / success vintage green */
+  --vt-emerald-500: #4f8a4a;
+  --vt-teal-400: #5a9a92;         /* Neutral accent */
+
+  --background: var(--vt-ink-950);
+  --foreground: var(--vt-parchment);
 }
 
 @theme inline {
@@ -10,34 +39,456 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --font-display: var(--font-playfair);
+
+  --color-vt-ink-950: var(--vt-ink-950);
+  --color-vt-ink-900: var(--vt-ink-900);
+  --color-vt-ink-850: var(--vt-ink-850);
+  --color-vt-ink-800: var(--vt-ink-800);
+  --color-vt-ink-700: var(--vt-ink-700);
+  --color-vt-ink-600: var(--vt-ink-600);
+  --color-vt-parchment: var(--vt-parchment);
+  --color-vt-parchment-soft: var(--vt-parchment-soft);
+  --color-vt-parchment-dim: var(--vt-parchment-dim);
+  --color-vt-brass-300: var(--vt-brass-300);
+  --color-vt-brass-400: var(--vt-brass-400);
+  --color-vt-brass-500: var(--vt-brass-500);
+  --color-vt-brass-600: var(--vt-brass-600);
+  --color-vt-brass-700: var(--vt-brass-700);
+  --color-vt-oxblood-400: var(--vt-oxblood-400);
+  --color-vt-oxblood-500: var(--vt-oxblood-500);
+  --color-vt-emerald-400: var(--vt-emerald-400);
+  --color-vt-emerald-500: var(--vt-emerald-500);
+  --color-vt-teal-400: var(--vt-teal-400);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+/* Page-level: warm dark gradient + faint film-grain noise overlay */
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background-color: var(--vt-ink-950);
+  background-image:
+    radial-gradient(ellipse at top, rgba(120, 90, 40, 0.18) 0%, transparent 55%),
+    radial-gradient(ellipse at bottom, rgba(60, 40, 20, 0.25) 0%, transparent 60%),
+    linear-gradient(180deg, #0e0b08 0%, #0c0a07 50%, #0a0805 100%);
+  background-attachment: fixed;
+  color: var(--vt-parchment);
+  font-family: var(--font-geist-sans), Georgia, "Times New Roman", serif;
   -webkit-text-size-adjust: 100%;
+  position: relative;
 }
 
-/* Ensure minimum touch target size */
-button, a, [role="button"] {
-  min-height: 44px;
-  min-width: 44px;
+/* Subtle film-grain / paper texture on top of everything */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.05;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.95  0 0 0 0 0.85  0 0 0 0 0.65  0 0 0 0.6 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
-/* Improve mobile scrolling */
-html {
-  -webkit-overflow-scrolling: touch;
+body > * { position: relative; z-index: 2; }
+
+/* Touch targets */
+button, a, [role="button"] { min-height: 44px; min-width: 44px; }
+html { -webkit-overflow-scrolling: touch; }
+* { -webkit-tap-highlight-color: transparent; }
+
+/* ==========================================================================
+   Vintage utility classes
+   ========================================================================== */
+
+/* Embossed logo / heading text — cast brass with bevel highlight */
+.vt-emboss {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: linear-gradient(
+    180deg,
+    #fbe39a 0%,
+    #e9c569 28%,
+    #b88a2c 55%,
+    #7a5715 78%,
+    #c89c3a 100%
+  );
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-shadow:
+    0 1px 0 rgba(255, 220, 140, 0.18),
+    0 -1px 0 rgba(0, 0, 0, 0.55),
+    0 2px 4px rgba(0, 0, 0, 0.7);
+  filter: drop-shadow(0 2px 1px rgba(0, 0, 0, 0.6))
+          drop-shadow(0 0 14px rgba(200, 156, 58, 0.18));
 }
 
-/* Remove tap highlight on mobile */
-* {
-  -webkit-tap-highlight-color: transparent;
+/* Smaller engraved subtitle */
+.vt-engraved {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-style: italic;
+  color: var(--vt-parchment-dim);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.7),
+    0 -1px 0 rgba(255, 220, 140, 0.06);
+  letter-spacing: 0.05em;
 }
+
+/* Heading separator — double-rule brass */
+.vt-rule {
+  border: 0;
+  height: 4px;
+  background:
+    linear-gradient(180deg,
+      transparent 0%,
+      var(--vt-brass-600) 35%,
+      var(--vt-brass-300) 50%,
+      var(--vt-brass-600) 65%,
+      transparent 100%);
+  box-shadow: 0 1px 0 rgba(0,0,0,0.7), 0 -1px 0 rgba(0,0,0,0.5);
+}
+
+/* Surface panel — like an aged leather/parchment plaque */
+.vt-panel {
+  background:
+    linear-gradient(180deg, rgba(40, 32, 22, 0.92) 0%, rgba(24, 19, 13, 0.96) 100%);
+  border: 1px solid var(--vt-ink-700);
+  border-radius: 6px;
+  box-shadow:
+    inset 0 1px 0 rgba(241, 214, 138, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    0 1px 0 rgba(0, 0, 0, 0.5),
+    0 8px 20px -8px rgba(0, 0, 0, 0.7);
+}
+
+/* Engraved card — slightly inset feel */
+.vt-card {
+  background:
+    linear-gradient(180deg, rgba(34, 28, 20, 0.85) 0%, rgba(20, 17, 13, 0.92) 100%);
+  border: 1px solid rgba(120, 95, 50, 0.25);
+  border-radius: 4px;
+  box-shadow:
+    inset 0 1px 0 rgba(241, 214, 138, 0.05),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+}
+
+/* Primary brass button — like a stamped metal plate */
+.vt-btn-primary {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #1a1208;
+  background:
+    linear-gradient(180deg, #f3d680 0%, #d8ad48 35%, #a87b1f 75%, #855e14 100%);
+  border: 1px solid #5a3f0f;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 195, 0.7),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 220, 140, 0.25),
+    0 2px 0 #3d2a08,
+    0 4px 8px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 0 rgba(255, 230, 170, 0.55);
+  transition: transform 0.06s ease-out, box-shadow 0.12s ease-out, filter 0.12s;
+}
+.vt-btn-primary:hover {
+  filter: brightness(1.07);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 240, 195, 0.85),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5),
+    inset 0 0 0 1px rgba(255, 220, 140, 0.35),
+    0 2px 0 #3d2a08,
+    0 6px 14px rgba(0, 0, 0, 0.6);
+}
+.vt-btn-primary:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.4),
+    inset 0 -1px 0 rgba(255, 220, 140, 0.3),
+    0 0 0 #3d2a08,
+    0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* Secondary / "engraved" button — dark with brass rim */
+.vt-btn-secondary {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--vt-brass-300);
+  background:
+    linear-gradient(180deg, #2a221a 0%, #1a1410 100%);
+  border: 1px solid var(--vt-brass-700);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(241, 214, 138, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 2px 0 rgba(0, 0, 0, 0.6),
+    0 4px 8px rgba(0, 0, 0, 0.45);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+  transition: transform 0.06s ease-out, color 0.12s, box-shadow 0.12s;
+}
+.vt-btn-secondary:hover {
+  color: var(--vt-brass-400);
+  box-shadow:
+    inset 0 1px 0 rgba(241, 214, 138, 0.28),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 0 0 1px rgba(241, 214, 138, 0.15),
+    0 2px 0 rgba(0, 0, 0, 0.6),
+    0 6px 14px rgba(0, 0, 0, 0.5);
+}
+.vt-btn-secondary:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 3px rgba(0, 0, 0, 0.6),
+    0 0 0 rgba(0, 0, 0, 0.6),
+    0 1px 4px rgba(0, 0, 0, 0.4);
+}
+
+/* Emerald (action — analyze) variant */
+.vt-btn-emerald {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: #f4e9cf;
+  background: linear-gradient(180deg, #6ea96a 0%, #4a7a48 50%, #2f5430 100%);
+  border: 1px solid #1c3a1f;
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(220, 240, 200, 0.45),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.55),
+    inset 0 0 0 1px rgba(180, 220, 160, 0.18),
+    0 2px 0 #16280f,
+    0 4px 8px rgba(0, 0, 0, 0.55);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+  transition: transform 0.06s ease-out, filter 0.12s, box-shadow 0.12s;
+}
+.vt-btn-emerald:hover { filter: brightness(1.1); }
+.vt-btn-emerald:active {
+  transform: translateY(2px);
+  box-shadow:
+    inset 0 1px 2px rgba(0, 0, 0, 0.5),
+    0 0 0 #16280f,
+    0 1px 4px rgba(0, 0, 0, 0.5);
+}
+.vt-btn-emerald:disabled,
+.vt-btn-emerald[disabled] {
+  background: linear-gradient(180deg, #2a2a26 0%, #1a1a16 100%);
+  color: var(--vt-parchment-dim);
+  cursor: not-allowed;
+  filter: grayscale(0.6);
+  opacity: 0.6;
+}
+
+/* Vintage input — brass-rimmed bezel */
+.vt-input {
+  font-family: var(--font-geist-mono), monospace;
+  background:
+    linear-gradient(180deg, #0e0b07 0%, #16110a 100%);
+  color: var(--vt-parchment);
+  border: 1px solid var(--vt-brass-700);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(241, 214, 138, 0.06),
+    0 1px 0 rgba(241, 214, 138, 0.05);
+  letter-spacing: 0.04em;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.vt-input::placeholder { color: rgba(184, 168, 125, 0.45); letter-spacing: 0.03em; }
+.vt-input:focus {
+  outline: none;
+  border-color: var(--vt-brass-400);
+  box-shadow:
+    inset 0 2px 4px rgba(0, 0, 0, 0.7),
+    inset 0 -1px 0 rgba(241, 214, 138, 0.1),
+    0 0 0 1px rgba(229, 193, 99, 0.4),
+    0 0 12px rgba(229, 193, 99, 0.15);
+}
+
+/* Vintage select — brass-rimmed with chevron. Native font/padding to keep
+   the browser's option-list anchored correctly on mobile. */
+.vt-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  color: var(--vt-parchment);
+  background-color: #14110d;
+  background-image:
+    linear-gradient(180deg, rgba(241,214,138,0.06) 0%, rgba(0,0,0,0) 50%),
+    url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%23e5c163' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/></svg>");
+  background-repeat: no-repeat, no-repeat;
+  background-position: 0 0, right 0.55rem center;
+  background-size: auto, 10px 6px;
+  border: 1px solid var(--vt-brass-700);
+  border-radius: 3px;
+  box-shadow:
+    inset 0 1px 0 rgba(241, 214, 138, 0.08),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.5);
+  padding: 0.4rem 1.6rem 0.4rem 0.65rem;
+  min-height: 36px;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.vt-select:focus {
+  outline: none;
+  border-color: var(--vt-brass-400);
+  box-shadow:
+    inset 0 1px 0 rgba(241, 214, 138, 0.12),
+    0 0 0 1px rgba(229, 193, 99, 0.35);
+}
+.vt-select option {
+  background-color: #14110d;
+  color: var(--vt-parchment);
+}
+
+/* AI Prediction headline label — like a stock-ticker plaque */
+.vt-prediction-label {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-size: 0.7rem;
+  color: var(--vt-brass-400);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.8),
+    0 -1px 0 rgba(241, 214, 138, 0.15);
+}
+
+/* AI Prediction — UP (bullish brass-emerald glow) */
+.vt-pred-up {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  padding: 0.18rem 0.6rem;
+  border-radius: 3px;
+  color: #d8f0c8;
+  background: linear-gradient(180deg, rgba(110, 169, 106, 0.22) 0%, rgba(47, 84, 48, 0.18) 100%);
+  border: 1px solid rgba(110, 169, 106, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(220, 240, 200, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(110, 169, 106, 0.35);
+  text-shadow: 0 0 8px rgba(160, 220, 140, 0.6), 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* AI Prediction — DOWN (oxblood vintage red) */
+.vt-pred-down {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 800;
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  padding: 0.18rem 0.6rem;
+  border-radius: 3px;
+  color: #f5c8c0;
+  background: linear-gradient(180deg, rgba(199, 90, 74, 0.22) 0%, rgba(120, 40, 30, 0.18) 100%);
+  border: 1px solid rgba(199, 90, 74, 0.55);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 200, 180, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 12px rgba(199, 90, 74, 0.35);
+  text-shadow: 0 0 8px rgba(245, 160, 140, 0.55), 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* AI Prediction — NEUTRAL (brass) */
+.vt-pred-flat {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 700;
+  font-size: 1.05rem;
+  letter-spacing: 0.05em;
+  padding: 0.18rem 0.6rem;
+  border-radius: 3px;
+  color: var(--vt-brass-300);
+  background: linear-gradient(180deg, rgba(200, 156, 58, 0.18) 0%, rgba(107, 79, 21, 0.14) 100%);
+  border: 1px solid rgba(200, 156, 58, 0.45);
+  box-shadow:
+    inset 0 1px 0 rgba(241, 214, 138, 0.18),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.4),
+    0 0 10px rgba(200, 156, 58, 0.22);
+  text-shadow: 0 0 6px rgba(241, 214, 138, 0.45), 0 1px 0 rgba(0, 0, 0, 0.6);
+}
+
+/* "AI下周预测" emphatic header column */
+.vt-pred-col-header {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: var(--vt-brass-400);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.7),
+    0 0 8px rgba(229, 193, 99, 0.35);
+  position: relative;
+}
+.vt-pred-col-header::before { content: "✦ "; color: var(--vt-brass-300); opacity: 0.85; }
+.vt-pred-col-header::after  { content: " ✦"; color: var(--vt-brass-300); opacity: 0.85; }
+
+/* Soft pulse for active / running prediction state */
+@keyframes vt-pulse-brass {
+  0%,100% { box-shadow: inset 0 1px 0 rgba(241,214,138,0.18), 0 0 10px rgba(229,193,99,0.25); }
+  50%    { box-shadow: inset 0 1px 0 rgba(241,214,138,0.28), 0 0 18px rgba(229,193,99,0.5); }
+}
+.vt-pulse { animation: vt-pulse-brass 2.4s ease-in-out infinite; }
+
+/* Tab styling — letterpress feel */
+.vt-tab {
+  font-family: var(--font-playfair), Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  font-size: 0.78rem;
+  color: var(--vt-parchment-dim);
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7);
+  transition: color 0.15s;
+}
+.vt-tab:hover { color: var(--vt-parchment-soft); }
+.vt-tab-active {
+  color: var(--vt-brass-300);
+  text-shadow:
+    0 1px 0 rgba(0, 0, 0, 0.8),
+    0 0 10px rgba(229, 193, 99, 0.45);
+}
+
+/* Brass underline for active tabs */
+.vt-tab-underline {
+  background: linear-gradient(90deg,
+    transparent 0%,
+    var(--vt-brass-500) 25%,
+    var(--vt-brass-300) 50%,
+    var(--vt-brass-500) 75%,
+    transparent 100%);
+  box-shadow: 0 0 8px rgba(229, 193, 99, 0.55);
+}
+
+/* Subtle decorative corner ornaments (optional usage) */
+.vt-ornament-tl::before,
+.vt-ornament-tr::before,
+.vt-ornament-bl::before,
+.vt-ornament-br::before {
+  content: "";
+  position: absolute;
+  width: 18px; height: 18px;
+  border: 1px solid var(--vt-brass-600);
+  pointer-events: none;
+}
+.vt-ornament-tl::before { top: 6px; left: 6px; border-right: 0; border-bottom: 0; }
+.vt-ornament-tr::before { top: 6px; right: 6px; border-left: 0; border-bottom: 0; }
+.vt-ornament-bl::before { bottom: 6px; left: 6px; border-right: 0; border-top: 0; }
+.vt-ornament-br::before { bottom: 6px; right: 6px; border-left: 0; border-top: 0; }

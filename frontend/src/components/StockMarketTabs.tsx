@@ -31,47 +31,41 @@ export default function StockMarketTabs({
   };
 
   return (
-    <div className="bg-slate-800 rounded-lg p-3 sm:p-4">
+    <div className="vt-panel p-3 sm:p-4">
       {/* Tab Bar */}
-      <div className="flex border-b border-slate-700 mb-4">
+      <div className="flex border-b border-vt-ink-700 mb-4">
         <button
           onClick={() => handleTabChange("A")}
-          className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-            activeTab === "A"
-              ? "text-blue-400"
-              : "text-slate-400 hover:text-slate-300"
+          className={`vt-tab px-4 py-2 transition-colors relative ${
+            activeTab === "A" ? "vt-tab-active" : ""
           }`}
         >
-          A股
+          A 股
           {activeTab === "A" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
+            <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
           )}
         </button>
         <button
           onClick={() => handleTabChange("US")}
-          className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-            activeTab === "US"
-              ? "text-blue-400"
-              : "text-slate-400 hover:text-slate-300"
+          className={`vt-tab px-4 py-2 transition-colors relative ${
+            activeTab === "US" ? "vt-tab-active" : ""
           }`}
         >
-          美股
+          美 股
           {activeTab === "US" && (
-            <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
+            <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
           )}
         </button>
         {hkContent && (
           <button
             onClick={() => handleTabChange("HK")}
-            className={`px-4 py-2 text-sm font-medium transition-colors relative ${
-              activeTab === "HK"
-                ? "text-blue-400"
-                : "text-slate-400 hover:text-slate-300"
+            className={`vt-tab px-4 py-2 transition-colors relative ${
+              activeTab === "HK" ? "vt-tab-active" : ""
             }`}
           >
-            港股
+            港 股
             {activeTab === "HK" && (
-              <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-400" />
+              <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
             )}
           </button>
         )}

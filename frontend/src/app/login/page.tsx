@@ -94,19 +94,20 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 to-slate-800 flex items-center justify-center px-4">
+    <div className="min-h-screen flex items-center justify-center px-4">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
-          <h1 className="text-4xl font-bold text-white mb-2">Stock Analyzer</h1>
-          <p className="text-slate-400">
+          <h1 className="vt-emboss text-5xl mb-3 leading-none">Stock Analyzer</h1>
+          <p className="vt-engraved">
             {isLogin ? "Sign in to your account" : "Create a new account"}
           </p>
+          <hr className="vt-rule mt-4 max-w-sm mx-auto" />
         </div>
 
-        <div className="bg-slate-800 rounded-lg p-8 shadow-xl">
+        <div className="vt-panel relative p-8 vt-ornament-tl vt-ornament-tr vt-ornament-bl vt-ornament-br">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="username" className="block text-sm font-medium text-slate-300 mb-1">
+              <label htmlFor="username" className="block text-xs font-[var(--font-playfair)] uppercase tracking-[0.2em] text-vt-brass-400 mb-2">
                 Username
               </label>
               <input
@@ -114,14 +115,14 @@ export default function LoginPage() {
                 type="text"
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="vt-input w-full px-4 py-2"
                 placeholder="Enter username"
                 required
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-slate-300 mb-1">
+              <label htmlFor="password" className="block text-xs font-[var(--font-playfair)] uppercase tracking-[0.2em] text-vt-brass-400 mb-2">
                 Password
               </label>
               <input
@@ -129,7 +130,7 @@ export default function LoginPage() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="vt-input w-full px-4 py-2"
                 placeholder="Enter password"
                 required
               />
@@ -137,7 +138,7 @@ export default function LoginPage() {
 
             {!isLogin && (
               <div>
-                <label htmlFor="confirmPassword" className="block text-sm font-medium text-slate-300 mb-1">
+                <label htmlFor="confirmPassword" className="block text-xs font-[var(--font-playfair)] uppercase tracking-[0.2em] text-vt-brass-400 mb-2">
                   Confirm Password
                 </label>
                 <input
@@ -145,7 +146,7 @@ export default function LoginPage() {
                   type="password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  className="w-full px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="vt-input w-full px-4 py-2"
                   placeholder="Confirm password"
                   required
                 />
@@ -153,7 +154,7 @@ export default function LoginPage() {
             )}
 
             <div>
-              <label htmlFor="captcha" className="block text-sm font-medium text-slate-300 mb-1">
+              <label htmlFor="captcha" className="block text-xs font-[var(--font-playfair)] uppercase tracking-[0.2em] text-vt-brass-400 mb-2">
                 CAPTCHA Verification
               </label>
               <div className="flex gap-3">
@@ -161,7 +162,8 @@ export default function LoginPage() {
                   <img
                     src={captcha.image}
                     alt="CAPTCHA"
-                    className="h-10 rounded border border-slate-600 cursor-pointer"
+                    className="h-10 rounded-sm border border-vt-brass-700 cursor-pointer"
+                    style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4), 0 1px 0 rgba(241,214,138,0.08)" }}
                     onClick={fetchCaptcha}
                     title="Click to refresh"
                   />
@@ -171,25 +173,25 @@ export default function LoginPage() {
                   type="text"
                   value={captchaCode}
                   onChange={(e) => setCaptchaCode(e.target.value.toUpperCase())}
-                  className="flex-1 px-4 py-2 bg-slate-700 border border-slate-600 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="vt-input flex-1 px-4 py-2"
                   placeholder="Enter CAPTCHA code"
                   maxLength={6}
                   required
                 />
               </div>
-              <p className="text-xs text-slate-500 mt-1">Click image to refresh</p>
+              <p className="vt-engraved text-xs mt-2">Click image to refresh</p>
             </div>
 
             {error && (
-              <div className="text-red-400 text-sm text-center">{error}</div>
+              <div className="text-vt-oxblood-400 text-sm text-center font-[var(--font-playfair)] italic tracking-wide">{error}</div>
             )}
 
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full px-4 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-800 text-white font-medium rounded-lg transition-colors"
+              className="vt-btn-primary w-full px-4 py-3 text-sm disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isLoading ? "Please wait..." : isLogin ? "Sign In" : "Sign Up"}
+              {isLoading ? "Please wait…" : isLogin ? "Sign In" : "Sign Up"}
             </button>
           </form>
 
@@ -197,7 +199,7 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={toggleMode}
-              className="text-blue-400 hover:text-blue-300 text-sm"
+              className="text-vt-brass-400 hover:text-vt-brass-300 text-sm font-[var(--font-playfair)] italic tracking-wide transition-colors"
             >
               {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
             </button>
