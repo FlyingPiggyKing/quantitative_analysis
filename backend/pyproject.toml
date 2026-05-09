@@ -22,6 +22,7 @@ dependencies = [
     "Pillow>=10.0.0",
     "langchain-mcp-adapters>=0.2.2",
     "requests>=2.31.0",
+    "futu-api>=10.4.6408",
 ]
 
 [tool.uv]
