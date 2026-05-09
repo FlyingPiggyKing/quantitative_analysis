@@ -26,16 +26,33 @@ def generate_code(length: int = CAPTCHA_LENGTH) -> str:
     return "".join(random.choice(chars) for _ in range(length))
 
 
+def _load_font(size: int) -> ImageFont.ImageFont | ImageFont.FreeTypeFont:
+    """Load a TrueType font at the requested size, trying common platform paths."""
+    candidates = [
+        "/System/Library/Fonts/Helvetica.ttc",                                  # macOS
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",                    # macOS
+        "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",                 # Debian/Ubuntu
+        "/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",         # Debian/Ubuntu
+        "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",                          # RHEL/CentOS
+        "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf",             # RHEL/CentOS
+        "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",                             # Arch
+        "C:\\Windows\\Fonts\\arialbd.ttf",                                      # Windows
+    ]
+    for path in candidates:
+        try:
+            return ImageFont.truetype(path, size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size=size)
+
+
 def create_captcha_image(code: str) -> str:
     """Create a CAPTCHA image and return as base64 string."""
     width, height = 240, 80
     image = Image.new("RGB", (width, height), "white")
     draw = ImageDraw.Draw(image)
 
-    try:
-        font = ImageFont.truetype("/System/Library/Fonts/Helvetica.ttc", 56)
-    except:
-        font = ImageFont.load_default()
+    font = _load_font(56)
 
     # Draw text with slight rotation
     x_start = 24
