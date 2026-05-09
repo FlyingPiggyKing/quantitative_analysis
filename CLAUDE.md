@@ -11,6 +11,8 @@ This is a quantitative analysis project.
   - API docs: https://openapi.futunn.com/futu-api-doc/quote/overview.html or `context7: futunnopen/py-futu-api`
   - Local skill installed: `futuapi`
 
-## Notes
+## Backend
 
-- Use `uv` for all Python dependency operations (e.g., `uv pip install`, `uv sync`)
+- Dependencies are managed in `backend/.venv` (uv virtualenv)
+- Use `uv` for Python dependency operations (e.g., `uv pip install`, `uv sync`)
+- Run backend from `backend/` directory
