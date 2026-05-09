@@ -164,7 +164,7 @@ export default function AuthModal({ isOpen, onClose, message = "登录后即可�
                 <img
                   src={captcha.image}
                   alt="CAPTCHA"
-                  className="h-14 sm:h-12 w-auto rounded-sm border border-vt-brass-700 cursor-pointer flex-shrink-0"
+                  className="h-10 w-auto rounded-sm border border-vt-brass-700 cursor-pointer flex-shrink-0"
                   style={{
                     boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4), 0 1px 0 rgba(241,214,138,0.08)",
                     imageRendering: "crisp-edges",
