@@ -162,7 +162,7 @@ export default function LoginPage() {
                   <img
                     src={captcha.image}
                     alt="CAPTCHA"
-                    className="h-10 rounded-sm border border-vt-brass-700 cursor-pointer"
+                    className="h-12 sm:h-10 rounded-sm border border-vt-brass-700 cursor-pointer flex-shrink-0"
                     style={{ boxShadow: "inset 0 0 0 1px rgba(0,0,0,0.4), 0 1px 0 rgba(241,214,138,0.08)" }}
                     onClick={fetchCaptcha}
                     title="Click to refresh"
@@ -173,8 +173,8 @@ export default function LoginPage() {
                   type="text"
                   value={captchaCode}
                   onChange={(e) => setCaptchaCode(e.target.value.toUpperCase())}
-                  className="vt-input flex-1 px-4 py-2"
-                  placeholder="Enter CAPTCHA code"
+                  className="vt-input flex-1 min-w-0 px-3 py-2"
+                  placeholder="验证码"
                   maxLength={6}
                   required
                 />
