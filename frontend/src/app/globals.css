@@ -90,8 +90,10 @@ body::before {
 
 body > * { position: relative; z-index: 2; }
 
-/* Touch targets */
-button, a, [role="button"] { min-height: 44px; min-width: 44px; }
+/* Touch targets - only on touch devices, so desktop layouts stay tight */
+@media (pointer: coarse) {
+  button, a, [role="button"] { min-height: 44px; min-width: 44px; }
+}
 html { -webkit-overflow-scrolling: touch; }
 * { -webkit-tap-highlight-color: transparent; }
 

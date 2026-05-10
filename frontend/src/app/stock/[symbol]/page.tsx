@@ -402,12 +402,12 @@ export default function StockDetailPage() {
       <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
         {/* Chart + Indicators */}
         <section className="vt-panel p-3 sm:p-4">
-          <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
+          <div className="flex items-center justify-between lg:justify-start gap-2 lg:gap-5 mb-3 sm:mb-4">
             <h2 className="font-[var(--font-playfair)] text-base sm:text-lg tracking-[0.18em] text-vt-parchment uppercase shrink-0">
               <span className="text-vt-brass-400">❖</span> K 线 图
             </h2>
             {valuation && (
-              <div className="flex flex-wrap justify-end items-center gap-x-3 gap-y-1 sm:gap-x-4 text-xs">
+              <div className="flex flex-wrap lg:flex-nowrap justify-end lg:justify-start items-center gap-x-3 gap-y-1 sm:gap-x-4 lg:gap-x-5 text-xs">
                 <div className="flex items-center gap-1">
                   <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>PE</span>
                   <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">

@@ -73,11 +73,12 @@ function StockTable({ items, valuations, moneyflows, predictions }: StockTablePr
     <>
       {/* Desktop View - hidden on mobile */}
       <div className="hidden sm:block">
-        <div className="grid grid-cols-12 gap-3 py-2 px-3 border-b border-vt-ink-700 text-xs">
-          <div className="col-span-3 vt-tab text-left">股票</div>
-          <div className="col-span-3 vt-tab text-left">PE趋势</div>
-          <div className="col-span-3 vt-tab text-left">主力资金</div>
-          <div className="col-span-3 vt-pred-col-header text-center">AI下周预测</div>
+        <div className="flex items-center gap-4 py-2 px-3 border-b border-vt-ink-700 text-xs">
+          <div className="vt-tab text-left w-44 shrink-0">股票</div>
+          <div className="vt-tab text-left flex-1 min-w-[180px]">估值</div>
+          <div className="vt-tab text-left w-24 shrink-0">PE趋势</div>
+          <div className="vt-tab text-left w-24 shrink-0">主力资金</div>
+          <div className="vt-pred-col-header text-center w-28 shrink-0">AI下周预测</div>
         </div>
         <div>
           {items.map((item) => {
@@ -86,52 +87,52 @@ function StockTable({ items, valuations, moneyflows, predictions }: StockTablePr
             return (
               <div
                 key={item.symbol}
-                className="grid grid-cols-12 gap-3 py-2 px-3 border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors text-vt-parchment text-sm"
+                className="flex items-center gap-4 py-2 px-3 border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors text-vt-parchment text-sm"
               >
-                {/* Left: Symbol + Name + PE/PB/换手率 stacked at bottom */}
-                <div className="col-span-3 flex flex-col justify-between">
-                  <div>
-                    <Link
-                      href={`/stock/${item.symbol}`}
-                      className="text-vt-brass-300 hover:text-vt-brass-400 tracking-wider font-[var(--font-geist-mono)] block"
-                    >
-                      {item.symbol}
-                    </Link>
-                    <Link
-                      href={`/stock/${item.symbol}`}
-                      className="text-vt-parchment hover:text-vt-brass-300 transition-colors text-xs"
-                    >
-                      {item.name}
-                    </Link>
-                  </div>
-                  <div className="flex items-center gap-3 text-[0.7rem] mt-2 font-[var(--font-geist-mono)]">
-                    <span>
-                      <span className="text-vt-parchment-dim">PE </span>
-                      {val?.pe != null ? val.pe.toFixed(2) : "-"}
-                    </span>
-                    <span>
-                      <span className="text-vt-parchment-dim">PB </span>
-                      {val?.pb != null ? val.pb.toFixed(2) : "-"}
-                    </span>
-                    <span>
-                      <span className="text-vt-parchment-dim">换手 </span>
-                      {val?.turnover_rate != null ? `${(val.turnover_rate < 1 ? val.turnover_rate * 100 : val.turnover_rate).toFixed(2)}%` : "-"}
-                    </span>
-                  </div>
+                {/* Symbol + Name */}
+                <div className="w-44 shrink-0 min-w-0">
+                  <Link
+                    href={`/stock/${item.symbol}`}
+                    className="text-vt-brass-300 hover:text-vt-brass-400 tracking-wider font-[var(--font-geist-mono)] block truncate"
+                  >
+                    {item.symbol}
+                  </Link>
+                  <Link
+                    href={`/stock/${item.symbol}`}
+                    className="text-vt-parchment hover:text-vt-brass-300 transition-colors text-xs block truncate"
+                  >
+                    {item.name}
+                  </Link>
                 </div>
 
-                {/* PE Sparkline aligned to top */}
-                <div className="col-span-3 flex items-start pt-1">
+                {/* PE / PB / 换手 inline */}
+                <div className="flex items-center gap-3 flex-1 min-w-[180px] text-[0.75rem] font-[var(--font-geist-mono)]">
+                  <span>
+                    <span className="text-vt-parchment-dim">PE </span>
+                    {val?.pe != null ? val.pe.toFixed(2) : "-"}
+                  </span>
+                  <span>
+                    <span className="text-vt-parchment-dim">PB </span>
+                    {val?.pb != null ? val.pb.toFixed(2) : "-"}
+                  </span>
+                  <span>
+                    <span className="text-vt-parchment-dim">换手 </span>
+                    {val?.turnover_rate != null ? `${(val.turnover_rate < 1 ? val.turnover_rate * 100 : val.turnover_rate).toFixed(2)}%` : "-"}
+                  </span>
+                </div>
+
+                {/* PE Sparkline */}
+                <div className="w-24 shrink-0 flex items-center">
                   <PETrendSparkline peHistory={val?.pe_history ?? []} />
                 </div>
 
-                {/* Money Flow Sparkline aligned to top */}
-                <div className="col-span-3 flex items-start pt-1">
+                {/* Money Flow Sparkline */}
+                <div className="w-24 shrink-0 flex items-center">
                   <MoneyFlowSparkline flowHistory={flow?.flow_history ?? []} />
                 </div>
 
-                {/* AI Prediction aligned to top */}
-                <div className="col-span-3 flex items-start justify-center pt-1">
+                {/* AI Prediction */}
+                <div className="w-28 shrink-0 flex items-center justify-center">
                   {predictions[item.symbol] ? (
                     <TrendIndicator prediction={predictions[item.symbol]} />
                   ) : (
