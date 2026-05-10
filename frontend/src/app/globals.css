@@ -90,8 +90,8 @@ body::before {
 
 body > * { position: relative; z-index: 2; }
 
-/* Touch targets - only on touch devices, so desktop layouts stay tight */
-@media (pointer: coarse) {
+/* Touch targets - only on phone-sized screens, so iPad/desktop layouts stay tight */
+@media (max-width: 640px) {
   button, a, [role="button"] { min-height: 44px; min-width: 44px; }
 }
 html { -webkit-overflow-scrolling: touch; }
