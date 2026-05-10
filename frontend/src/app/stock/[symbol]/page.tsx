@@ -7,6 +7,7 @@ import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
 import TrendAnalysisPanel from "@/components/TrendAnalysisPanel";
 import PETrendSparkline from "@/components/PETrendSparkline";
+import MoneyFlowSparkline from "@/components/MoneyFlowSparkline";
 import AuthModal from "@/components/AuthModal";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
 import { getTrendPrediction, TrendPrediction, runForcedSingleAnalysis, getCooldownEndTime, setCooldownEndTime } from "@/services/trendPrediction";
@@ -38,6 +39,20 @@ interface Indicators {
   ma: { ma5: number; ma10: number; ma20: number; ma60: number | null };
 }
 
+interface MoneyFlowRecord {
+  date: string;
+  flow: number | null;
+  net_5d_total?: number | null;
+}
+
+interface MoneyFlowResponse {
+  symbol: string;
+  market: string;
+  data?: Array<{ trade_date?: string; date?: string; buy_lg_amount?: number; main_in_flow?: number }>;
+  net_5d_total?: number | null;
+  error?: string;
+}
+
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function StockDetailPage() {
@@ -51,6 +66,9 @@ export default function StockDetailPage() {
   const [indicators, setIndicators] = useState<Indicators | null>(null);
   const [valuation, setValuation] = useState<ValuationRecord | null>(null);
   const [valuationHistory, setValuationHistory] = useState<ValuationRecord[]>([]);
+  const [moneyFlowHistory, setMoneyFlowHistory] = useState<MoneyFlowRecord[]>([]);
+  const [moneyFlowLoading, setMoneyFlowLoading] = useState(false);
+  const [moneyFlowMarket, setMoneyFlowMarket] = useState<string>("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isInWatchlist, setIsInWatchlist] = useState(false);
@@ -114,6 +132,37 @@ export default function StockDetailPage() {
     };
 
     fetchData();
+  }, [symbol]);
+
+  // Fetch money flow data (non-blocking, separate from main data load)
+  useEffect(() => {
+    if (!symbol) return;
+
+    const fetchMoneyFlow = async () => {
+      setMoneyFlowLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/stock/${symbol}/moneyflow?days=30`);
+        const data: MoneyFlowResponse = await res.json();
+        if (!data.error && data.data) {
+          // Determine flow field based on market
+          const flowField = data.market === "A-share" ? "buy_lg_amount" : "main_in_flow";
+          setMoneyFlowMarket(data.market);
+          setMoneyFlowHistory(
+            data.data.map((r) => ({
+              date: r.trade_date || r.date || "",
+              flow: (r[flowField] as number) ?? null,
+              net_5d_total: data.net_5d_total ?? null,
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to fetch money flow:", err);
+      } finally {
+        setMoneyFlowLoading(false);
+      }
+    };
+
+    fetchMoneyFlow();
   }, [symbol]);
 
   // Fetch existing trend prediction (non-force, just to display cached data)
@@ -367,6 +416,31 @@ export default function StockDetailPage() {
                   <PETrendSparkline
                     peHistory={valuationHistory.map((v) => ({ date: v.trade_date, pe: v.pe_ttm }))}
                     loading={false}
+                    mobile
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>主力(5日)</span>
+                  {moneyFlowHistory.length > 0 && moneyFlowHistory[0].net_5d_total != null ? (
+                    <span
+                      className={`font-[var(--font-geist-mono)] font-medium ${
+                        moneyFlowHistory[0].net_5d_total! >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"
+                      }`}
+                    >
+                      {moneyFlowHistory[0].net_5d_total! >= 0 ? "+" : ""}
+                      {moneyFlowHistory[0].net_5d_total! >= 0
+                        ? (moneyFlowHistory[0].net_5d_total! / 10000).toFixed(1)
+                        : (Math.abs(moneyFlowHistory[0].net_5d_total!) / 10000).toFixed(1)}
+                      亿
+                    </span>
+                  ) : (
+                    <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
+                      {moneyFlowLoading ? "..." : "N/A"}
+                    </span>
+                  )}
+                  <MoneyFlowSparkline
+                    flowHistory={moneyFlowHistory}
+                    loading={moneyFlowLoading}
                     mobile
                   />
                 </div>

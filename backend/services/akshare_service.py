@@ -333,6 +333,60 @@ class AShareService:
             return {"symbol": symbol, "error": str(e)}
 
     @staticmethod
+    def get_moneyflow(symbol: str, days: int = 30) -> dict:
+        """Get A-share main force net inflow via Tushare moneyflow_ths API.
+
+        Returns buy_lg_amount (主力大单净流入 in 万元) and net_d5_amount (5日累计).
+        """
+        try:
+            ts_code = _symbol_to_ts_code(symbol)
+            pro = ts.pro_api()
+
+            end_date = datetime.now().strftime("%Y%m%d")
+            start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y%m%d")
+
+            df = pro.moneyflow_ths(ts_code=ts_code, start_date=start_date, end_date=end_date)
+
+            if df is None or df.empty:
+                return {"symbol": symbol, "market": "A-share", "error": "No moneyflow_ths data"}
+
+            # Parse date format (Tushare returns as YYYYMMDD)
+            if "trade_date" in df.columns:
+                df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d").dt.strftime("%Y-%m-%d")
+            elif "date" in df.columns:
+                df["trade_date"] = pd.to_datetime(df["date"], format="%Y%m%d").dt.strftime("%Y-%m-%d")
+
+            df = df.sort_values("trade_date").tail(days)
+
+            def safe_float(val):
+                try:
+                    return float(val) if pd.notna(val) else None
+                except (TypeError, ValueError):
+                    return None
+
+            records = []
+            for _, row in df.iterrows():
+                records.append({
+                    "trade_date": row["trade_date"],
+                    "net_amount": safe_float(row.get("net_amount")),
+                    "buy_lg_amount": safe_float(row.get("buy_lg_amount")),
+                    "net_d5_amount": safe_float(row.get("net_d5_amount")),
+                })
+
+            # Calculate 5-day total of buy_lg_amount
+            net_5d_total = sum(r["buy_lg_amount"] or 0 for r in records[-5:])
+
+            return {
+                "symbol": symbol,
+                "market": "A-share",
+                "data": records,
+                "latest": records[-1] if records else {},
+                "net_5d_total": net_5d_total,
+            }
+        except Exception as e:
+            return {"symbol": symbol, "market": "A-share", "error": str(e)}
+
+    @staticmethod
     def get_daily_basic_batch(symbols: List[str], days: int = 30) -> dict:
         """Get daily basic metrics for multiple A-share symbols in a single batch request."""
         import concurrent.futures
@@ -433,6 +487,12 @@ class USStockService:
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_stock_info_batch(symbols)
 
+    @staticmethod
+    def get_moneyflow(symbol: str, days: int = 30) -> dict:
+        """Get main force net inflow for US stock via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_capital_flow(symbol, days)
+
 
 class HKStockService:
     """Service wrapper for HK stock data via Futu OpenAPI.
@@ -480,6 +540,12 @@ class HKStockService:
         """Get basic HK stock information for multiple symbols via Futu OpenAPI."""
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_stock_info_batch(symbols)
+
+    @staticmethod
+    def get_moneyflow(symbol: str, days: int = 30) -> dict:
+        """Get main force net inflow for HK stock via Futu OpenAPI."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_capital_flow(symbol, days)
 
 
 # Backward compatibility - AkshareService now points to AShareService
@@ -556,8 +622,10 @@ def get_valuation_data(symbol: str, days: int = 100) -> dict:
 def _is_us_stock_symbol(symbol: str) -> bool:
     """Check if a symbol appears to be a US stock (not a 6-digit A-share code)."""
     symbol = symbol.strip().upper()
-    # US stocks are typically 1-5 letters
+    # US stocks are typically 1-5 letters, or have .US suffix/prefix
     if symbol.endswith(".US"):
+        return True
+    if symbol.startswith("US."):
         return True
     if len(symbol) <= 5 and not symbol.isdigit():
         return True
@@ -565,9 +633,11 @@ def _is_us_stock_symbol(symbol: str) -> bool:
 
 
 def _is_hk_stock_symbol(symbol: str) -> bool:
-    """Check if a symbol appears to be a HK stock (4-5 digits, not A-share)."""
+    """Check if a symbol appears to be a HK stock (4-5 digits, or HK. prefix, not A-share)."""
     symbol = symbol.strip()
-    # HK stocks are 4-5 digits (e.g., 00700, 9988), A-shares are 6 digits
+    # HK stocks are 4-5 digits (e.g., 00700, 9988), or have HK. prefix
+    if symbol.startswith("HK."):
+        return True
     if len(symbol) in (4, 5) and symbol.isdigit():
         return True
     return False

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { getWatchlist, WatchlistItem } from "@/services/watchlist";
 import { getTrendPredictions, TrendPrediction } from "@/services/trendPrediction";
 import PETrendSparkline from "./PETrendSparkline";
+import MoneyFlowSparkline from "./MoneyFlowSparkline";
 import StockMarketTabs from "./StockMarketTabs";
 
 interface ValuationData {
@@ -12,6 +13,11 @@ interface ValuationData {
   pb: number | null;
   turnover_rate: number | null;
   pe_history: Array<{ date: string; pe: number | null }>;
+}
+
+interface MoneyFlowData {
+  flow_history: Array<{ date: string; flow: number | null }>;
+  net_5d_total: number | null;
 }
 
 interface WatchListProps {
@@ -23,6 +29,7 @@ interface WatchListProps {
 interface StockTableProps {
   items: WatchlistItem[];
   valuations: Record<string, ValuationData>;
+  moneyflows: Record<string, MoneyFlowData>;
   predictions: Record<string, TrendPrediction>;
 }
 
@@ -53,7 +60,7 @@ function TrendIndicator({ prediction }: { prediction: TrendPrediction }) {
   }
 }
 
-function StockTable({ items, valuations, predictions }: StockTableProps) {
+function StockTable({ items, valuations, moneyflows, predictions }: StockTableProps) {
   if (items.length === 0) {
     return (
       <div className="vt-engraved text-center py-8">
@@ -72,6 +79,7 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
               <th className="text-left py-2 px-3 vt-tab text-xs">股票代码</th>
               <th className="text-left py-2 px-3 vt-tab text-xs">股票名称</th>
               <th className="text-left py-2 px-3 vt-tab text-xs">PE趋势</th>
+              <th className="text-left py-2 px-3 vt-tab text-xs">主力资金</th>
               <th className="text-right py-2 px-3 vt-tab text-xs">市盈率(PE)</th>
               <th className="text-right py-2 px-3 vt-tab text-xs">市净率(PB)</th>
               <th className="text-right py-2 px-3 vt-tab text-xs">换手率</th>
@@ -81,6 +89,7 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
           <tbody>
             {items.map((item) => {
               const val = valuations[item.symbol];
+              const flow = moneyflows[item.symbol];
               return (
                 <tr
                   key={item.symbol}
@@ -104,6 +113,9 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
                   </td>
                   <td className="py-2 px-3">
                     <PETrendSparkline peHistory={val?.pe_history ?? []} />
+                  </td>
+                  <td className="py-2 px-3">
+                    <MoneyFlowSparkline flowHistory={flow?.flow_history ?? []} />
                   </td>
                   <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
                     {val?.pe != null ? val.pe.toFixed(2) : "-"}
@@ -132,6 +144,7 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
       <div className="sm:hidden space-y-3">
         {items.map((item) => {
           const val = valuations[item.symbol];
+          const flow = moneyflows[item.symbol];
           return (
             <Link
               key={item.symbol}
@@ -155,7 +168,11 @@ function StockTable({ items, valuations, predictions }: StockTableProps) {
               <div className="flex items-center gap-4 text-sm">
                 <div className="flex items-center gap-1">
                   <PETrendSparkline peHistory={val?.pe_history ?? []} mobile />
-                  <span className="text-vt-parchment-dim text-xs tracking-wider">PE趋势</span>
+                  <span className="text-vt-parchment-dim text-xs tracking-wider">PE</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <MoneyFlowSparkline flowHistory={flow?.flow_history ?? []} mobile />
+                  <span className="text-vt-parchment-dim text-xs tracking-wider">主力</span>
                 </div>
                 <div>
                   <span className="text-vt-parchment font-[var(--font-geist-mono)]">{val?.pe != null ? val.pe.toFixed(2) : "-"}</span>
@@ -230,6 +247,7 @@ interface MarketWatchlistProps {
   totalPages: number;
   items: WatchlistItem[];
   valuations: Record<string, ValuationData>;
+  moneyflows: Record<string, MoneyFlowData>;
   predictions: Record<string, TrendPrediction>;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
@@ -268,6 +286,40 @@ async function fetchValuationByMarket(
   return valMap;
 }
 
+async function fetchMoneyFlowByMarket(
+  apiBase: string,
+  symbols: string[]
+): Promise<Record<string, MoneyFlowData>> {
+  if (symbols.length === 0) return {};
+  const flowMap: Record<string, MoneyFlowData> = {};
+  try {
+    // Fetch moneyflow for each symbol individually since there's no batch endpoint yet
+    const promises = symbols.map(async (symbol) => {
+      try {
+        const res = await fetch(`${apiBase}/api/stock/${symbol}/moneyflow?days=30`);
+        const data = await res.json();
+        if (!data.error && data.data) {
+          // Determine flow field based on market
+          const flowField = data.market === "A-share" ? "buy_lg_amount" : "main_in_flow";
+          flowMap[symbol] = {
+            flow_history: data.data.map((r: { trade_date?: string; date?: string; [key: string]: unknown }) => ({
+              date: r.trade_date || r.date,
+              flow: r[flowField] as number | null,
+            })),
+            net_5d_total: data.net_5d_total,
+          };
+        }
+      } catch (err) {
+        console.error(`Failed to fetch moneyflow for ${symbol}:`, err);
+      }
+    });
+    await Promise.all(promises);
+  } catch (err) {
+    console.error("Failed to fetch moneyflow:", err);
+  }
+  return flowMap;
+}
+
 function MarketWatchlist({
   market,
   loading,
@@ -276,6 +328,7 @@ function MarketWatchlist({
   totalPages,
   items,
   valuations,
+  moneyflows,
   predictions,
   onPageChange,
   onPageSizeChange,
@@ -299,6 +352,7 @@ function MarketWatchlist({
       <StockTable
         items={marketItems}
         valuations={valuations}
+        moneyflows={moneyflows}
         predictions={predictions}
       />
       {marketItems.length > 0 && (
@@ -324,6 +378,9 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
   const [aShareValuations, setAShareValuations] = useState<Record<string, ValuationData>>({});
   const [usValuations, setUsValuations] = useState<Record<string, ValuationData>>({});
   const [hkValuations, setHkValuations] = useState<Record<string, ValuationData>>({});
+  const [aShareMoneyflows, setAShareMoneyflows] = useState<Record<string, MoneyFlowData>>({});
+  const [usMoneyflows, setUsMoneyflows] = useState<Record<string, MoneyFlowData>>({});
+  const [hkMoneyflows, setHkMoneyflows] = useState<Record<string, MoneyFlowData>>({});
   const [aShareLoading, setAShareLoading] = useState(true);
   const [usLoading, setUsLoading] = useState(true);
   const [hkLoading, setHkLoading] = useState(true);
@@ -355,6 +412,13 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
         console.log("[A-Share] fetchValuationByMarket returned at", new Date().toISOString());
         if (cancelled) return;
         setAShareValuations(aShareVal);
+
+        // Fetch moneyflow data
+        console.log("[A-Share] Calling fetchMoneyFlowByMarket at", new Date().toISOString());
+        const aShareFlow = await fetchMoneyFlowByMarket(API_BASE, aShareSymbols);
+        console.log("[A-Share] fetchMoneyFlowByMarket returned at", new Date().toISOString());
+        if (cancelled) return;
+        setAShareMoneyflows(aShareFlow);
       } catch (err) {
         console.error("Failed to fetch A-share watchlist:", err);
       } finally {
@@ -386,6 +450,13 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
         console.log("[US] fetchValuationByMarket returned at", new Date().toISOString());
         if (cancelled) return;
         setUsValuations(usVal);
+
+        // Fetch moneyflow data
+        console.log("[US] Calling fetchMoneyFlowByMarket at", new Date().toISOString());
+        const usFlow = await fetchMoneyFlowByMarket(API_BASE, usSymbols);
+        console.log("[US] fetchMoneyFlowByMarket returned at", new Date().toISOString());
+        if (cancelled) return;
+        setUsMoneyflows(usFlow);
       } catch (err) {
         console.error("Failed to fetch US watchlist:", err);
       } finally {
@@ -417,6 +488,13 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
         console.log("[HK] fetchValuationByMarket returned at", new Date().toISOString());
         if (cancelled) return;
         setHkValuations(hkVal);
+
+        // Fetch moneyflow data
+        console.log("[HK] Calling fetchMoneyFlowByMarket at", new Date().toISOString());
+        const hkFlow = await fetchMoneyFlowByMarket(API_BASE, hkSymbols);
+        console.log("[HK] fetchMoneyFlowByMarket returned at", new Date().toISOString());
+        if (cancelled) return;
+        setHkMoneyflows(hkFlow);
       } catch (err) {
         console.error("Failed to fetch HK watchlist:", err);
       } finally {
@@ -491,6 +569,7 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
       totalPages={aShareTotalPages}
       items={aShareItems}
       valuations={aShareValuations}
+      moneyflows={aShareMoneyflows}
       predictions={aSharePredictions}
       onPageChange={handleASharePageChange}
       onPageSizeChange={handlePageSizeChange}
@@ -506,6 +585,7 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
       totalPages={usTotalPages}
       items={usItems}
       valuations={usValuations}
+      moneyflows={usMoneyflows}
       predictions={usPredictions}
       onPageChange={handleUsPageChange}
       onPageSizeChange={handlePageSizeChange}
@@ -521,6 +601,7 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
       totalPages={hkTotalPages}
       items={hkItems}
       valuations={hkValuations}
+      moneyflows={hkMoneyflows}
       predictions={hkPredictions}
       onPageChange={handleHkPageChange}
       onPageSizeChange={handlePageSizeChange}

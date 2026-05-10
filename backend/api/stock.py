@@ -166,3 +166,20 @@ async def get_valuation(symbol: str, days: int = Query(default=30, ge=1, le=365)
         return USStockService.get_daily_basic(symbol, days)
     else:
         return AShareService.get_daily_basic(symbol, days)
+
+
+@router.get("/{symbol}/moneyflow")
+async def get_moneyflow(symbol: str, days: int = Query(default=30, ge=1, le=365)):
+    """Get main force net inflow (money flow) for a stock.
+
+    Routes to appropriate service based on symbol:
+    - A-share (SH/SZ prefix or 6-digit code): Tushare moneyflow_ths
+    - HK stock (4-5 digit code): Futu get_capital_flow
+    - US stock (.US suffix or regular symbols): Futu get_capital_flow
+    """
+    if _is_hk_stock_symbol(symbol):
+        return HKStockService.get_moneyflow(symbol, days)
+    elif _is_us_stock_symbol(symbol):
+        return USStockService.get_moneyflow(symbol, days)
+    else:
+        return AShareService.get_moneyflow(symbol, days)

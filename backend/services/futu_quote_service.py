@@ -504,3 +504,68 @@ class FutuQuoteService:
                     errors.append({"symbol": symbol, "error": str(e)})
 
         return {"results": results, "errors": errors}
+
+    @staticmethod
+    def get_capital_flow(symbol: str, days: int = 30) -> dict:
+        """Get main force net inflow (主力资金净流入) via Futu get_capital_flow API.
+
+        Supports HK and US stocks. Returns main_in_flow (positive = net inflow).
+        """
+        cache_key = f"capital_flow:{symbol.upper()}:{days}"
+
+        def fetch_capital_flow() -> dict:
+            logger.info(f"[Futu] Fetching capital flow for {symbol} ({days} days)")
+            ctx = FutuQuoteService._get_quote_context()
+            futu_code, market = _get_futu_code(symbol)
+
+            from futu import PeriodType
+            end_date = datetime.now().strftime("%Y-%m-%d")
+            start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y-%m-%d")
+
+            ret, data = ctx.get_capital_flow(
+                stock_code=futu_code,
+                start=start_date,
+                end=end_date,
+                period_type=PeriodType.DAY,
+            )
+
+            if ret != 0:
+                raise Exception(f"Futu get_capital_flow error: {data}")
+
+            if data is None or len(data) == 0:
+                return {"symbol": symbol, "market": market, "error": "No capital flow data"}
+
+            # Process data - extract main_in_flow per day
+            records = []
+            for i in range(len(data)):
+                row = data.iloc[i] if hasattr(data, "iloc") else data[i]
+
+                date_str = row.get("time_key", "")
+                if date_str:
+                    date_str = date_str.split(" ")[0] if " " in date_str else date_str
+
+                records.append({
+                    "date": date_str,
+                    "main_in_flow": _to_python_type(row.get("main_in_flow")),
+                })
+
+            # Sort by date and take last N
+            records.sort(key=lambda x: x["date"])
+            records = records[-days:]
+
+            # Calculate 5-day total
+            net_5d_total = sum(r["main_in_flow"] or 0 for r in records[-5:])
+
+            return {
+                "symbol": symbol,
+                "market": market,
+                "data": records,
+                "latest": records[-1] if records else {},
+                "net_5d_total": net_5d_total,
+            }
+
+        try:
+            return _futu_cache.on_error_return_stale(cache_key, fetch_capital_flow)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} capital flow error: {e}")
+            return {"symbol": symbol, "market": "HK/US", "error": str(e)}
