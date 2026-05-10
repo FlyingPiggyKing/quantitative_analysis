@@ -302,6 +302,7 @@ def get_system_prompt(today_date: str, market: str = "A") -> str:
    - RSI zone (overbought >80, oversold <20)
    - Price position relative to moving averages
    - Volume ratio (above 1 = volume expansion)
+   - Money flow signals (main force net inflow/outflow, 净流入/净流出偏多/持平)
 
 2. **Search for stock-specific news**: Use the search_with_fallback tool to search for recent news about the specific stock (symbol and name).
    - Search query format: "[stock name] [stock symbol] recent news"
@@ -380,7 +381,7 @@ Your final response MUST be a valid JSON object with these fields. Here is a com
 """
 
 
-def format_data_context(recent_prices: list, indicators: dict, valuation_data: dict = None, market: str = "A") -> str:
+def format_data_context(recent_prices: list, indicators: dict, valuation_data: dict = None, market: str = "A", money_flow_data: dict = None) -> str:
     """Format quantitative data as readable text for LLM context."""
     lines = []
     currency = "USD" if market == "US" else "CNY"
@@ -438,6 +439,19 @@ def format_data_context(recent_prices: list, indicators: dict, valuation_data: d
             lines.append(f"换手率: {turnover_rate:.2f}%")
         if total_mv is not None:
             lines.append(f"总市值: {total_mv:.0f}万元")
+
+    # Money flow (appended to valuation section)
+    if money_flow_data and "error" not in money_flow_data:
+        net_5d = money_flow_data.get("net_5d_total", 0)
+        if net_5d is None:
+            net_5d = 0
+        if net_5d > 0:
+            signal = "净流入偏多"
+        elif net_5d < 0:
+            signal = "净流出偏多"
+        else:
+            signal = "持平"
+        lines.append(f"5日主力净流入: {net_5d/1_0000:.0f}万元 ({signal})")
 
     return "\n".join(lines)
 
@@ -502,11 +516,20 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"Failed to fetch valuation data for {symbol}: {e}")
 
+    # Fetch money flow data (5-day main force net inflow)
+    money_flow_data = None
+    try:
+        money_flow_result = stock_service.get_moneyflow(symbol, days=5)
+        if "error" not in money_flow_result:
+            money_flow_data = money_flow_result
+    except Exception as e:
+        logger.warning(f"Failed to fetch money flow data for {symbol}: {e}")
+
     # Step 2: Build data context if we have technical data
     data_context = ""
     if kline_data and indicators and not indicators.get("error"):
         recent_prices = kline_data[-10:] if len(kline_data) >= 10 else kline_data
-        data_context = format_data_context(recent_prices, indicators, valuation_data, market)
+        data_context = format_data_context(recent_prices, indicators, valuation_data, market, money_flow_data)
 
     # Step 3: Build user message based on market
     agent = create_stock_trend_agent(market)
