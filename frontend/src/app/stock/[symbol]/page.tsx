@@ -343,58 +343,62 @@ export default function StockDetailPage() {
         }}
       >
         <div className="max-w-6xl mx-auto">
-          {/* Back link and title row */}
-          <div className="flex items-center gap-3 mb-3">
-            <Link href="/" className="vt-engraved not-italic text-vt-parchment-dim hover:text-vt-brass-300 active:scale-95 transition-all">
-              ← 返回
-            </Link>
-            <div className="flex-1 min-w-0">
-              <h1 className="vt-emboss text-2xl sm:text-3xl truncate leading-tight">
-                {stockInfo?.name || symbol}{" "}
-                <span className="text-vt-brass-400 font-[var(--font-geist-mono)] text-xl sm:text-2xl tracking-widest" style={{ WebkitTextFillColor: "currentColor", background: "none" }}>
-                  ({symbol})
-                </span>
-              </h1>
-              {stockInfo?.sector && (
-                <p className="vt-engraved text-xs sm:text-sm hidden sm:block">{stockInfo.sector}</p>
+          <div className="flex items-stretch justify-between gap-3">
+            {/* Left: back link on top, name/code at bottom */}
+            <div className="flex flex-col justify-between gap-2 min-w-0 flex-1">
+              <Link href="/" className="vt-engraved not-italic text-vt-parchment-dim hover:text-vt-brass-300 active:scale-95 transition-all self-start">
+                ← 返回
+              </Link>
+              <div className="min-w-0">
+                <h1 className="vt-emboss text-2xl sm:text-3xl truncate leading-tight">
+                  {stockInfo?.name || symbol}{" "}
+                  <span className="text-vt-brass-400 font-[var(--font-geist-mono)] text-xl sm:text-2xl tracking-widest" style={{ WebkitTextFillColor: "currentColor", background: "none" }}>
+                    ({symbol})
+                  </span>
+                </h1>
+                {stockInfo?.sector && stockInfo.sector !== "未知" && (
+                  <p className="vt-engraved text-xs sm:text-sm hidden sm:block">{stockInfo.sector}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Right: watchlist button on top, price at bottom */}
+            <div className="flex flex-col justify-between items-end gap-2 shrink-0">
+              <button
+                onClick={handleWatchlistToggle}
+                disabled={watchlistLoading}
+                className={`px-4 py-2 text-xs disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center ${
+                  isInWatchlist ? "vt-btn-secondary" : "vt-btn-primary"
+                }`}
+                style={isInWatchlist ? { color: "var(--vt-oxblood-400)" } : undefined}
+              >
+                {watchlistLoading
+                  ? "…"
+                  : isInWatchlist
+                  ? "移 除"
+                  : "自 选"}
+              </button>
+              {klineData.length > 0 && (
+                <div className="flex items-baseline gap-2 justify-end">
+                  <div
+                    className="text-2xl sm:text-3xl font-[var(--font-playfair)] font-bold text-vt-parchment leading-none"
+                    style={{ textShadow: "0 1px 0 rgba(241,214,138,0.18), 0 2px 4px rgba(0,0,0,0.6)" }}
+                  >
+                    {latestPrice.toFixed(2)}
+                  </div>
+                  <div
+                    className={`text-sm sm:text-base font-[var(--font-geist-mono)] font-bold tracking-wide leading-none ${
+                      latestChange >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"
+                    }`}
+                    style={{ textShadow: "0 0 8px currentColor, 0 1px 0 rgba(0,0,0,0.6)" }}
+                  >
+                    {latestChange >= 0 ? "+" : ""}
+                    {latestChange.toFixed(2)}%
+                  </div>
+                </div>
               )}
             </div>
-            <button
-              onClick={handleWatchlistToggle}
-              disabled={watchlistLoading}
-              className={`px-4 py-2 text-xs disabled:opacity-50 min-h-[44px] min-w-[44px] flex items-center justify-center ${
-                isInWatchlist ? "vt-btn-secondary" : "vt-btn-primary"
-              }`}
-              style={isInWatchlist ? { color: "var(--vt-oxblood-400)" } : undefined}
-            >
-              {watchlistLoading
-                ? "…"
-                : isInWatchlist
-                ? "移 除"
-                : "自 选"}
-            </button>
           </div>
-
-          {/* Price row */}
-          {klineData.length > 0 && (
-            <div className="flex items-baseline gap-3">
-              <div
-                className="text-3xl sm:text-4xl font-[var(--font-playfair)] font-bold text-vt-parchment"
-                style={{ textShadow: "0 1px 0 rgba(241,214,138,0.18), 0 2px 4px rgba(0,0,0,0.6)" }}
-              >
-                {latestPrice.toFixed(2)}
-              </div>
-              <div
-                className={`text-base sm:text-lg font-[var(--font-geist-mono)] font-bold tracking-wide ${
-                  latestChange >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"
-                }`}
-                style={{ textShadow: "0 0 8px currentColor, 0 1px 0 rgba(0,0,0,0.6)" }}
-              >
-                {latestChange >= 0 ? "+" : ""}
-                {latestChange.toFixed(2)}%
-              </div>
-            </div>
-          )}
         </div>
       </header>
 
