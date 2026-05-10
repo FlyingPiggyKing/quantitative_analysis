@@ -7,22 +7,22 @@ interface Indicators {
     dif: number;
     dea: number;
     hist: number;
-  };
+  } | null;
   rsi: {
     rsi6: number;
     rsi12: number;
     rsi24: number;
-  };
+  } | null;
   ma: {
     ma5: number;
     ma10: number;
     ma20: number;
     ma60: number | null;
-  };
+  } | null;
 }
 
 interface IndicatorPanelProps {
-  indicators: Indicators | null;
+  indicators: Indicators | { error: string } | null;
   loading: boolean;
 }
 
@@ -39,8 +39,12 @@ export default function IndicatorPanel({ indicators, loading }: IndicatorPanelPr
     );
   }
 
-  if (!indicators) {
-    return null;
+  if (!indicators || "error" in indicators) {
+    return (
+      <div className="vt-panel p-4 text-center text-vt-brass-400 text-sm">
+        暂无详细数据
+      </div>
+    );
   }
 
   const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
@@ -88,41 +92,63 @@ export default function IndicatorPanel({ indicators, loading }: IndicatorPanelPr
     </div>
   );
 
+  const NoData = () => (
+    <div className="text-center text-vt-brass-500 text-xs py-2">暂无详细数据</div>
+  );
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
       <IndicatorCard title="MACD (12,26,9)" sectionKey="macd">
-        <IndicatorRow label="DIF" value={indicators.macd.dif} />
-        <IndicatorRow label="DEA" value={indicators.macd.dea} />
-        <IndicatorRow
-          label="MACD"
-          value={indicators.macd.hist}
-          color={indicators.macd.hist >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"}
-        />
+        {indicators.macd ? (
+          <>
+            <IndicatorRow label="DIF" value={indicators.macd.dif} />
+            <IndicatorRow label="DEA" value={indicators.macd.dea} />
+            <IndicatorRow
+              label="MACD"
+              value={indicators.macd.hist}
+              color={indicators.macd.hist >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"}
+            />
+          </>
+        ) : (
+          <NoData />
+        )}
       </IndicatorCard>
 
       <IndicatorCard title="RSI (6,12,24)" sectionKey="rsi">
-        <IndicatorRow
-          label="RSI(6)"
-          value={indicators.rsi.rsi6}
-          color={indicators.rsi.rsi6 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi6 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
-        />
-        <IndicatorRow
-          label="RSI(12)"
-          value={indicators.rsi.rsi12}
-          color={indicators.rsi.rsi12 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi12 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
-        />
-        <IndicatorRow
-          label="RSI(24)"
-          value={indicators.rsi.rsi24}
-          color={indicators.rsi.rsi24 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi24 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
-        />
+        {indicators.rsi ? (
+          <>
+            <IndicatorRow
+              label="RSI(6)"
+              value={indicators.rsi.rsi6}
+              color={indicators.rsi.rsi6 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi6 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
+            />
+            <IndicatorRow
+              label="RSI(12)"
+              value={indicators.rsi.rsi12}
+              color={indicators.rsi.rsi12 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi12 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
+            />
+            <IndicatorRow
+              label="RSI(24)"
+              value={indicators.rsi.rsi24}
+              color={indicators.rsi.rsi24 > 70 ? "text-vt-oxblood-400" : indicators.rsi.rsi24 < 30 ? "text-vt-emerald-400" : "text-vt-parchment"}
+            />
+          </>
+        ) : (
+          <NoData />
+        )}
       </IndicatorCard>
 
       <IndicatorCard title="MA (移动平均线)" sectionKey="ma">
-        <IndicatorRow label="MA5" value={indicators.ma.ma5} />
-        <IndicatorRow label="MA10" value={indicators.ma.ma10} />
-        <IndicatorRow label="MA20" value={indicators.ma.ma20} />
-        <IndicatorRow label="MA60" value={indicators.ma.ma60} />
+        {indicators.ma ? (
+          <>
+            <IndicatorRow label="MA5" value={indicators.ma.ma5} />
+            <IndicatorRow label="MA10" value={indicators.ma.ma10} />
+            <IndicatorRow label="MA20" value={indicators.ma.ma20} />
+            <IndicatorRow label="MA60" value={indicators.ma.ma60} />
+          </>
+        ) : (
+          <NoData />
+        )}
       </IndicatorCard>
     </div>
   );
