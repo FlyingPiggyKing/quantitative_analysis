@@ -326,66 +326,71 @@ export default function StockDetailPage() {
             </button>
           </div>
 
-          {/* Price and valuation row - stacks on mobile */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-            {klineData.length > 0 && (
-              <div className="flex items-baseline gap-3">
-                <div
-                  className="text-3xl sm:text-4xl font-[var(--font-playfair)] font-bold text-vt-parchment"
-                  style={{ textShadow: "0 1px 0 rgba(241,214,138,0.18), 0 2px 4px rgba(0,0,0,0.6)" }}
-                >
-                  {latestPrice.toFixed(2)}
-                </div>
-                <div
-                  className={`text-base sm:text-lg font-[var(--font-geist-mono)] font-bold tracking-wide ${
-                    latestChange >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"
-                  }`}
-                  style={{ textShadow: "0 0 8px currentColor, 0 1px 0 rgba(0,0,0,0.6)" }}
-                >
-                  {latestChange >= 0 ? "+" : ""}
-                  {latestChange.toFixed(2)}%
-                </div>
+          {/* Price row */}
+          {klineData.length > 0 && (
+            <div className="flex items-baseline gap-3">
+              <div
+                className="text-3xl sm:text-4xl font-[var(--font-playfair)] font-bold text-vt-parchment"
+                style={{ textShadow: "0 1px 0 rgba(241,214,138,0.18), 0 2px 4px rgba(0,0,0,0.6)" }}
+              >
+                {latestPrice.toFixed(2)}
               </div>
-            )}
-
-            {valuation && (
-              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 sm:gap-5 text-sm border-t sm:border-t-0 border-vt-ink-700 pt-3 sm:pt-0">
-                <div>
-                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>PE(TTM)</div>
-                  <div className="flex items-center gap-1">
-                    <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.pe_ttm != null ? valuation.pe_ttm.toFixed(2) : "N/A"}</span>
-                    <PETrendSparkline
-                      peHistory={valuationHistory.map((v) => ({ date: v.trade_date, pe: v.pe_ttm }))}
-                      loading={false}
-                      mobile
-                    />
-                  </div>
-                </div>
-                <div>
-                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>PB</div>
-                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.pb != null ? valuation.pb.toFixed(2) : "N/A"}</span>
-                </div>
-                <div>
-                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>换手率</div>
-                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}</span>
-                </div>
-                <div>
-                  <div className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>总市值</div>
-                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">{valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}</span>
-                </div>
+              <div
+                className={`text-base sm:text-lg font-[var(--font-geist-mono)] font-bold tracking-wide ${
+                  latestChange >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"
+                }`}
+                style={{ textShadow: "0 0 8px currentColor, 0 1px 0 rgba(0,0,0,0.6)" }}
+              >
+                {latestChange >= 0 ? "+" : ""}
+                {latestChange.toFixed(2)}%
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </div>
       </header>
 
       {/* Main Content */}
       <main className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-6">
-        {/* Chart */}
+        {/* Chart + Indicators */}
         <section className="vt-panel p-3 sm:p-4">
-          <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
-            <span className="text-vt-brass-400">❖</span> K 线 图
-          </h2>
+          <div className="flex items-center justify-between gap-2 mb-3 sm:mb-4">
+            <h2 className="font-[var(--font-playfair)] text-base sm:text-lg tracking-[0.18em] text-vt-parchment uppercase shrink-0">
+              <span className="text-vt-brass-400">❖</span> K 线 图
+            </h2>
+            {valuation && (
+              <div className="flex flex-wrap justify-end items-center gap-x-3 gap-y-1 sm:gap-x-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>PE</span>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
+                    {valuation.pe_ttm != null ? valuation.pe_ttm.toFixed(2) : "N/A"}
+                  </span>
+                  <PETrendSparkline
+                    peHistory={valuationHistory.map((v) => ({ date: v.trade_date, pe: v.pe_ttm }))}
+                    loading={false}
+                    mobile
+                  />
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>PB</span>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
+                    {valuation.pb != null ? valuation.pb.toFixed(2) : "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>换手</span>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
+                    {valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>市值</span>
+                  <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
+                    {valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}
+                  </span>
+                </div>
+              </div>
+            )}
+          </div>
           {klineData.length > 0 ? (
             <StockChart
               data={klineData}
@@ -397,14 +402,10 @@ export default function StockDetailPage() {
               暂无数据
             </div>
           )}
-        </section>
 
-        {/* Indicators */}
-        <section>
-          <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
-            <span className="text-vt-brass-400">❖</span> 技 术 指 标
-          </h2>
-          <IndicatorPanel indicators={indicators} loading={false} />
+          <div className="mt-4 pt-4 border-t border-vt-brass-500/20">
+            <IndicatorPanel indicators={indicators} loading={false} />
+          </div>
         </section>
 
         {/* Trend Analysis */}
