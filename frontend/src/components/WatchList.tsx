@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { getWatchlist, WatchlistItem } from "@/services/watchlist";
 import { getTrendPredictions, TrendPrediction } from "@/services/trendPrediction";
@@ -71,73 +71,77 @@ function StockTable({ items, valuations, moneyflows, predictions }: StockTablePr
 
   return (
     <>
-      {/* Desktop Table View - hidden on mobile */}
-      <div className="hidden sm:block overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-vt-ink-700">
-              <th className="text-left py-2 px-3 vt-tab text-xs">股票代码</th>
-              <th className="text-left py-2 px-3 vt-tab text-xs">股票名称</th>
-              <th className="text-left py-2 px-3 vt-tab text-xs">PE趋势</th>
-              <th className="text-left py-2 px-3 vt-tab text-xs">主力资金</th>
-              <th className="text-right py-2 px-3 vt-tab text-xs">市盈率(PE)</th>
-              <th className="text-right py-2 px-3 vt-tab text-xs">市净率(PB)</th>
-              <th className="text-right py-2 px-3 vt-tab text-xs">换手率</th>
-              <th className="text-center py-2 px-3 vt-pred-col-header">AI下周预测</th>
-            </tr>
-          </thead>
-          <tbody>
-            {items.map((item) => {
-              const val = valuations[item.symbol];
-              const flow = moneyflows[item.symbol];
-              return (
-                <tr
-                  key={item.symbol}
-                  className="text-vt-parchment border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors"
-                >
-                  <td className="py-2 px-3 font-[var(--font-geist-mono)]">
+      {/* Desktop View - hidden on mobile */}
+      <div className="hidden sm:block">
+        <div className="grid grid-cols-12 gap-3 py-2 px-3 border-b border-vt-ink-700 text-xs">
+          <div className="col-span-3 vt-tab text-left">股票</div>
+          <div className="col-span-3 vt-tab text-left">PE趋势</div>
+          <div className="col-span-3 vt-tab text-left">主力资金</div>
+          <div className="col-span-3 vt-pred-col-header text-center">AI下周预测</div>
+        </div>
+        <div>
+          {items.map((item) => {
+            const val = valuations[item.symbol];
+            const flow = moneyflows[item.symbol];
+            return (
+              <div
+                key={item.symbol}
+                className="grid grid-cols-12 gap-3 py-2 px-3 border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors text-vt-parchment text-sm"
+              >
+                {/* Left: Symbol + Name + PE/PB/换手率 stacked at bottom */}
+                <div className="col-span-3 flex flex-col justify-between">
+                  <div>
                     <Link
                       href={`/stock/${item.symbol}`}
-                      className="text-vt-brass-300 hover:text-vt-brass-400 tracking-wider"
+                      className="text-vt-brass-300 hover:text-vt-brass-400 tracking-wider font-[var(--font-geist-mono)] block"
                     >
                       {item.symbol}
                     </Link>
-                  </td>
-                  <td className="py-2 px-3">
                     <Link
                       href={`/stock/${item.symbol}`}
-                      className="text-vt-parchment hover:text-vt-brass-300 transition-colors"
+                      className="text-vt-parchment hover:text-vt-brass-300 transition-colors text-xs"
                     >
                       {item.name}
                     </Link>
-                  </td>
-                  <td className="py-2 px-3">
-                    <PETrendSparkline peHistory={val?.pe_history ?? []} />
-                  </td>
-                  <td className="py-2 px-3">
-                    <MoneyFlowSparkline flowHistory={flow?.flow_history ?? []} />
-                  </td>
-                  <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
-                    {val?.pe != null ? val.pe.toFixed(2) : "-"}
-                  </td>
-                  <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
-                    {val?.pb != null ? val.pb.toFixed(2) : "-"}
-                  </td>
-                  <td className="py-2 px-3 text-right font-[var(--font-geist-mono)]">
-                    {val?.turnover_rate != null ? `${val.turnover_rate.toFixed(2)}%` : "-"}
-                  </td>
-                  <td className="py-2 px-3 text-center">
-                    {predictions[item.symbol] ? (
-                      <TrendIndicator prediction={predictions[item.symbol]} />
-                    ) : (
-                      <span className="text-vt-parchment-dim">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </div>
+                  <div className="flex items-center gap-3 text-[0.7rem] mt-2 font-[var(--font-geist-mono)]">
+                    <span>
+                      <span className="text-vt-parchment-dim">PE </span>
+                      {val?.pe != null ? val.pe.toFixed(2) : "-"}
+                    </span>
+                    <span>
+                      <span className="text-vt-parchment-dim">PB </span>
+                      {val?.pb != null ? val.pb.toFixed(2) : "-"}
+                    </span>
+                    <span>
+                      <span className="text-vt-parchment-dim">换手 </span>
+                      {val?.turnover_rate != null ? `${val.turnover_rate.toFixed(2)}%` : "-"}
+                    </span>
+                  </div>
+                </div>
+
+                {/* PE Sparkline aligned to top */}
+                <div className="col-span-3 flex items-start pt-1">
+                  <PETrendSparkline peHistory={val?.pe_history ?? []} />
+                </div>
+
+                {/* Money Flow Sparkline aligned to top */}
+                <div className="col-span-3 flex items-start pt-1">
+                  <MoneyFlowSparkline flowHistory={flow?.flow_history ?? []} />
+                </div>
+
+                {/* AI Prediction aligned to top */}
+                <div className="col-span-3 flex items-start justify-center pt-1">
+                  {predictions[item.symbol] ? (
+                    <TrendIndicator prediction={predictions[item.symbol]} />
+                  ) : (
+                    <span className="text-vt-parchment-dim">—</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Mobile Card View - visible only on mobile */}
@@ -151,37 +155,43 @@ function StockTable({ items, valuations, moneyflows, predictions }: StockTablePr
               href={`/stock/${item.symbol}`}
               className="vt-card block p-3 min-h-[44px] active:opacity-80 transition-opacity"
             >
-              <div className="flex justify-between items-start mb-2">
+              <div className="flex justify-between items-center mb-2">
                 <div>
                   <span className="text-vt-brass-300 font-[var(--font-geist-mono)] tracking-wider">{item.symbol}</span>
                   <span className="text-vt-parchment ml-2">{item.name}</span>
                 </div>
-                <div className="text-right">
-                  <div className="vt-pred-col-header text-[0.6rem] mb-1">AI预测</div>
-                  {predictions[item.symbol] ? (
-                    <TrendIndicator prediction={predictions[item.symbol]} />
-                  ) : (
-                    <span className="text-vt-parchment-dim text-sm">—</span>
-                  )}
-                </div>
+                <div className="vt-pred-col-header text-[0.6rem]">AI预测</div>
               </div>
-              <div className="flex items-center gap-4 text-sm">
-                <div className="flex items-center gap-1">
-                  <PETrendSparkline peHistory={val?.pe_history ?? []} mobile />
-                  <span className="text-vt-parchment-dim text-xs tracking-wider">PE</span>
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-1">
+                    <PETrendSparkline peHistory={val?.pe_history ?? []} mobile />
+                    <span className="text-vt-parchment-dim text-xs tracking-wider">PE</span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <MoneyFlowSparkline flowHistory={flow?.flow_history ?? []} mobile />
+                    <span className="text-vt-parchment-dim text-xs tracking-wider">主力</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-1">
-                  <MoneyFlowSparkline flowHistory={flow?.flow_history ?? []} mobile />
-                  <span className="text-vt-parchment-dim text-xs tracking-wider">主力</span>
-                </div>
-                <div>
-                  <span className="text-vt-parchment font-[var(--font-geist-mono)]">{val?.pe != null ? val.pe.toFixed(2) : "-"}</span>
-                  <span className="text-vt-parchment-dim text-xs ml-1">PE</span>
-                </div>
-                <div>
-                  <span className="text-vt-parchment font-[var(--font-geist-mono)]">{val?.pb != null ? val.pb.toFixed(2) : "-"}</span>
-                  <span className="text-vt-parchment-dim text-xs ml-1">PB</span>
-                </div>
+                {predictions[item.symbol] ? (
+                  <TrendIndicator prediction={predictions[item.symbol]} />
+                ) : (
+                  <span className="text-vt-parchment-dim text-sm">—</span>
+                )}
+              </div>
+              <div className="flex items-center gap-4 text-xs font-[var(--font-geist-mono)]">
+                <span>
+                  <span className="text-vt-parchment">{val?.pe != null ? val.pe.toFixed(2) : "-"}</span>
+                  <span className="text-vt-parchment-dim ml-1">PE</span>
+                </span>
+                <span>
+                  <span className="text-vt-parchment">{val?.pb != null ? val.pb.toFixed(2) : "-"}</span>
+                  <span className="text-vt-parchment-dim ml-1">PB</span>
+                </span>
+                <span>
+                  <span className="text-vt-parchment">{val?.turnover_rate != null ? `${val.turnover_rate.toFixed(2)}%` : "-"}</span>
+                  <span className="text-vt-parchment-dim ml-1">换手</span>
+                </span>
               </div>
             </Link>
           );
