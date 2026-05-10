@@ -205,9 +205,25 @@ function TechnicalSection({ data }: { data: TechnicalAnalysis }) {
             <span className="vt-engraved not-italic text-xs uppercase tracking-wider">估值:</span>
             {data.valuation.pe && <span className="ml-2 text-vt-parchment font-[var(--font-geist-mono)]">PE: {data.valuation.pe}</span>}
             {data.valuation.pb && <span className="ml-2 text-vt-parchment font-[var(--font-geist-mono)]">PB: {data.valuation.pb}</span>}
-            {data.valuation.turnover && <span className="ml-2 text-vt-parchment font-[var(--font-geist-mono)]">换手: {data.valuation.turnover}%</span>}
+            {data.valuation.turnover && <span className="ml-2 text-vt-parchment font-[var(--font-geist-mono)]">换手: {data.valuation.turnover.replace(/%$/, '')}%</span>}
             {data.valuation.interpretation && (
               <p className="text-vt-parchment-soft mt-1">{data.valuation.interpretation}</p>
+            )}
+          </div>
+        )}
+
+        {/* Money Flow */}
+        {data.money_flow && (
+          <div className="rounded p-2 col-span-2" style={cardStyle}>
+            <span className="vt-engraved not-italic text-xs uppercase tracking-wider">主力流入:</span>
+            <span className="ml-2 text-vt-parchment font-[var(--font-geist-mono)]">{data.money_flow.net_5d}</span>
+            <span className={`ml-2 font-[var(--font-playfair)] ${
+              data.money_flow.signal?.includes("净流入") ? "text-vt-emerald-400" : "text-vt-oxblood-400"
+            }`}>
+              {data.money_flow.signal}
+            </span>
+            {data.money_flow.interpretation && (
+              <p className="text-vt-parchment-soft mt-1">{data.money_flow.interpretation}</p>
             )}
           </div>
         )}

@@ -31,6 +31,11 @@ export interface TechnicalAnalysis {
     ratio: string;
     interpretation: string;
   };
+  money_flow?: {
+    net_5d: string;
+    signal: string;
+    interpretation: string;
+  };
   valuation?: {
     pe: string;
     pb: string;

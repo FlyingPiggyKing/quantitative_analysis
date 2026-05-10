@@ -427,11 +427,11 @@ export default function StockDetailPage() {
                         moneyFlowHistory[0].net_5d_total! >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"
                       }`}
                     >
-                      {moneyFlowHistory[0].net_5d_total! >= 0 ? "+" : ""}
-                      {moneyFlowHistory[0].net_5d_total! >= 0
-                        ? (moneyFlowHistory[0].net_5d_total! / 10000).toFixed(1)
-                        : (Math.abs(moneyFlowHistory[0].net_5d_total!) / 10000).toFixed(1)}
-                      亿
+                      {moneyFlowHistory[0].net_5d_total! >= 0 ? "+" : "-"}
+                      {moneyFlowMarket === "A-share"
+                        ? (Math.abs(moneyFlowHistory[0].net_5d_total!) / 10000).toFixed(2)
+                        : (Math.abs(moneyFlowHistory[0].net_5d_total!) / 1e8).toFixed(2)}
+                      {moneyFlowMarket === "HK" ? "亿HKD" : moneyFlowMarket === "US" ? "亿USD" : "亿"}
                     </span>
                   ) : (
                     <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
@@ -453,13 +453,23 @@ export default function StockDetailPage() {
                 <div className="flex items-center gap-1">
                   <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>换手</span>
                   <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
-                    {valuation.turnover_rate != null ? `${valuation.turnover_rate.toFixed(2)}%` : "N/A"}
+                    {valuation.turnover_rate != null
+                      ? /^\d{6}$/.test(symbol)
+                        ? `${valuation.turnover_rate.toFixed(2)}%`
+                        : `${(valuation.turnover_rate * 100).toFixed(2)}%`
+                      : "N/A"}
                   </span>
                 </div>
                 <div className="flex items-center gap-1">
                   <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>市值</span>
                   <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
-                    {valuation.total_mv != null ? `${(valuation.total_mv / 10000).toFixed(0)}亿` : "N/A"}
+                    {valuation.total_mv != null
+                      ? /^\d{6}$/.test(symbol)
+                        ? `${(valuation.total_mv / 10000).toFixed(0)}亿`
+                        : /^\d{4,5}$/.test(symbol)
+                        ? `${(valuation.total_mv / 1e8).toFixed(0)}亿HKD`
+                        : `${(valuation.total_mv / 1e8).toFixed(0)}亿美元`
+                      : "N/A"}
                   </span>
                 </div>
               </div>

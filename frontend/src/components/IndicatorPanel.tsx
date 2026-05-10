@@ -98,6 +98,7 @@ export default function IndicatorPanel({ indicators, loading }: IndicatorPanelPr
       >
         <h3 className="font-[var(--font-playfair)] text-sm tracking-[0.16em] text-vt-brass-300 uppercase">
           技 术 指 标
+          <span className="text-vt-brass-500 text-[10px] tracking-normal ml-1">100日</span>
         </h3>
         <span className="text-vt-brass-400 text-lg font-[var(--font-playfair)] leading-none">
           {collapsed ? "+" : "−"}

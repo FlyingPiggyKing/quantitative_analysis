@@ -113,7 +113,7 @@ function PresetTable({ stocks, infoMap, valMap, flowMap, predictions }: PresetTa
                     </span>
                     <span>
                       <span className="text-vt-parchment-dim">换手 </span>
-                      {val?.turnover_rate != null ? `${val.turnover_rate.toFixed(2)}%` : "-"}
+                      {val?.turnover_rate != null ? `${(val.turnover_rate < 1 ? val.turnover_rate * 100 : val.turnover_rate).toFixed(2)}%` : "-"}
                     </span>
                   </div>
                 </div>
@@ -188,7 +188,7 @@ function PresetTable({ stocks, infoMap, valMap, flowMap, predictions }: PresetTa
                   <span className="text-vt-parchment-dim ml-1">PB</span>
                 </span>
                 <span>
-                  <span className="text-vt-parchment">{val?.turnover_rate != null ? `${val.turnover_rate.toFixed(2)}%` : "-"}</span>
+                  <span className="text-vt-parchment">{val?.turnover_rate != null ? `${(val.turnover_rate < 1 ? val.turnover_rate * 100 : val.turnover_rate).toFixed(2)}%` : "-"}</span>
                   <span className="text-vt-parchment-dim ml-1">换手</span>
                 </span>
               </div>

@@ -1,8 +1,11 @@
 """Trend prediction database service using SQLite."""
+import logging
 import sqlite3
 from pathlib import Path
 from typing import Optional, List
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 DB_PATH = Path(__file__).parent.parent / "trend_predictions.db"
 

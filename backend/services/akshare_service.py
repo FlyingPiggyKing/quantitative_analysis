@@ -373,8 +373,8 @@ class AShareService:
                     "net_d5_amount": safe_float(row.get("net_d5_amount")),
                 })
 
-            # Calculate 5-day total of buy_lg_amount
-            net_5d_total = sum(r["buy_lg_amount"] or 0 for r in records[-5:])
+            # Use net_d5_amount from latest record as the official 5-day cumulative
+            net_5d_total = records[-1].get("net_d5_amount") if records and records[-1].get("net_d5_amount") is not None else None
 
             return {
                 "symbol": symbol,

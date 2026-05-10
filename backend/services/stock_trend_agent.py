@@ -15,7 +15,7 @@ from langsmith import traceable
 
 from backend.services.tavily_search_tool import tavily_search
 from backend.services.minimax_mcp_search_tool import minimax_mcp_search
-from backend.services.akshare_service import AShareService, USStockService, AkshareService, calculate_indicators, _is_us_stock_symbol
+from backend.services.akshare_service import AShareService, USStockService, HKStockService, AkshareService, calculate_indicators, _is_us_stock_symbol, _is_hk_stock_symbol
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -363,7 +363,8 @@ Your final response MUST be a valid JSON object with these fields. Here is a com
         "rsi": {{"value": "65.5", "zone": "正常", "interpretation": "RSI处于正常区间，未出现超买超卖"}},
         "ma": {{"position": "价格在5日、20日均线上方", "interpretation": "均线多头排列，短期趋势向好"}},
         "volume": {{"ratio": "1.3", "interpretation": "成交量放大，市场参与度提升"}},
-        "valuation": {{"pe": "28.5", "pb": "5.2", "turnover": "2.5%", "interpretation": "估值处于历史中枢偏低位置"}}
+        "valuation": {{"pe": "28.5", "pb": "5.2", "turnover": "2.5%", "interpretation": "估值处于历史中枢偏低位置"}},
+        "money_flow": {{"net_5d": "6.76亿元", "signal": "净流入偏多", "interpretation": "主力资金持续流入，市场参与度提升"}}
     }},
     "趋势判断": {{
         "forecast": "市场环境\n外围市场整体平稳，美联储降息预期升温，流动性环境有利成长股\n\n技术面分析\nMACD金叉确认，均线多头排列，成交量配合放大，108元一线为近期重要阻力位\n\n短期展望\n预计股价在102-110区间震荡偏强运行，若突破108元可能进一步上探110元",
@@ -386,7 +387,9 @@ def format_data_context(recent_prices: list, indicators: dict, valuation_data: d
     lines = []
     currency = "USD" if market == "US" else "CNY"
 
-    # Recent price trend
+    # Note: data is based on 100-day K-line
+    lines.append("注: 以下技术指标基于近100日K线数据计算")
+    lines.append("")
     if recent_prices:
         first = recent_prices[0]
         last = recent_prices[-1]
@@ -435,23 +438,36 @@ def format_data_context(recent_prices: list, indicators: dict, valuation_data: d
             lines.append(f"PE(TTM): {pe_ttm:.2f}")
         if pb is not None:
             lines.append(f"PB: {pb:.2f}")
-        if turnover_rate is not None:
-            lines.append(f"换手率: {turnover_rate:.2f}%")
+        if turnover_rate is not None and turnover_rate != 0:
+            # HK/US stocks return turnover as decimal fraction (<1), A-shares return as percentage (>=1)
+            display_turnover = turnover_rate * 100 if market in ("HK", "US") else turnover_rate
+            lines.append(f"换手率: {display_turnover:.2f}%")
         if total_mv is not None:
-            lines.append(f"总市值: {total_mv:.0f}万元")
+            if market == "HK":
+                # total_mv from Futu is in HKD; convert to 亿HKD
+                hkd_yi = total_mv / 1e8
+                lines.append(f"总市值: {hkd_yi:.0f}亿HKD")
+            elif market == "US":
+                # total_mv from Futu is in USD; display as 亿美元
+                lines.append(f"总市值: {total_mv / 1e8:.0f}亿美元")
+            else:
+                # A-share: total_mv from Tushare is in 万元; convert to 亿元
+                lines.append(f"总市值: {total_mv/10000:.0f}亿元")
 
     # Money flow (appended to valuation section)
     if money_flow_data and "error" not in money_flow_data:
-        net_5d = money_flow_data.get("net_5d_total", 0)
-        if net_5d is None:
-            net_5d = 0
-        if net_5d > 0:
-            signal = "净流入偏多"
-        elif net_5d < 0:
-            signal = "净流出偏多"
-        else:
-            signal = "持平"
-        lines.append(f"5日主力净流入: {net_5d/1_0000:.0f}万元 ({signal})")
+        net_5d = money_flow_data.get("net_5d_total")
+        if net_5d is not None and net_5d != 0:
+            signal = "净流入偏多" if net_5d > 0 else "净流出偏多"
+            if market == "HK":
+                # main_in_flow from Futu is in HKD; convert to 亿HKD
+                lines.append(f"5日主力净流入: {net_5d/1e8:.2f}亿HKD ({signal})")
+            elif market == "US":
+                # US money flow from Futu is in USD; convert to 亿美元
+                lines.append(f"5日主力净流入: {net_5d/1e8:.2f}亿美元 ({signal})")
+            else:
+                # A-share money flow is in 万元; convert to 亿元
+                lines.append(f"5日主力净流入: {net_5d/10000:.2f}亿元 ({signal})")
 
     return "\n".join(lines)
 
@@ -467,6 +483,110 @@ def create_stock_trend_agent(market: str = "A"):
     )
 
     return agent
+
+
+def _build_user_message(market: str, symbol: str, name: str, today_date: str, data_context: str) -> str:
+    """Build user message based on market type.
+
+    Args:
+        market: "US", "HK", or "A"
+        symbol: Stock symbol
+        name: Stock name
+        today_date: Today's date in YYYY-MM-DD format
+        data_context: Formatted technical data string
+
+    Returns:
+        User message prompt for the agent
+    """
+    if market == "US":
+        return _build_us_stock_message(symbol, name, today_date, data_context)
+    elif market == "HK":
+        return _build_hk_stock_message(symbol, name, today_date, data_context)
+    else:
+        return _build_a_stock_message(symbol, name, today_date, data_context)
+
+
+def _build_us_stock_message(symbol: str, name: str, today_date: str, data_context: str) -> str:
+    """Build user message for US stocks using Yahoo Finance RSS + search fallback."""
+    proxy_url = os.environ.get("YF_PROXY")
+    rss_items = fetch_yahoo_finance_rss(symbol, proxy_url)
+
+    if rss_items:
+        logger.info(f"RSS returned {len(rss_items)} items for {symbol}")
+        rss_news_text = _format_rss_news_for_agent(rss_items, name, symbol)
+
+        if data_context:
+            return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+## 技术数据
+{data_context}
+
+## Yahoo Finance 最新新闻列表
+{rss_news_text}
+
+请根据以上新闻列表，选取最重要的5条新闻（根据与 {name} 的相关性和时效性），然后使用 search_with_fallback 工具分别搜索每条新闻获取更多详情，最后结合技术数据和新闻给出预测。
+"""
+        else:
+            return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+## Yahoo Finance 最新新闻列表
+{rss_news_text}
+
+请根据以上新闻列表，选取最重要的5条新闻（根据与 {name} 的相关性和时效性），然后使用 search_with_fallback 工具分别搜索每条新闻获取更多详情，最后给出预测。
+"""
+    else:
+        # RSS failed - fall back to existing search
+        logger.warning(f"RSS fetch failed for {symbol}, using fallback search")
+        if data_context:
+            return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+## 技术数据
+{data_context}
+
+请使用 search_with_fallback 工具优先搜索 Yahoo Finance (site:finance.yahoo.com) 关于 {name} ({symbol}) 的新闻，再搜索今天 '{today_date}' 最新新闻，然后结合以上技术数据给出预测。
+"""
+        else:
+            return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+请使用 search_with_fallback 工具优先搜索 Yahoo Finance (site:finance.yahoo.com) 关于 {name} ({symbol}) 的新闻。
+"""
+
+
+def _build_a_stock_message(symbol: str, name: str, today_date: str, data_context: str) -> str:
+    """Build user message for A-shares (China) using generic search."""
+    if data_context:
+        return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+## 技术数据
+{data_context}
+
+请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻，然后结合以上技术数据给出预测。
+"""
+    else:
+        return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻。
+"""
+
+
+def _build_hk_stock_message(symbol: str, name: str, today_date: str, data_context: str) -> str:
+    """Build user message for HK stocks.
+
+    Currently uses same logic as A-shares. TODO: Add HK-specific news sources.
+    """
+    if data_context:
+        return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+## 技术数据
+{data_context}
+
+请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻，然后结合以上技术数据给出预测。
+"""
+    else:
+        return f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
+
+请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻。
+"""
 
 
 @traceable
@@ -485,11 +605,15 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     """
     # Determine market and select appropriate service
     is_us = _is_us_stock_symbol(symbol)
-    market = "US" if is_us else "A"
+    is_hk = _is_hk_stock_symbol(symbol)
+    market = "US" if is_us else ("HK" if is_hk else "A")
 
     if is_us:
         stock_service = USStockService
         logger.info(f"Starting US stock trend analysis for {name} ({symbol})")
+    elif is_hk:
+        stock_service = HKStockService
+        logger.info(f"Starting HK stock trend analysis for {name} ({symbol})")
     else:
         stock_service = AShareService
         logger.info(f"Starting A-share trend analysis for {name} ({symbol})")
@@ -499,7 +623,7 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     indicators = {}
 
     try:
-        kline_result = stock_service.get_kline_data(symbol, days=60)
+        kline_result = stock_service.get_kline_data(symbol, days=100)
         kline_data = kline_result.get("data", [])
 
         if kline_data:
@@ -519,7 +643,7 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     # Fetch money flow data (5-day main force net inflow)
     money_flow_data = None
     try:
-        money_flow_result = stock_service.get_moneyflow(symbol, days=5)
+        money_flow_result = stock_service.get_moneyflow(symbol, days=30)
         if "error" not in money_flow_result:
             money_flow_data = money_flow_result
     except Exception as e:
@@ -536,69 +660,7 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     logger.info(f"Agent created for {symbol}, invoking...")
 
     today_date = get_today_date()
-
-    if market == "US":
-        # US stocks: Use Yahoo Finance RSS + MiniMax search workflow
-        proxy_url = os.environ.get("YF_PROXY")
-        rss_items = fetch_yahoo_finance_rss(symbol, proxy_url)
-
-        if rss_items:
-            # RSS succeeded - use RSS + MiniMax workflow
-            logger.info(f"RSS returned {len(rss_items)} items for {symbol}")
-
-            # Format RSS items for user message
-            rss_news_text = _format_rss_news_for_agent(rss_items, name, symbol)
-
-            if data_context:
-                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
-
-## 技术数据
-{data_context}
-
-## Yahoo Finance 最新新闻列表
-{rss_news_text}
-
-请根据以上新闻列表，选取最重要的5条新闻（根据与 {name} 的相关性和时效性），然后使用 search_with_fallback 工具分别搜索每条新闻获取更多详情，最后结合技术数据和新闻给出预测。
-"""
-            else:
-                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
-
-## Yahoo Finance 最新新闻列表
-{rss_news_text}
-
-请根据以上新闻列表，选取最重要的5条新闻（根据与 {name} 的相关性和时效性），然后使用 search_with_fallback 工具分别搜索每条新闻获取更多详情，最后给出预测。
-"""
-        else:
-            # RSS failed - fall back to existing search
-            logger.warning(f"RSS fetch failed for {symbol}, using fallback search")
-            if data_context:
-                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
-
-## 技术数据
-{data_context}
-
-请使用 search_with_fallback 工具优先搜索 Yahoo Finance (site:finance.yahoo.com) 关于 {name} ({symbol}) 的新闻，再搜索今天 '{today_date}' 最新新闻，然后结合以上技术数据给出预测。
-"""
-            else:
-                user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
-
-请使用 search_with_fallback 工具优先搜索 Yahoo Finance (site:finance.yahoo.com) 关于 {name} ({symbol}) 的新闻。
-"""
-    else:
-        # A-shares: use existing generic search logic (unchanged)
-        if data_context:
-            user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
-
-## 技术数据
-{data_context}
-
-请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻，然后结合以上技术数据给出预测。
-"""
-        else:
-            user_message = f"""请分析股票 {name} ({symbol}) 的未来2周趋势（日期: {today_date}）。
-
-请使用 search_with_fallback 工具搜索今天 '{today_date}' 最新新闻，再搜索这周的新闻。
-"""
+    user_message = _build_user_message(market, symbol, name, today_date, data_context)
 
     # Step 3: Invoke agent with retry logic
     attempt = 0

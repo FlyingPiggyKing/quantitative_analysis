@@ -536,22 +536,30 @@ class FutuQuoteService:
                 return {"symbol": symbol, "market": market, "error": "No capital flow data"}
 
             # Process data - extract main_in_flow per day
+            # Note: Futu's get_capital_flow returns date field directly (may be empty string)
             records = []
             for i in range(len(data)):
                 row = data.iloc[i] if hasattr(data, "iloc") else data[i]
 
-                date_str = row.get("time_key", "")
-                if date_str:
-                    date_str = date_str.split(" ")[0] if " " in date_str else date_str
+                date_str = row.get("date", "") or row.get("time_key", "") or ""
+                if date_str and " " in date_str:
+                    date_str = date_str.split(" ")[0]
 
                 records.append({
                     "date": date_str,
                     "main_in_flow": _to_python_type(row.get("main_in_flow")),
+                    "_index": i,  # preserve original order as fallback
                 })
 
-            # Sort by date and take last N
-            records.sort(key=lambda x: x["date"])
-            records = records[-days:]
+            # Sort by date (if dates are valid), otherwise keep API order
+            valid_dates = [r for r in records if r["date"]]
+            if len(valid_dates) >= days:
+                # Enough valid dates - sort and take last N
+                records.sort(key=lambda x: x["date"])
+                records = records[-days:]
+            else:
+                # Dates missing/empty - take last N from original API order
+                records = records[-days:]
 
             # Calculate 5-day total
             net_5d_total = sum(r["main_in_flow"] or 0 for r in records[-5:])
