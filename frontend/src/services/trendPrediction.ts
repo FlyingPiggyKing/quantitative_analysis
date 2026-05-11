@@ -42,6 +42,10 @@ export interface TechnicalAnalysis {
     turnover: string;
     interpretation: string;
   };
+  finance_metrics?: {
+    summary: string;
+    interpretation: string;
+  };
 }
 
 export interface TrendJudgment {

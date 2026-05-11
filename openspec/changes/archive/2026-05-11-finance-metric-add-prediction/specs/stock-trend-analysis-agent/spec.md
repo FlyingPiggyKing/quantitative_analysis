@@ -1,18 +1,3 @@
-## ADDED Requirements
-
-### Requirement: MiniMax MCP Web Search (Fallback)
-The system SHALL provide a MiniMax MCP-based web search tool that serves as fallback when Tavily is unavailable.
-
-#### Scenario: Search with MiniMax MCP fallback
-- **WHEN** Tavily search fails or returns empty results
-- **THEN** the agent SHALL automatically invoke MiniMax MCP search
-- **AND** continue analysis using MiniMax MCP results
-
-#### Scenario: Both sources unavailable
-- **WHEN** both Tavily and MiniMax MCP return errors or no results
-- **THEN** agent SHALL return "neutral" trend with 0% confidence
-- **AND** summary SHALL state "Insufficient recent news data for analysis"
-
 ## MODIFIED Requirements
 
 ### Requirement: Stock Trend Analysis Agent

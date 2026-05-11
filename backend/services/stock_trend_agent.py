@@ -276,23 +276,13 @@ def _get_model():
 
 def get_system_prompt(today_date: str, market: str = "A") -> str:
     """Return the system prompt with today's date injected."""
-    if market == "US":
-        market_context = """## US Stock Market Context
-- Currency: USD (美元)
-- Exchanges: NYSE, NASDAQ
-- Trading hours: 9:30 AM - 4:00 PM EST (Eastern Time)
-- Key indices: S&P 500, NASDAQ Composite, Dow Jones Industrial Average
-"""
-    else:
-        market_context = """## A-Share Market Context
+    if market == "A":
+        return f"""You are a professional stock analyst agent. Today is {today_date}. Your task is to analyze a given A-share stock and predict its price trend for the next 2 weeks based on BOTH technical data AND recent news.
+
+## A-Share Market Context
 - Currency: CNY (人民币)
 - Exchanges: Shanghai Stock Exchange (SSE), Shenzhen Stock Exchange (SZSE)
 - Trading hours: 9:30 AM - 3:00 PM CST (China Standard Time)
-"""
-
-    return f"""You are a professional stock analyst agent. Today is {today_date}. Your task is to analyze a given stock and predict its price trend for the next 2 weeks based on BOTH technical data AND recent news.
-
-{market_context}
 
 ## Your Process
 
@@ -364,7 +354,8 @@ Your final response MUST be a valid JSON object with these fields. Here is a com
         "ma": {{"position": "价格在5日、20日均线上方", "interpretation": "均线多头排列，短期趋势向好"}},
         "volume": {{"ratio": "1.3", "interpretation": "成交量放大，市场参与度提升"}},
         "valuation": {{"pe": "28.5", "pb": "5.2", "turnover": "2.5%", "interpretation": "估值处于历史中枢偏低位置"}},
-        "money_flow": {{"net_5d": "6.76亿元", "signal": "净流入偏多", "interpretation": "主力资金持续流入，市场参与度提升"}}
+        "money_flow": {{"net_5d": "6.76亿元", "signal": "净流入偏多", "interpretation": "主力资金持续流入，市场参与度提升"}},
+        "finance_metrics": {{"summary": "EPS: 2.35, BPS: 12.80, ROE: 18.4%, 毛利率: 35.2%, 净利率: 15.8%, 每股收益同比增长: +12.5%, 净利润同比增长: +8.3%, 营收同比增长: +5.1%, 资产负债率: 45.2%, 流动比率: 1.8, 总营收: 125.6亿元, 净利润: 19.8亿元", "interpretation": "公司盈利能力良好，ROE维持在18%以上，净利润保持稳定增长，资产负债率适中，流动性充裕，基本面支撑股价"}}
     }},
     "趋势判断": {{
         "forecast": "市场环境\n外围市场整体平稳，美联储降息预期升温，流动性环境有利成长股\n\n技术面分析\nMACD金叉确认，均线多头排列，成交量配合放大，108元一线为近期重要阻力位\n\n短期展望\n预计股价在102-110区间震荡偏强运行，若突破108元可能进一步上探110元",
@@ -379,10 +370,100 @@ Your final response MUST be a valid JSON object with these fields. Here is a com
 2. Each paragraph has a title (like "市场环境", "技术面分析", "操作建议") followed by content
 3. Use Chinese for all content
 4. Output valid JSON only - no markdown code blocks, no explanatory text
+5. When financial data (财务指标) is provided in the context, the `技术分析` block MUST include a `finance_metrics` sub-block summarizing key financial indicators (EPS, ROE, margins, growth rates) and their interpretation.
+"""
+
+    # HK and US stocks
+    return f"""You are a professional stock analyst agent. Today is {today_date}. Your task is to analyze a given stock and predict its price trend for the next 2 weeks based on BOTH technical data AND recent news.
+
+## Market Context
+- Currency: USD (美元) for US stocks, HKD (港币) for HK stocks
+- Exchanges: NYSE, NASDAQ (US) / SEHK (HK)
+
+## Your Process
+
+1. **Analyze the provided technical data**: Review the K-line data, MACD, RSI, and MA signals provided in the message.
+   - Price trend direction and magnitude
+   - MACD golden/death cross signals
+   - RSI zone (overbought >80, oversold <20)
+   - Price position relative to moving averages
+   - Volume ratio (above 1 = volume expansion)
+   - Money flow signals (main force net inflow/outflow)
+
+2. **Search for stock-specific news**: Use the search_with_fallback tool to search for recent news about the specific stock (symbol and name).
+   - Search query format: "[stock name] [stock symbol] recent news"
+   - This will try MiniMax MCP first, then Tavily as fallback
+   - Collect up to 5 recent news items from the past month
+
+3. **Search for macro environment**: Use the search_with_fallback tool to search for macro factors that might affect the stock:
+   - Interest rate trends
+   - GDP and economic data
+   - Industry-specific trends
+   - Market sentiment
+
+4. **Combine technical + sentiment analysis**: Weight technical signals (40%) and news sentiment (60%) to form your prediction.
+   - If technical signals confirm news direction → higher confidence
+   - If technical signals conflict with news direction → lower confidence and note the disagreement
+
+5. **Return structured prediction**: Provide your final prediction with structured three-section format
+
+## Important Guidelines
+
+- **Use the provided technical data first**: The technical data is provided under "## 技术数据" section. Analyze it BEFORE searching for news.
+- **Weight: 40% technical, 60% news**: Technical signals provide context, but news drives short-term movements.
+- **Focus on the LATEST news**: The search_with_fallback returns news from the current week. Prioritize the most recent articles in your analysis as they are most relevant for 2-week trend prediction
+- If you find limited or no news, note this in your summary and provide lower confidence
+- Consider both company-specific news and broader market/industry trends
+- Provide honest, balanced analysis - don't overstate confidence if evidence is weak
+- **Operation suggestions are for reference only, not investment advice**
+
+## Response Format
+
+**CRITICAL: You MUST output ONLY a valid JSON object. Do not include any text before or after the JSON.**
+
+Your final response MUST be a valid JSON object with these fields. Here is a complete example:
+
+```json
+{{
+    "trend_direction": "up",
+    "confidence": 75,
+    "情绪分析": {{
+        "news": [
+            {{
+                "title": "Apple发布强劲Q4财报",
+                "source": "Reuters",
+                "date": "2024-01-15",
+                "summary": "Apple业绩超预期，中国区iPhone销售强劲。"
+            }}
+        ],
+        "summary": "财报超预期，市场情绪偏多。"
+    }},
+    "技术分析": {{
+        "macd": {{"value": "0.35/0.28", "signal": "金叉", "interpretation": "MACD在零轴上方形成金叉，短期多头信号明显"}},
+        "rsi": {{"value": "65.5", "zone": "正常", "interpretation": "RSI处于正常区间，未出现超买超卖"}},
+        "ma": {{"position": "价格在5日、20日均线上方", "interpretation": "均线多头排列，短期趋势向好"}},
+        "volume": {{"ratio": "1.3", "interpretation": "成交量放大，市场参与度提升"}},
+        "valuation": {{"pe": "28.5", "pb": "5.2", "turnover": "2.5%", "interpretation": "估值处于历史中枢位置"}},
+        "money_flow": {{"net_5d": "6.76亿美元", "signal": "净流入偏多", "interpretation": "主力资金持续流入，市场参与度提升"}}
+    }},
+    "趋势判断": {{
+        "forecast": "市场环境\n美股市场整体平稳，美联储降息预期升温，流动性环境有利成长股\n\n技术面分析\nMACD金叉确认，均线多头排列，180美元一线为近期重要阻力位\n\n短期展望\n预计股价在175-185区间震荡偏强运行，若突破180美元可能进一步上探185美元",
+        "suggestion": "持有",
+        "reasoning": "市场环境\n机构看多情绪较高，外资持续流入提供支撑\n\n技术面分析\n技术指标向好，但RSI已接近70，短期可能有回调压力\n\n操作建议\n建议持有为主，逢低可适度加仓，突破180美元后考虑加仓"
+    }}
+}}
+```
+
+**Key Requirements:**
+1. `forecast` and `reasoning` MUST use exactly 3 paragraphs separated by `\\n\\n`
+2. Each paragraph has a title (like "市场环境", "技术面分析", "操作建议") followed by content
+3. Use Chinese for all content
+4. Output valid JSON only - no markdown code blocks, no explanatory text
+5. Do NOT include `finance_metrics` field for HK or US stocks.
 """
 
 
-def format_data_context(recent_prices: list, indicators: dict, valuation_data: dict = None, market: str = "A", money_flow_data: dict = None) -> str:
+def format_data_context(recent_prices: list, indicators: dict, valuation_data: dict = None, market: str = "A", money_flow_data: dict = None, financial_data: dict = None) -> str:
     """Format quantitative data as readable text for LLM context."""
     lines = []
     currency = "USD" if market == "US" else "CNY"
@@ -468,6 +549,43 @@ def format_data_context(recent_prices: list, indicators: dict, valuation_data: d
             else:
                 # A-share money flow is in 万元; convert to 亿元
                 lines.append(f"5日主力净流入: {net_5d/10000:.2f}亿元 ({signal})")
+
+    # Financial fundamentals for A-share stocks
+    if financial_data and "error" not in financial_data:
+        data = financial_data.get("data", {})
+        if data:
+            report_label = data.get("report_label", "--")
+            ann_date = data.get("ann_date", "--")
+            lines.append(f"财务指标 ({report_label}, {ann_date}发布):")
+
+            # Helper to format value or return --
+            def fmt(val, decimal=2):
+                if val is None:
+                    return "--"
+                return f"{val:.{decimal}f}"
+
+            eps = fmt(data.get("eps"))
+            bps = fmt(data.get("bps"))
+            roe = fmt(data.get("roe"), 1)
+            gross_margin = fmt(data.get("gross_margin"), 1)
+            netprofit_margin = fmt(data.get("netprofit_margin"), 1)
+            basic_eps_yoy = fmt(data.get("basic_eps_yoy"), 1)
+            netprofit_yoy = fmt(data.get("netprofit_yoy"), 1)
+            tr_yoy = fmt(data.get("tr_yoy"), 1)
+            debt_to_assets_val = data.get("debt_to_assets")
+            debt_to_assets = f"{debt_to_assets_val:.1f}" if debt_to_assets_val is not None else "--"
+            if debt_to_assets.startswith("+"):
+                debt_to_assets = debt_to_assets[1:]
+            current_ratio = fmt(data.get("current_ratio"), 1)
+            # Tushare income table returns in 元, convert to 亿元 (/1e8)
+            total_revenue_val = data.get("total_revenue")
+            total_revenue = f"{total_revenue_val/1e8:.2f}" if total_revenue_val is not None else "--"
+            n_income_val = data.get("n_income")
+            n_income = f"{n_income_val/1e8:.2f}" if n_income_val is not None else "--"
+
+            lines.append(f"EPS: {eps}, BPS: {bps}, ROE: {roe}%, 毛利率: {gross_margin}%, 净利率: {netprofit_margin}%")
+            lines.append(f"每股收益同比增长: {basic_eps_yoy}%, 净利润同比增长: {netprofit_yoy}%, 营收同比增长: {tr_yoy}%")
+            lines.append(f"资产负债率: {debt_to_assets}%, 流动比率: {current_ratio}, 总营收: {total_revenue}亿元, 净利润: {n_income}亿元")
 
     return "\n".join(lines)
 
@@ -649,11 +767,21 @@ def analyze_stock_trend(symbol: str, name: str) -> Dict[str, Any]:
     except Exception as e:
         logger.warning(f"Failed to fetch money flow data for {symbol}: {e}")
 
+    # Fetch financial fundamentals for A-share stocks
+    financial_data = None
+    if market == "A":
+        try:
+            financial_result = AShareService.get_financial_fundamentals(symbol)
+            if "error" not in financial_result:
+                financial_data = financial_result
+        except Exception as e:
+            logger.warning(f"Failed to fetch financial fundamentals for {symbol}: {e}")
+
     # Step 2: Build data context if we have technical data
     data_context = ""
     if kline_data and indicators and not indicators.get("error"):
         recent_prices = kline_data[-10:] if len(kline_data) >= 10 else kline_data
-        data_context = format_data_context(recent_prices, indicators, valuation_data, market, money_flow_data)
+        data_context = format_data_context(recent_prices, indicators, valuation_data, market, money_flow_data, financial_data)
 
     # Step 3: Build user message based on market
     agent = create_stock_trend_agent(market)

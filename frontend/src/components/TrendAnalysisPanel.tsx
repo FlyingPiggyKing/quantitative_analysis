@@ -227,6 +227,17 @@ function TechnicalSection({ data }: { data: TechnicalAnalysis }) {
             )}
           </div>
         )}
+
+        {/* Finance Metrics (A-share only) */}
+        {data.finance_metrics && (
+          <div className="rounded p-2 col-span-2" style={cardStyle}>
+            <span className="vt-engraved not-italic text-xs uppercase tracking-wider">财务指标:</span>
+            <p className="text-vt-parchment mt-1">{data.finance_metrics.summary}</p>
+            {data.finance_metrics.interpretation && (
+              <p className="text-vt-parchment-soft mt-1">{data.finance_metrics.interpretation}</p>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
