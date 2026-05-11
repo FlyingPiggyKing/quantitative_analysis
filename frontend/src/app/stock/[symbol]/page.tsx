@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
+import FinancialIndicatorsPanel from "@/components/FinancialIndicatorsPanel";
 import TrendAnalysisPanel from "@/components/TrendAnalysisPanel";
 import PETrendSparkline from "@/components/PETrendSparkline";
 import MoneyFlowSparkline from "@/components/MoneyFlowSparkline";
@@ -80,6 +81,8 @@ export default function StockDetailPage() {
   const [cooldownRemaining, setCooldownRemaining] = useState<string | null>(null);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [authModalMessage, setAuthModalMessage] = useState("");
+  const [fundamentals, setFundamentals] = useState<{ data: Record<string, unknown> | null; error: string | null } | null>(null);
+  const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
 
   // Allow guest access - no redirect to login
 
@@ -163,6 +166,35 @@ export default function StockDetailPage() {
     };
 
     fetchMoneyFlow();
+  }, [symbol]);
+
+  // Fetch financial fundamentals (A-share only, non-blocking)
+  useEffect(() => {
+    if (!symbol) return;
+    // Only fetch for A-share stocks (6-digit symbols)
+    if (!/^\d{6}$/.test(symbol)) return;
+
+    const fetchFundamentals = async () => {
+      setFundamentalsLoading(true);
+      try {
+        const res = await fetch(`${API_BASE}/api/stock/${symbol}/fundamentals`);
+        const data = await res.json();
+        if (data.error) {
+          setFundamentals({ data: null, error: data.error });
+        } else if (data.data) {
+          setFundamentals({ data: data.data, error: null });
+        } else {
+          setFundamentals({ data: null, error: "暂无数据" });
+        }
+      } catch (err) {
+        console.error("Failed to fetch fundamentals:", err);
+        setFundamentals({ data: null, error: "数据加载失败" });
+      } finally {
+        setFundamentalsLoading(false);
+      }
+    };
+
+    fetchFundamentals();
   }, [symbol]);
 
   // Fetch existing trend prediction (non-force, just to display cached data)
@@ -592,6 +624,17 @@ export default function StockDetailPage() {
             </div>
           )}
         </section>
+
+        {/* Financial Indicators - A-share only */}
+        {/^\d{6}$/.test(symbol) && (
+          <section className="vt-panel p-3 sm:p-4">
+            <FinancialIndicatorsPanel
+              data={fundamentals?.data ?? null}
+              error={fundamentals?.error ?? null}
+              loading={fundamentalsLoading}
+            />
+          </section>
+        )}
 
         {/* Data Table */}
         {klineData.length > 0 && (

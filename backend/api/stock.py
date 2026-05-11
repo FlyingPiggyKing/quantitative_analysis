@@ -168,6 +168,17 @@ async def get_valuation(symbol: str, days: int = Query(default=30, ge=1, le=365)
         return AShareService.get_daily_basic(symbol, days)
 
 
+@router.get("/{symbol}/fundamentals")
+async def get_financial_fundamentals(symbol: str):
+    """Get quarterly financial fundamentals (EPS, ROE, profit margins, growth rates) for A-share stocks.
+
+    Returns "暂不适用" error for HK and US stocks (FutuAPI does not provide financial fundamentals).
+    """
+    if _is_hk_stock_symbol(symbol) or _is_us_stock_symbol(symbol):
+        return {"symbol": symbol, "error": "暂不适用", "data": None}
+    return AShareService.get_financial_fundamentals(symbol)
+
+
 @router.get("/{symbol}/moneyflow")
 async def get_moneyflow(symbol: str, days: int = Query(default=30, ge=1, le=365)):
     """Get main force net inflow (money flow) for a stock.

@@ -439,6 +439,137 @@ class AShareService:
 
         return {"results": results, "errors": errors}
 
+    @staticmethod
+    def get_financial_fundamentals(symbol: str) -> dict:
+        """Get quarterly financial fundamentals for an A-share stock.
+
+        Fetches from Tushare fina_indicator and income tables.
+        Returns EPS, ROE, profit margins, growth rates, revenue, and net income.
+        """
+        try:
+            ts_code = _symbol_to_ts_code(symbol)
+            pro = ts.pro_api()
+
+            # Fields to fetch from fina_indicator
+            fina_fields = (
+                "ts_code,ann_date,end_date,end_type,eps,dt_eps,bps,gross_margin,netprofit_margin,"
+                "roe,roe_yearly,debt_to_assets,current_ratio,basic_eps_yoy,netprofit_yoy,tr_yoy"
+            )
+
+            # Fields to fetch from income
+            income_fields = (
+                "ts_code,ann_date,end_date,total_revenue,revenue,n_income,gross_profit"
+            )
+
+            # Fetch latest quarter from fina_indicator (no date filter, get most recent)
+            fina_df = pro.fina_indicator(ts_code=ts_code, fields=fina_fields)
+
+            # Fetch latest quarter from income (may fail due to rate limit - wrap gracefully)
+            income_df = None
+            try:
+                income_df = pro.income(ts_code=ts_code, fields=income_fields)
+            except Exception as e:
+                logger.warning(f"[A股] {symbol} income API failed: {e}")
+
+            if (fina_df is None or fina_df.empty) and (income_df is None or income_df.empty):
+                return {"symbol": symbol, "error": "No financial data", "data": None}
+
+            def safe_float(val):
+                try:
+                    return float(val) if pd.notna(val) else None
+                except (TypeError, ValueError):
+                    return None
+
+            # Use fina_indicator as primary source for most fields
+            result = {"symbol": symbol}
+            _fina_gross_margin = None
+
+            if fina_df is not None and not fina_df.empty:
+                row = fina_df.iloc[0]
+                end_date = str(row.get("end_date", ""))
+                result["period"] = end_date
+                result["ann_date"] = str(row.get("ann_date", ""))
+
+                # Derive report type from end_date (period) MM-DD suffix
+                # 0331 -> Q1, 0630 -> half-year, 0930 -> Q3, 1231 -> annual
+                month_day = end_date[4:]
+                if month_day == "0331":
+                    result["report_label"] = f"{end_date[:4]}年一季报"
+                elif month_day == "0630":
+                    result["report_label"] = f"{end_date[:4]}年半年报"
+                elif month_day == "0930":
+                    result["report_label"] = f"{end_date[:4]}年三季报"
+                elif month_day == "1231":
+                    result["report_label"] = f"{end_date[:4]}年年报"
+                else:
+                    result["report_label"] = f"{end_date[:4]}-{end_date[4:6]}-{end_date[6:8]}"
+
+                result["eps"] = safe_float(row.get("eps"))
+                result["bps"] = safe_float(row.get("bps"))
+                result["roe"] = safe_float(row.get("roe"))
+                result["roe_yearly"] = safe_float(row.get("roe_yearly"))
+                # gross_margin from fina_indicator: if > 1000 it's gross_profit in 元, not a %
+                _fina_gross_margin = safe_float(row.get("gross_margin"))
+                result["gross_margin"] = _fina_gross_margin
+                result["netprofit_margin"] = safe_float(row.get("netprofit_margin"))
+                result["basic_eps_yoy"] = safe_float(row.get("basic_eps_yoy"))
+                result["netprofit_yoy"] = safe_float(row.get("netprofit_yoy"))
+                result["tr_yoy"] = safe_float(row.get("tr_yoy"))
+                result["debt_to_assets"] = safe_float(row.get("debt_to_assets"))
+                result["current_ratio"] = safe_float(row.get("current_ratio"))
+            else:
+                result["period"] = None
+                result["ann_date"] = None
+                result["report_label"] = None
+                result["eps"] = None
+                result["bps"] = None
+                result["roe"] = None
+                result["roe_yearly"] = None
+                result["netprofit_margin"] = None
+                result["basic_eps_yoy"] = None
+                result["netprofit_yoy"] = None
+                result["tr_yoy"] = None
+                result["debt_to_assets"] = None
+                result["current_ratio"] = None
+
+            if income_df is not None and not income_df.empty:
+                # Try to find the record matching the same end_date as fina_indicator
+                income_row = None
+                if result.get("period"):
+                    matching = income_df[income_df["end_date"].astype(str) == result["period"]]
+                    if not matching.empty:
+                        income_row = matching.iloc[0]
+                    else:
+                        income_row = income_df.iloc[0]
+                else:
+                    income_row = income_df.iloc[0]
+
+                total_revenue = safe_float(income_row.get("total_revenue"))
+                revenue = safe_float(income_row.get("revenue"))
+                gross_profit = safe_float(income_row.get("gross_profit"))
+
+                result["total_revenue"] = total_revenue
+                result["revenue"] = revenue
+                result["n_income"] = safe_float(income_row.get("n_income"))
+
+                # gross_margin from fina_indicator can be either:
+                # 1. A percentage (e.g., 33.26 for 33.26%) - typical for annual reports
+                # 2. Gross profit in 元 (e.g., 5175926820.42) - typical for quarterly reports
+                # Heuristic: if gross_margin > 1000, treat as gross_profit in 元 and compute %
+                if _fina_gross_margin is not None and revenue is not None and revenue > 0:
+                    if _fina_gross_margin > 1000:
+                        result["gross_margin"] = (_fina_gross_margin / revenue) * 100
+            else:
+                result["total_revenue"] = None
+                result["revenue"] = None
+                result["n_income"] = None
+
+            return {"symbol": symbol, "data": result}
+
+        except Exception as e:
+            logger.error(f"[A股] {symbol} financial fundamentals error: {e}")
+            return {"symbol": symbol, "error": str(e), "data": None}
+
 
 class USStockService:
     """Service wrapper for US stock data via Futu OpenAPI.
