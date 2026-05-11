@@ -10,7 +10,7 @@ import PETrendSparkline from "@/components/PETrendSparkline";
 import MoneyFlowSparkline from "@/components/MoneyFlowSparkline";
 import AuthModal from "@/components/AuthModal";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
-import { getTrendPrediction, TrendPrediction, runForcedSingleAnalysis, getCooldownEndTime, setCooldownEndTime } from "@/services/trendPrediction";
+import { getTrendPrediction, TrendPrediction, runForcedSingleAnalysis, runForcedSingleAnalysisAsync, pollTaskStatus, getCooldownEndTime, setCooldownEndTime, clearCooldownEndTime } from "@/services/trendPrediction";
 import { fetchStockValuation, ValuationRecord } from "@/services/stock";
 import { useAuth } from "@/services/auth";
 
@@ -203,12 +203,16 @@ export default function StockDetailPage() {
   useEffect(() => {
     if (!symbol || !user) return;
 
-    const storedEndTime = getCooldownEndTime(String(user.id), symbol);
+    const userId = String(user.id);
+    const storedEndTime = getCooldownEndTime(userId, symbol);
+    console.log("[Cooldown] Loading cooldown:", { userId, symbol, storedEndTime, now: Date.now() });
     if (storedEndTime && storedEndTime > Date.now()) {
+      console.log("[Cooldown] Setting active cooldown, ends at:", storedEndTime);
       setCooldownEndTimeState(storedEndTime);
     } else if (storedEndTime && storedEndTime <= Date.now()) {
       // Cooldown expired, clear it
-      setCooldownEndTime(String(user.id), symbol, 0);
+      console.log("[Cooldown] Cooldown expired, clearing");
+      clearCooldownEndTime(String(user.id), symbol);
     }
   }, [symbol, user]);
 
@@ -274,26 +278,41 @@ export default function StockDetailPage() {
     setAnalysisRunning(true);
     setAnalysisError(null);
     try {
-      const result = await runForcedSingleAnalysis(symbol);
-      setTrendPrediction(result);
-      // Set cooldown for 1 hour after successful trigger
+      // Set cooldown immediately when user clicks (before API call)
+      // This ensures cooldown is active even if user refreshes page during analysis
       if (user) {
         const endTime = Date.now() + 60 * 60 * 1000;
+        console.log("[Cooldown] Setting cooldown immediately on click:", { userId: String(user.id), symbol, endTime });
         setCooldownEndTime(String(user.id), symbol, endTime);
         setCooldownEndTimeState(endTime);
+      }
+
+      // Submit to background queue and get task_id
+      const { task_id } = await runForcedSingleAnalysisAsync(symbol);
+
+      // Poll for task completion
+      const finalStatus = await pollTaskStatus(task_id);
+
+      if (finalStatus.status === "completed" && finalStatus.results && finalStatus.results.length > 0) {
+        setTrendPrediction(finalStatus.results[0]);
+      } else if (finalStatus.status === "failed") {
+        // Analysis failed, but cooldown was already set on click
+        // User will need to wait for cooldown to expire
+        setAnalysisError(finalStatus.error || "分析失败");
       }
     } catch (err) {
       console.error("Failed to run analysis:", err);
       const error = err as Error & { retryAfter?: number };
       if (error.retryAfter) {
-        // Handle rate limit error
-        const endTime = Date.now() + error.retryAfter * 1000;
-        if (user) {
-          setCooldownEndTime(String(user.id), symbol, endTime);
-          setCooldownEndTimeState(endTime);
-        }
+        // 429 Rate limit - user is already in cooldown from previous analysis
+        // Keep the cooldown we set on click, just show error message
         setAnalysisError(`操作过于频繁，请在 ${error.retryAfter} 秒后重试`);
       } else {
+        // Network error or other failure - clear cooldown so user can retry
+        if (user) {
+          clearCooldownEndTime(String(user.id), symbol);
+          setCooldownEndTimeState(null);
+        }
         setAnalysisError(err instanceof Error ? err.message : "分析失败");
       }
     } finally {

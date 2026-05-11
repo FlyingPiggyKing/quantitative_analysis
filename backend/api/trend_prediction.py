@@ -11,6 +11,7 @@ from backend.services.stock_trend_agent import analyze_stock_trend
 from backend.api.auth import get_current_user
 from backend.services.task_queue import (
     submit_analysis_task,
+    submit_single_analysis_task,
     get_task_status,
     TaskStatus,
 )
@@ -63,6 +64,11 @@ class BatchAnalysisRequest(BaseModel):
 
 class BatchAsyncRequest(BaseModel):
     force: bool = False
+
+
+class ForceAnalysisResponse(BaseModel):
+    task_id: str
+    status: str
 
 
 @router.get("", response_model=List[PredictionResponse])
@@ -187,6 +193,64 @@ async def get_prediction(
     )
     saved["is_fallback"] = False
     return saved
+
+
+@router.post("/{symbol}/force-async", response_model=ForceAnalysisResponse)
+async def force_analysis_async(
+    symbol: str,
+    authorization: Optional[str] = Header(None),
+):
+    """Submit force analysis for a single stock to background task queue.
+
+    Returns immediately with a task_id. Poll /api/trend-predictions/task/{task_id}
+    for status and results.
+    Rate limit: only one force analysis per user per stock per hour.
+    Requires authentication.
+    """
+    # Auth required
+    current_user = get_current_user(authorization)
+    user_id = current_user.get("user_id")
+
+    # Check rate limit
+    if TrendPredictionService.check_rate_limit(user_id, symbol):
+        remaining = TrendPredictionService.get_rate_limit_remaining_seconds(user_id, symbol)
+        raise HTTPException(
+            status_code=429,
+            detail={
+                "error": "Rate limit exceeded",
+                "retry_after": remaining,
+            },
+            headers={"retry_after": str(remaining)},
+        )
+
+    # Look up name from watchlist first, fallback to stock info API
+    name = symbol
+    try:
+        watchlist = WatchlistService.get_watchlist(page=1, page_size=100)
+        for stock in watchlist.get("items", []):
+            if stock["symbol"] == symbol:
+                name = stock["name"]
+                break
+    except Exception:
+        pass
+
+    # If name still equals symbol, try to get from stock info API
+    if name == symbol:
+        try:
+            from backend.services.akshare_service import AkshareService
+            stock_info = AkshareService.get_stock_info(symbol)
+            if stock_info and "name" in stock_info and stock_info["name"]:
+                name = stock_info["name"]
+        except Exception:
+            pass
+
+    # Submit to background queue (record_trigger will be called in _run_single_analysis on success)
+    task_id = submit_single_analysis_task(symbol, name, force=True, user_id=user_id)
+
+    return ForceAnalysisResponse(
+        task_id=task_id,
+        status="pending",
+    )
 
 
 @router.post("/batch", response_model=BatchAnalysisResponse)

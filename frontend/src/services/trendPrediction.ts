@@ -187,6 +187,26 @@ export async function runForcedSingleAnalysis(symbol: string): Promise<TrendPred
   return res.json();
 }
 
+export async function runForcedSingleAnalysisAsync(symbol: string): Promise<BatchAsyncResponse> {
+  const res = await fetch(`${API_BASE}/api/trend-predictions/${symbol}/force-async`, {
+    method: "POST",
+    headers: {
+      ...getAuthHeaders(),
+    },
+  });
+  if (res.status === 429) {
+    const data = await res.json().catch(() => ({}));
+    const retryAfter = data.retry_after || parseInt(res.headers.get("retry_after") || "0", 10);
+    const error = new Error(`Rate limit exceeded. Try again in ${retryAfter} seconds.`) as Error & { retryAfter?: number };
+    error.retryAfter = retryAfter;
+    throw error;
+  }
+  if (!res.ok) {
+    throw new Error("Failed to submit forced analysis");
+  }
+  return res.json();
+}
+
 const COOLDOWN_KEY_PREFIX = "analysis_cooldown";
 
 function getCooldownKey(userId: string, symbol: string): string {

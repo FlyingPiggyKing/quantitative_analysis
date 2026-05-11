@@ -43,6 +43,31 @@ class TaskQueue:
         self._tasks: Dict[str, AnalysisTask] = {}
         self._lock = threading.Lock()
 
+    def submit_single_analysis_task(self, symbol: str, name: str, force: bool = False, user_id: str = None) -> str:
+        """Submit a single stock analysis task.
+
+        Args:
+            symbol: Stock symbol
+            name: Stock name
+            force: If False, skip if valid cached result exists today
+            user_id: User ID for rate limiting
+
+        Returns:
+            task_id: UUID for tracking the task
+        """
+        task_id = str(uuid.uuid4())
+
+        with self._lock:
+            self._tasks[task_id] = AnalysisTask(
+                task_id=task_id,
+                total=1,
+                progress="0/1",
+            )
+
+        self._executor.submit(self._run_single_analysis, task_id, symbol, name, force, user_id)
+
+        return task_id
+
     def submit_analysis_task(self, symbols: List[Dict[str, str]], force: bool = False) -> str:
         """Submit a batch analysis task.
 
@@ -65,6 +90,65 @@ class TaskQueue:
         self._executor.submit(self._run_analysis, task_id, symbols, force)
 
         return task_id
+
+    def _run_single_analysis(self, task_id: str, symbol: str, name: str, force: bool = False, user_id: str = None):
+        """Run single stock analysis in background thread."""
+        with self._lock:
+            task = self._tasks[task_id]
+            task.status = TaskStatus.RUNNING
+
+        result = None
+        error = None
+
+        # Check cache if not forcing
+        if not force:
+            cached = TrendPredictionService.get_today_prediction(symbol)
+            if cached:
+                logger.info(f"[Task {task_id}] Skipping {name} ({symbol}) - cached result exists")
+                result = cached
+
+        if result is None:
+            try:
+                logger.info(f"[Task {task_id}] Analyzing {name} ({symbol})")
+                prediction = analyze_stock_trend(symbol, name)
+
+                # Build extended_analysis if available
+                extended_analysis = None
+                if prediction.get("情绪分析") or prediction.get("技术分析") or prediction.get("趋势判断"):
+                    extended_analysis = {
+                        "情绪分析": prediction.get("情绪分析"),
+                        "技术分析": prediction.get("技术分析"),
+                        "趋势判断": prediction.get("趋势判断"),
+                    }
+
+                saved = TrendPredictionService.save_prediction(
+                    symbol=symbol,
+                    name=name,
+                    trend_direction=prediction.get("trend_direction", "neutral"),
+                    confidence=prediction.get("confidence", 0),
+                    summary=prediction.get("summary", ""),
+                    extended_analysis=extended_analysis,
+                )
+                result = saved
+
+                # Record trigger only on successful analysis (for rate limiting)
+                if user_id and result:
+                    TrendPredictionService.record_trigger(user_id, symbol)
+
+            except Exception as e:
+                error = str(e)
+                logger.error(f"[Task {task_id}] Failed to analyze {symbol}: {e}")
+
+        with self._lock:
+            task = self._tasks[task_id]
+            task.current = 1
+            task.progress = "1/1"
+            task.status = TaskStatus.COMPLETED if result else TaskStatus.FAILED
+            task.results = [result] if result else []
+            task.error = error
+            task.completed_at = time.time()
+
+        logger.info(f"[Task {task_id}] Completed: {'analyzed' if result else 'failed'} {symbol}")
 
     def _run_analysis(self, task_id: str, symbols: List[Dict[str, str]], force: bool = False):
         """Run analysis in background thread."""
@@ -163,6 +247,11 @@ def get_task_queue() -> TaskQueue:
             if _task_queue is None:
                 _task_queue = TaskQueue(max_workers=3)
     return _task_queue
+
+
+def submit_single_analysis_task(symbol: str, name: str, force: bool = False, user_id: str = None) -> str:
+    """Submit a single stock analysis task to the global queue."""
+    return get_task_queue().submit_single_analysis_task(symbol, name, force=force, user_id=user_id)
 
 
 def submit_analysis_task(symbols: List[Dict[str, str]], force: bool = False) -> str:
