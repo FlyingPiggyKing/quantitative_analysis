@@ -138,7 +138,7 @@ export default function FinancialIndicatorsPanel({
       </button>
 
       {!collapsed && (
-        <div className="grid grid-cols-4 gap-x-4 gap-y-1">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-x-4 gap-y-1">
           <div>
             <GroupTitle>每股指标</GroupTitle>
             <Cell label="EPS" value={fmt(data.eps)} />
