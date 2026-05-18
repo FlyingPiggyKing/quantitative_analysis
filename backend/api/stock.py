@@ -99,6 +99,16 @@ async def get_batch_info(
     return {"results": results, "errors": errors}
 
 
+@router.get("/dragon-tiger-list")
+async def get_dragon_tiger_list(days: int = Query(default=3, ge=1, le=10)):
+    """Get Dragon Tiger List (机构龙虎榜) aggregated data.
+
+    Returns top 5 net buy and top 5 net sell stocks from recent trading days (cumulative).
+    This is a read-only endpoint that does NOT trigger AI analysis.
+    """
+    return AShareService.get_dragon_tiger_list(days)
+
+
 @router.get("/{symbol}")
 async def get_stock_info(symbol: str):
     """Get basic stock information."""

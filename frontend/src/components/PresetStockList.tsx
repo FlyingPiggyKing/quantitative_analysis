@@ -343,7 +343,7 @@ export default function PresetStockList() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-[var(--font-playfair)] text-xl tracking-[0.18em] text-vt-parchment uppercase">
-          <span className="text-vt-brass-400">❖</span> 推 荐 股 票 <span className="text-vt-brass-400">❖</span>
+          <span className="text-vt-brass-400">❖</span> 热 门 股 <span className="text-vt-brass-400">❖</span>
         </h2>
         <span className="vt-engraved text-sm">游客预览</span>
       </div>

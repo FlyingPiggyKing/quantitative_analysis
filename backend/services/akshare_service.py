@@ -440,6 +440,137 @@ class AShareService:
         return {"results": results, "errors": errors}
 
     @staticmethod
+    def get_top_list(trade_date: str) -> dict:
+        """Get Dragon Tiger List (龙虎榜) data for a specific trade date via Tushare top_list API.
+
+        Returns institutional trading data including net amounts, close price, pct_change.
+        """
+        try:
+            pro = ts.pro_api()
+            df = pro.top_list(trade_date=trade_date)
+
+            if df is None or df.empty:
+                return {"trade_date": trade_date, "data": []}
+
+            def safe_float(val):
+                try:
+                    return float(val) if pd.notna(val) else None
+                except (TypeError, ValueError):
+                    return None
+
+            records = []
+            for _, row in df.iterrows():
+                records.append({
+                    "ts_code": str(row.get("ts_code", "")),
+                    "name": str(row.get("name", "")),
+                    "close": safe_float(row.get("close")),
+                    "pct_change": safe_float(row.get("pct_change")),
+                    "amount": safe_float(row.get("amount")),
+                    "net_amount": safe_float(row.get("net_amount")),
+                    "reason": str(row.get("reason", "")),
+                })
+
+            return {"trade_date": trade_date, "data": records}
+        except Exception as e:
+            logger.error(f"[A股] top_list error for {trade_date}: {e}")
+            return {"trade_date": trade_date, "error": str(e), "data": []}
+
+    @staticmethod
+    def get_dragon_tiger_list(days: int = 3) -> dict:
+        """Get aggregated Dragon Tiger List data from last N trading days.
+
+        Returns top 5 by cumulative net buy amount and top 5 by cumulative net sell amount
+        (summed across all N trading days), with latest close/pct_change from most recent date.
+        This is a read-only operation that does NOT trigger AI analysis.
+        """
+        try:
+            pro = ts.pro_api()
+
+            # Get recent trading days
+            end_date = datetime.now().strftime("%Y%m%d")
+            start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y%m%d")
+            trade_cal_df = pro.trade_cal(exchange='SSE', start_date=start_date, end_date=end_date, is_open='1')
+            trade_dates = trade_cal_df.tail(days)['cal_date'].tolist()
+
+            logger.info(f"[A股] DragonTigerList: querying dates {trade_dates}")
+
+            # Fetch top_list for each trading day
+            all_data = []
+            for date in trade_dates:
+                result = AShareService.get_top_list(date)
+                if result.get("data"):
+                    for record in result["data"]:
+                        record["query_date"] = date
+                    all_data.extend(result["data"])
+
+            if not all_data:
+                return {"net_buy": [], "net_sell": [], "error": None}
+
+            # Convert to DataFrame
+            df = pd.DataFrame(all_data)
+
+            # Filter out records with no net_amount
+            df = df.dropna(subset=["net_amount"])
+
+            if df.empty:
+                return {"net_buy": [], "net_sell": [], "error": None}
+
+            # Group by stock and sum net_amount across all days
+            aggregated = df.groupby(["ts_code", "name"]).agg({
+                "net_amount": "sum",  # cumulative net amount
+                "query_date": "max",    # latest date
+            }).reset_index()
+
+            # Count appearances (上榜次数)
+            appearance_count = df.groupby(["ts_code", "name"]).size().reset_index(name="appear_count")
+
+            # Get latest close/pct_change for each stock (from the most recent date entry)
+            latest_data = df.sort_values("query_date", ascending=False).groupby("ts_code").first().reset_index()
+            latest_data = latest_data[["ts_code", "close", "pct_change", "reason"]]
+            latest_data.columns = ["ts_code", "close", "pct_change", "reason"]
+
+            # Merge aggregated with latest data and appearance count
+            aggregated = aggregated.merge(latest_data, on="ts_code", how="left")
+            aggregated = aggregated.merge(appearance_count, on=["ts_code", "name"], how="left")
+
+            # Top 5 by cumulative net buy (descending)
+            net_buy_df = aggregated.nlargest(5, "net_amount")
+            net_buy = []
+            for _, row in net_buy_df.iterrows():
+                net_buy.append({
+                    "trade_date": str(row.get("query_date", "")),
+                    "ts_code": row.get("ts_code", ""),
+                    "name": row.get("name", ""),
+                    "close": row.get("close"),
+                    "pct_change": row.get("pct_change"),
+                    "net_amount": row.get("net_amount"),
+                    "reason": row.get("reason", ""),
+                    "appear_count": int(row.get("appear_count", 1)),
+                })
+
+            # Top 5 by cumulative net sell (ascending - most negative first)
+            net_sell_df = aggregated.nsmallest(5, "net_amount")
+            net_sell = []
+            for _, row in net_sell_df.iterrows():
+                net_sell.append({
+                    "trade_date": str(row.get("query_date", "")),
+                    "ts_code": row.get("ts_code", ""),
+                    "name": row.get("name", ""),
+                    "close": row.get("close"),
+                    "pct_change": row.get("pct_change"),
+                    "net_amount": row.get("net_amount"),
+                    "reason": row.get("reason", ""),
+                    "appear_count": int(row.get("appear_count", 1)),
+                })
+
+            logger.info(f"[A股] DragonTigerList: net_buy={len(net_buy)}, net_sell={len(net_sell)}")
+
+            return {"net_buy": net_buy, "net_sell": net_sell, "error": None}
+        except Exception as e:
+            logger.error(f"[A股] get_dragon_tiger_list error: {e}")
+            return {"net_buy": [], "net_sell": [], "error": str(e)}
+
+    @staticmethod
     def get_financial_fundamentals(symbol: str) -> dict:
         """Get quarterly financial fundamentals for an A-share stock.
 

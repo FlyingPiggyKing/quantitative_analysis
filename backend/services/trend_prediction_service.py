@@ -29,7 +29,8 @@ def init_db():
                 trend_direction TEXT NOT NULL,
                 confidence INTEGER NOT NULL,
                 summary TEXT NOT NULL,
-                analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                source TEXT DEFAULT 'trend'
             )
         """)
         # Add extended_analysis column if it doesn't exist (for backward compatibility)
@@ -39,10 +40,17 @@ def init_db():
             """)
         except Exception:
             pass  # Column already exists
+        # Add source column if it doesn't exist (for backward compatibility)
+        try:
+            conn.execute("""
+                ALTER TABLE predictions ADD COLUMN source TEXT DEFAULT 'trend'
+            """)
+        except Exception:
+            pass  # Column already exists
         # Create index for faster lookups
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_predictions_symbol_analyzed
-            ON predictions(symbol, analyzed_at DESC)
+            ON predictions(symbol, source, analyzed_at DESC)
         """)
 
         # Create user_analysis_triggers table for rate limiting
@@ -74,6 +82,7 @@ class TrendPredictionService:
         confidence: int,
         summary: str,
         extended_analysis: dict = None,
+        source: str = "trend",
     ) -> dict:
         """Save or update a prediction (upsert behavior - one per symbol per day)."""
         import json as json_lib
@@ -87,16 +96,16 @@ class TrendPredictionService:
             # Check if prediction exists for today
             today = datetime.now().strftime("%Y-%m-%d")
             existing = cursor.execute(
-                "SELECT id FROM predictions WHERE symbol = ? AND date(analyzed_at) = ?",
-                (symbol, today),
+                "SELECT id FROM predictions WHERE symbol = ? AND date(analyzed_at) = ? AND source = ?",
+                (symbol, today, source),
             ).fetchone()
 
             if existing:
                 # Only update if new result is better (higher confidence or non-neutral when existing is neutral)
                 # Don't overwrite successful results with failures
                 existing_confidence = cursor.execute(
-                    "SELECT confidence FROM predictions WHERE symbol = ? AND date(analyzed_at) = ?",
-                    (symbol, today),
+                    "SELECT confidence FROM predictions WHERE symbol = ? AND date(analyzed_at) = ? AND source = ?",
+                    (symbol, today, source),
                 ).fetchone()[0]
 
                 should_update = True
@@ -109,15 +118,15 @@ class TrendPredictionService:
                     cursor.execute(
                         """UPDATE predictions
                            SET trend_direction = ?, confidence = ?, summary = ?, analyzed_at = ?, extended_analysis = ?
-                           WHERE symbol = ? AND date(analyzed_at) = ?""",
-                        (trend_direction, confidence, summary, analyzed_at, extended_json, symbol, today),
+                           WHERE symbol = ? AND date(analyzed_at) = ? AND source = ?""",
+                        (trend_direction, confidence, summary, analyzed_at, extended_json, symbol, today, source),
                     )
             else:
                 # Insert new
                 cursor.execute(
-                    """INSERT INTO predictions (symbol, name, trend_direction, confidence, summary, analyzed_at, extended_analysis)
-                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
-                    (symbol, name, trend_direction, confidence, summary, analyzed_at, extended_json),
+                    """INSERT INTO predictions (symbol, name, trend_direction, confidence, summary, analyzed_at, extended_analysis, source)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (symbol, name, trend_direction, confidence, summary, analyzed_at, extended_json, source),
                 )
 
             conn.commit()
@@ -130,16 +139,25 @@ class TrendPredictionService:
                 "analyzed_at": analyzed_at,
             }
             if extended_analysis:
+                # Old format fields (for backward compatibility)
                 result["情绪分析"] = extended_analysis.get("情绪分析")
                 result["技术分析"] = extended_analysis.get("技术分析")
                 result["趋势判断"] = extended_analysis.get("趋势判断")
+                # Six-dimensional fields
+                result["宏观产业周期"] = extended_analysis.get("宏观产业周期")
+                result["板块行业景气"] = extended_analysis.get("板块行业景气")
+                result["公司基本面质变"] = extended_analysis.get("公司基本面质变")
+                result["资金筹码结构"] = extended_analysis.get("资金筹码结构")
+                result["技术形态量价"] = extended_analysis.get("技术形态量价")
+                result["波段操作执行"] = extended_analysis.get("波段操作执行")
+                result["综合判断"] = extended_analysis.get("综合判断")
             return result
         finally:
             conn.close()
 
     @staticmethod
-    def get_latest_prediction(symbol: str) -> Optional[dict]:
-        """Get the latest prediction for a specific stock symbol."""
+    def get_latest_prediction(symbol: str, source: str = "trend") -> Optional[dict]:
+        """Get the latest prediction for a specific stock symbol and source."""
         import json as json_lib
         init_db()
         conn = get_db_connection()
@@ -148,10 +166,10 @@ class TrendPredictionService:
             row = cursor.execute(
                 """SELECT symbol, name, trend_direction, confidence, summary, analyzed_at, extended_analysis
                    FROM predictions
-                   WHERE symbol = ?
+                   WHERE symbol = ? AND source = ?
                    ORDER BY analyzed_at DESC
                    LIMIT 1""",
-                (symbol,),
+                (symbol, source),
             ).fetchone()
 
             if row:
@@ -166,9 +184,18 @@ class TrendPredictionService:
                 if row["extended_analysis"]:
                     try:
                         extended = json_lib.loads(row["extended_analysis"])
+                        # Old format fields (for regular stock analysis)
                         result["情绪分析"] = extended.get("情绪分析")
                         result["技术分析"] = extended.get("技术分析")
                         result["趋势判断"] = extended.get("趋势判断")
+                        # Six-dimensional fields (for institutional analysis)
+                        result["宏观产业周期"] = extended.get("宏观产业周期")
+                        result["板块行业景气"] = extended.get("板块行业景气")
+                        result["公司基本面质变"] = extended.get("公司基本面质变")
+                        result["资金筹码结构"] = extended.get("资金筹码结构")
+                        result["技术形态量价"] = extended.get("技术形态量价")
+                        result["波段操作执行"] = extended.get("波段操作执行")
+                        result["综合判断"] = extended.get("综合判断")
                     except (json_lib.JSONDecodeError, ValueError):
                         pass
                 return result
@@ -210,9 +237,18 @@ class TrendPredictionService:
                 if row["extended_analysis"]:
                     try:
                         extended = json_lib.loads(row["extended_analysis"])
+                        # Old format fields (for regular stock analysis)
                         result["情绪分析"] = extended.get("情绪分析")
                         result["技术分析"] = extended.get("技术分析")
                         result["趋势判断"] = extended.get("趋势判断")
+                        # Six-dimensional fields (for institutional analysis)
+                        result["宏观产业周期"] = extended.get("宏观产业周期")
+                        result["板块行业景气"] = extended.get("板块行业景气")
+                        result["公司基本面质变"] = extended.get("公司基本面质变")
+                        result["资金筹码结构"] = extended.get("资金筹码结构")
+                        result["技术形态量价"] = extended.get("技术形态量价")
+                        result["波段操作执行"] = extended.get("波段操作执行")
+                        result["综合判断"] = extended.get("综合判断")
                     except (json_lib.JSONDecodeError, ValueError):
                         pass
                 results.append(result)
@@ -221,8 +257,8 @@ class TrendPredictionService:
             conn.close()
 
     @staticmethod
-    def get_today_prediction(symbol: str) -> Optional[dict]:
-        """Get today's cached prediction for a symbol if it exists and is valid (confidence > 0).
+    def get_today_prediction(symbol: str, source: str = "trend") -> Optional[dict]:
+        """Get today's cached prediction for a symbol and source if it exists and is valid (confidence > 0).
 
         Returns None if no prediction exists for today or if the existing prediction
         has confidence = 0 (failed analysis).
@@ -236,10 +272,10 @@ class TrendPredictionService:
             row = cursor.execute(
                 """SELECT symbol, name, trend_direction, confidence, summary, analyzed_at, extended_analysis
                    FROM predictions
-                   WHERE symbol = ? AND date(analyzed_at) = ? AND confidence > 0
+                   WHERE symbol = ? AND date(analyzed_at) = ? AND source = ? AND confidence > 0
                    ORDER BY analyzed_at DESC
                    LIMIT 1""",
-                (symbol, today),
+                (symbol, today, source),
             ).fetchone()
 
             if row:
@@ -254,9 +290,13 @@ class TrendPredictionService:
                 if row["extended_analysis"]:
                     try:
                         extended = json_lib.loads(row["extended_analysis"])
-                        result["情绪分析"] = extended.get("情绪分析")
-                        result["技术分析"] = extended.get("技术分析")
-                        result["趋势判断"] = extended.get("趋势判断")
+                        result["宏观产业周期"] = extended.get("宏观产业周期")
+                        result["板块行业景气"] = extended.get("板块行业景气")
+                        result["公司基本面质变"] = extended.get("公司基本面质变")
+                        result["资金筹码结构"] = extended.get("资金筹码结构")
+                        result["技术形态量价"] = extended.get("技术形态量价")
+                        result["波段操作执行"] = extended.get("波段操作执行")
+                        result["综合判断"] = extended.get("综合判断")
                     except (json_lib.JSONDecodeError, ValueError):
                         pass
                 return result
@@ -294,9 +334,18 @@ class TrendPredictionService:
                 if row["extended_analysis"]:
                     try:
                         extended = json_lib.loads(row["extended_analysis"])
+                        # Old format fields (for regular stock analysis)
                         result["情绪分析"] = extended.get("情绪分析")
                         result["技术分析"] = extended.get("技术分析")
                         result["趋势判断"] = extended.get("趋势判断")
+                        # Six-dimensional fields (for institutional analysis)
+                        result["宏观产业周期"] = extended.get("宏观产业周期")
+                        result["板块行业景气"] = extended.get("板块行业景气")
+                        result["公司基本面质变"] = extended.get("公司基本面质变")
+                        result["资金筹码结构"] = extended.get("资金筹码结构")
+                        result["技术形态量价"] = extended.get("技术形态量价")
+                        result["波段操作执行"] = extended.get("波段操作执行")
+                        result["综合判断"] = extended.get("综合判断")
                     except (json_lib.JSONDecodeError, ValueError):
                         pass
                 results.append(result)

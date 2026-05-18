@@ -6,6 +6,7 @@ import Link from "next/link";
 import WatchList from "@/components/WatchList";
 import StockMarketTabs from "@/components/StockMarketTabs";
 import { ASharePresetList, USPresetList, HKPresetList } from "@/components/PresetStockList";
+import DragonTigerList from "@/components/DragonTigerList";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
 import { getTaskStatus, runBatchAnalysisAsync, TaskStatusResponse } from "@/services/trendPrediction";
 import { useAuth } from "@/services/auth";
@@ -177,19 +178,29 @@ export default function Home() {
 
         <div className="mb-8">
           {user ? (
-            <WatchList
-              key={refreshTrigger}
-              activeTab={stockTab}
-              onTabChange={setStockTab}
-            />
+            <>
+              <WatchList
+                key={refreshTrigger}
+                activeTab={stockTab}
+                onTabChange={setStockTab}
+              />
+              <div className="mt-8">
+                <DragonTigerList />
+              </div>
+            </>
           ) : (
-            <StockMarketTabs
-              aShareContent={<ASharePresetList />}
-              usContent={<USPresetList />}
-              hkContent={<HKPresetList />}
-              activeTab={stockTab}
-              onTabChange={setStockTab}
-            />
+            <>
+              <StockMarketTabs
+                aShareContent={<ASharePresetList />}
+                usContent={<USPresetList />}
+                hkContent={<HKPresetList />}
+                activeTab={stockTab}
+                onTabChange={setStockTab}
+              />
+              <div className="mt-8">
+                <DragonTigerList />
+              </div>
+            </>
           )}
         </div>
 
