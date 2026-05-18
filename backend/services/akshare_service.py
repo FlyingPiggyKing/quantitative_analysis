@@ -490,7 +490,7 @@ class AShareService:
             end_date = datetime.now().strftime("%Y%m%d")
             start_date = (datetime.now() - timedelta(days=days * 2)).strftime("%Y%m%d")
             trade_cal_df = pro.trade_cal(exchange='SSE', start_date=start_date, end_date=end_date, is_open='1')
-            trade_dates = trade_cal_df.tail(days)['cal_date'].tolist()
+            trade_dates = trade_cal_df.head(days)['cal_date'].tolist()
 
             logger.info(f"[A股] DragonTigerList: querying dates {trade_dates}")
 
