@@ -290,7 +290,7 @@ export default function DragonTigerList({ showHeader = true, onDateChange }: Dra
               <span className="vt-tab text-sm">净买入</span>
             </div>
             <DragonTigerTable data={data?.net_buy || []} isBuy={true} />
-            <div className="sm:hidden">
+            <div className="sm:hidden space-y-3">
               {(data?.net_buy || []).length === 0 ? (
                 <div className="vt-engraved text-center py-4 text-sm">暂无数据</div>
               ) : (
@@ -308,7 +308,7 @@ export default function DragonTigerList({ showHeader = true, onDateChange }: Dra
               <span className="vt-tab text-sm">净卖出</span>
             </div>
             <DragonTigerTable data={data?.net_sell || []} isBuy={false} />
-            <div className="sm:hidden">
+            <div className="sm:hidden space-y-3">
               {(data?.net_sell || []).length === 0 ? (
                 <div className="vt-engraved text-center py-4 text-sm">暂无数据</div>
               ) : (
