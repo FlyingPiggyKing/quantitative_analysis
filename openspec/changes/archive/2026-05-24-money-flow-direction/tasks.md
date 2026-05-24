@@ -5,7 +5,7 @@
 - [x] 1.1 在 `akshare_service.py` 中添加 `get_sector_moneyflow(days=5, top_n=8)` 方法，调用Tushare `moneyflow_ind_dc` 接口
 - [x] 1.2 在 `backend/api/stock.py` 中添加 `/api/stock/sector-money-flow` endpoint，返回聚合后的板块资金流向数据
 - [x] 1.3 添加后端缓存逻辑（5分钟TTL）
-- [x] 1.4 实现罗马数字后缀去重逻辑（Ⅱ,Ⅲ等变体合并为基础名称）
+- [x] 1.4 实现罗马数字后缀去重逻辑（Ⅱ,Ⅲ等变体：当值相同或相近时合并为一个，取单一值；当值差异显著时保留两个条目）
 
 ## 2. Frontend Dependencies
 
@@ -23,6 +23,8 @@
 - [x] 4.4 添加点击高亮交互（点击折线/图例高亮板块）
 - [x] 4.5 U型折线使用独立水平通道避免竖线重叠
 - [x] 4.6 响应式布局支持（移动端 < 640px）
+- [x] 4.7 修复移动端标签遮挡问题：扇形区宽度足够容纳板块名但不够容纳板块名+金额时，板块名在扇形内、金额在右侧完整显示
+- [x] 4.8 修复绘制顺序：折线先绘制，条形和标签后绘制（避免折线遮挡标签）
 
 ## 5. SubModuleTabs Integration
 

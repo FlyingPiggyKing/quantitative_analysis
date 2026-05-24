@@ -461,12 +461,15 @@ class AShareService:
                     net_amounts[date][sector] = amount_in_yi
                 all_sectors.add(sector)
 
-            # Deduplicate: for names like "家电零部件Ⅱ" and "家电零部件Ⅲ",
-            # merge into single entry with base name and sum of amounts
+            # Deduplicate roman-numeral variants. Tushare's DC source emits two
+            # separate codes (e.g., BK1444.DC + BK1238.DC for "IT服务Ⅱ/Ⅲ") that
+            # almost always carry identical net_amount — they're aliases of the
+            # same sector, not distinct sub-sectors. Summing would double-count.
+            # When variants disagree (rare, e.g. "其他电源设备"), they are real
+            # sub-sectors and must stay separate.
             import re
             roman_pattern = r'[IVXⅰⅱⅲⅳⅴⅵⅷⅸⅹⅠ-Ⅿ]+$'
             for date in net_amounts:
-                # Group sectors by base name
                 base_groups: Dict[str, List[str]] = {}
                 for s in list(net_amounts[date].keys()):
                     base = re.sub(roman_pattern, '', s.strip())
@@ -474,19 +477,19 @@ class AShareService:
                         base_groups[base] = []
                     base_groups[base].append(s)
 
-                # Merge groups with multiple entries
                 for base, names in base_groups.items():
                     if len(names) <= 1:
                         continue
-                    # Sum all amounts in this group
-                    total = sum(net_amounts[date][n] for n in names)
-                    # Remove all entries
-                    for n in names:
-                        del net_amounts[date][n]
-                        all_sectors.discard(n)
-                    # Add merged entry with base name
-                    net_amounts[date][base] = total
-                    all_sectors.add(base)
+                    amounts = [net_amounts[date][n] for n in names]
+                    max_abs = max(abs(a) for a in amounts) or 1.0
+                    spread = max(amounts) - min(amounts)
+                    # Treat as aliases when values match within 1% of magnitude
+                    if spread / max_abs < 0.01:
+                        for n in names:
+                            del net_amounts[date][n]
+                            all_sectors.discard(n)
+                        net_amounts[date][base] = amounts[0]
+                        all_sectors.add(base)
 
             # Sort dates descending (newest first) and take last `days` trading days
             sorted_dates = sorted(net_amounts.keys(), reverse=True)[:days]

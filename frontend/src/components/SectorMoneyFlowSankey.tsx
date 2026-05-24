@@ -189,7 +189,53 @@ export default function SectorMoneyFlowSankey() {
       }
     });
 
-    // Draw bars
+    // Draw flow lines first so bars/labels render on top of them
+    const flowLineEntries = Object.entries(sectorPositions).filter(([, p]) => p.length >= 2);
+
+    const segments: Array<{ sector: string; curr: typeof sectorPositions[string][0]; next: typeof sectorPositions[string][0]; color: string }> = [];
+    flowLineEntries.forEach(([sector, positions]) => {
+      const value = net_amounts[dates[positions[0].dateIdx]]?.[sector] || 0;
+      const isPositive = value >= 0;
+      const color = sectorColor(sector, isPositive);
+      for (let i = 0; i < positions.length - 1; i++) {
+        segments.push({ sector, curr: positions[i], next: positions[i + 1], color });
+      }
+    });
+
+    const laneCount = Math.max(segments.length, 1);
+    const laneWidth = (laneAreaEnd - laneAreaStart) / laneCount;
+
+    const segmentRects: SegmentRect[] = [];
+
+    segments.forEach(({ sector, curr, next, color }, idx) => {
+      const laneX = laneAreaStart + (idx + 0.5) * laneWidth;
+      const dimmed = isDimmed(sector);
+      const highlighted = highlightedSector === sector;
+
+      ctx.strokeStyle = color;
+      ctx.globalAlpha = dimmed ? 0.1 : highlighted ? 0.95 : 0.55;
+      ctx.lineWidth = highlighted ? 3.5 : 1.8;
+      ctx.beginPath();
+      ctx.moveTo(curr.barX, curr.barY);
+      ctx.lineTo(laneX, curr.barY);
+      ctx.lineTo(laneX, next.barY);
+      ctx.lineTo(next.barX, next.barY);
+      ctx.stroke();
+      ctx.globalAlpha = 1;
+
+      segmentRects.push({
+        sector,
+        lines: [
+          { x1: curr.barX, y1: curr.barY, x2: laneX, y2: curr.barY },
+          { x1: laneX, y1: curr.barY, x2: laneX, y2: next.barY },
+          { x1: laneX, y1: next.barY, x2: next.barX, y2: next.barY },
+        ],
+      });
+    });
+
+    segmentsRef.current = segmentRects;
+
+    // Draw bars on top of flow lines
     dates.forEach((date, dateIdx) => {
       const rowTop = padding.top + dateIdx * (rowHeight + rowGap) + dateLabelHeight;
       const sectors = daily_top[date] || [];
@@ -217,24 +263,45 @@ export default function SectorMoneyFlowSankey() {
         ctx.fillStyle = "rgba(255, 255, 255, 0.15)";
         ctx.fillRect(padding.left, barY, barWidth, 1);
 
-        const minBarForInlineLabel = isMobile ? 60 : 80;
-        const labelInsideBar = barWidth >= minBarForInlineLabel;
         const sign = value >= 0 ? "+" : "";
         const valueLabel = `${sign}${value.toFixed(1)}亿`;
 
-        if (labelInsideBar) {
+        const sectorFont = isMobile ? "600 11px Georgia, serif" : "600 12px Georgia, serif";
+        const valueFont = isMobile ? "10px Georgia, serif" : "11px Georgia, serif";
+
+        ctx.font = sectorFont;
+        const sectorWidth = ctx.measureText(sector).width;
+        ctx.font = valueFont;
+        const valueWidth = ctx.measureText(valueLabel).width;
+
+        const inlinePadding = 6;
+        const inlineGap = 8;
+        const bothFitInside = barWidth >= sectorWidth + valueWidth + inlinePadding * 2 + inlineGap;
+        const sectorFitsInside = barWidth >= sectorWidth + inlinePadding * 2;
+
+        if (bothFitInside) {
           ctx.fillStyle = "#fff3d6";
-          ctx.font = isMobile ? "600 11px Georgia, serif" : "600 12px Georgia, serif";
+          ctx.font = sectorFont;
           ctx.textAlign = "left";
-          ctx.fillText(sector, padding.left + 6, barY + barHeight / 2 + 4);
+          ctx.fillText(sector, padding.left + inlinePadding, barY + barHeight / 2 + 4);
 
           ctx.fillStyle = "rgba(255, 243, 214, 0.85)";
-          ctx.font = isMobile ? "10px Georgia, serif" : "11px Georgia, serif";
+          ctx.font = valueFont;
           ctx.textAlign = "right";
-          ctx.fillText(valueLabel, padding.left + barWidth - 6, barY + barHeight / 2 + 4);
+          ctx.fillText(valueLabel, padding.left + barWidth - inlinePadding, barY + barHeight / 2 + 4);
+        } else if (sectorFitsInside) {
+          ctx.fillStyle = "#fff3d6";
+          ctx.font = sectorFont;
+          ctx.textAlign = "left";
+          ctx.fillText(sector, padding.left + inlinePadding, barY + barHeight / 2 + 4);
+
+          ctx.fillStyle = "#f4e9cf";
+          ctx.font = valueFont;
+          ctx.textAlign = "left";
+          ctx.fillText(valueLabel, padding.left + barWidth + 6, barY + barHeight / 2 + 4);
         } else {
           ctx.fillStyle = "#f4e9cf";
-          ctx.font = isMobile ? "600 11px Georgia, serif" : "600 12px Georgia, serif";
+          ctx.font = sectorFont;
           ctx.textAlign = "left";
 
           const labelX = padding.left + barWidth + 6;
@@ -250,54 +317,6 @@ export default function SectorMoneyFlowSankey() {
         ctx.globalAlpha = 1;
       });
     });
-
-    // Draw flow lines and record their geometry for hit-testing
-    const flowLineEntries = Object.entries(sectorPositions).filter(([, p]) => p.length >= 2);
-
-    const segments: Array<{ sector: string; curr: typeof sectorPositions[string][0]; next: typeof sectorPositions[string][0]; color: string }> = [];
-    flowLineEntries.forEach(([sector, positions]) => {
-      const value = net_amounts[dates[positions[0].dateIdx]]?.[sector] || 0;
-      const isPositive = value >= 0;
-      const color = sectorColor(sector, isPositive);
-      for (let i = 0; i < positions.length - 1; i++) {
-        segments.push({ sector, curr: positions[i], next: positions[i + 1], color });
-      }
-    });
-
-    const laneCount = Math.max(segments.length, 1);
-    const laneWidth = (laneAreaEnd - laneAreaStart) / laneCount;
-
-    // Reset segments tracking for hit-testing
-    const segmentRects: SegmentRect[] = [];
-
-    segments.forEach(({ sector, curr, next, color }, idx) => {
-      const laneX = laneAreaStart + (idx + 0.5) * laneWidth;
-      const dimmed = isDimmed(sector);
-      const highlighted = highlightedSector === sector;
-
-      ctx.strokeStyle = color;
-      ctx.globalAlpha = dimmed ? 0.1 : highlighted ? 0.95 : 0.55;
-      ctx.lineWidth = highlighted ? 3.5 : 1.8;
-      ctx.beginPath();
-      ctx.moveTo(curr.barX, curr.barY);
-      ctx.lineTo(laneX, curr.barY);
-      ctx.lineTo(laneX, next.barY);
-      ctx.lineTo(next.barX, next.barY);
-      ctx.stroke();
-      ctx.globalAlpha = 1;
-
-      // Record the three line segments for hit testing
-      segmentRects.push({
-        sector,
-        lines: [
-          { x1: curr.barX, y1: curr.barY, x2: laneX, y2: curr.barY },
-          { x1: laneX, y1: curr.barY, x2: laneX, y2: next.barY },
-          { x1: laneX, y1: next.barY, x2: next.barX, y2: next.barY },
-        ],
-      });
-    });
-
-    segmentsRef.current = segmentRects;
   }, [data, containerWidth, isMobile, highlightedSector]);
 
   // Click handler for canvas to detect line clicks
