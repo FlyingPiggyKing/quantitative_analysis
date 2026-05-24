@@ -8,6 +8,7 @@ interface DragonTigerItem {
   trade_date: string;
   ts_code: string;
   name: string;
+  industry?: string;
   close: number | null;
   pct_change: number | null;
   net_amount: number | null;
@@ -141,6 +142,9 @@ function DragonTigerRow({ item, isBuy }: DragonTigerRowProps) {
             {item.name}
             {item.appear_count > 1 && <span className="text-vt-parchment-dim ml-1">({item.appear_count}次)</span>}
           </div>
+          {item.industry && (
+            <div className="text-vt-parchment-dim text-[0.65rem]">{item.industry}</div>
+          )}
         </Link>
       </div>
       <div className="w-20 text-right font-[var(--font-geist-mono)] text-xs shrink-0">
@@ -200,24 +204,39 @@ function MobileCard({ item, isBuy }: MobileCardProps) {
   const symbol = item.ts_code.replace(".SH", "").replace(".SZ", "");
 
   return (
-    <Link href={`/stock/dragon-tiger/${symbol}`} className="vt-card p-3 block">
+    <Link href={`/stock/dragon-tiger/${symbol}`} className="vt-card block p-3 min-h-[44px] active:opacity-80 transition-opacity">
+      {/* Row 1: Symbol/Name | AI龙虎 */}
       <div className="flex justify-between items-center mb-2">
         <div>
-          <span className="text-vt-brass-300 font-[var(--font-geist-mono)] tracking-wider text-xs">{item.ts_code}</span>
-          <span className="text-vt-parchment ml-2 text-sm">{item.name}</span>
+          <span className="text-vt-brass-300 font-[var(--font-geist-mono)] tracking-wider">{item.ts_code}</span>
+          <span className="text-vt-parchment ml-2">{item.name}</span>
           {item.appear_count > 1 && <span className="text-vt-parchment-dim ml-1 text-xs">({item.appear_count}次)</span>}
         </div>
         <div className="vt-pred-col-header text-[0.6rem]">AI龙虎</div>
       </div>
-      <div className="flex justify-between items-center text-xs font-[var(--font-geist-mono)]">
-        <span className={`${isBuy ? "text-vt-pred-up" : "text-vt-pred-down"}`}>
-          {formatNetAmount(item.net_amount, isBuy)}
-        </span>
-        <span>{item.close != null ? item.close.toFixed(2) : "-"}</span>
+      {/* Row 2: Net amount + Close | AI */}
+      <div className="flex justify-between items-center mb-2">
+        <div className="flex items-center gap-3">
+          <span className={`font-[var(--font-geist-mono)] text-xs ${isBuy ? "text-vt-pred-up" : "text-vt-pred-down"}`}>
+            {formatNetAmount(item.net_amount, isBuy)}
+          </span>
+          <span className="text-vt-parchment-dim text-xs tracking-wider">{isBuy ? "净买入" : "净卖出"}</span>
+          <span className="text-vt-parchment text-xs font-[var(--font-geist-mono)]">
+            {item.close != null ? item.close.toFixed(2) : "-"}
+          </span>
+          <span className="text-vt-parchment-dim text-xs tracking-wider">收盘</span>
+        </div>
+        <AIPredictionCell symbol={symbol} asLink={false} />
+      </div>
+      {/* Row 3: PctChange | Industry */}
+      <div className="flex items-center gap-4 text-xs font-[var(--font-geist-mono)]">
         <span className={item.pct_change != null && item.pct_change >= 0 ? "text-vt-pred-up" : "text-vt-pred-down"}>
           {formatPctChange(item.pct_change)}
         </span>
-        <AIPredictionCell symbol={symbol} asLink={false} />
+        <span className="text-vt-parchment-dim tracking-wider">涨跌</span>
+        {item.industry && (
+          <span className="text-vt-parchment font-semibold">{item.industry}</span>
+        )}
       </div>
     </Link>
   );

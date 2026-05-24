@@ -53,6 +53,10 @@
   - Auto-fetch prediction on component mount, show prediction icon if available, dash if not
   - Prediction icons styled with vt-pred-up/vt-pred-down/vt-pred-flat classes (same as AI下周预测)
 - [x] 5.3 DragonTigerList displayed on homepage for both logged-in users (below WatchList) and non-logged-in users
+- [x] 5.4 Add industry field to DragonTigerList:
+  - Backend fetches industry from Tushare `stock_basic` API
+  - Desktop: Display industry below stock name
+  - Mobile: Display industry in third line with bold styling
 
 ## 6. Verification
 

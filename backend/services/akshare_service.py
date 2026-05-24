@@ -533,6 +533,15 @@ class AShareService:
             aggregated = aggregated.merge(latest_data, on="ts_code", how="left")
             aggregated = aggregated.merge(appearance_count, on=["ts_code", "name"], how="left")
 
+            # Fetch industry info from stock_basic
+            try:
+                stock_basic = pro.stock_basic(exchange='', list_status='L', fields='ts_code,industry')
+                industry_map = dict(zip(stock_basic['ts_code'], stock_basic['industry']))
+                aggregated['industry'] = aggregated['ts_code'].map(industry_map).fillna('')
+            except Exception as e:
+                logger.warning(f"[A股] Failed to fetch industry data: {e}")
+                aggregated['industry'] = ''
+
             # Top 5 by cumulative net buy (descending)
             net_buy_df = aggregated.nlargest(5, "net_amount")
             net_buy = []
@@ -541,6 +550,7 @@ class AShareService:
                     "trade_date": str(row.get("query_date", "")),
                     "ts_code": row.get("ts_code", ""),
                     "name": row.get("name", ""),
+                    "industry": row.get("industry", ""),
                     "close": row.get("close"),
                     "pct_change": row.get("pct_change"),
                     "net_amount": row.get("net_amount"),
@@ -556,6 +566,7 @@ class AShareService:
                     "trade_date": str(row.get("query_date", "")),
                     "ts_code": row.get("ts_code", ""),
                     "name": row.get("name", ""),
+                    "industry": row.get("industry", ""),
                     "close": row.get("close"),
                     "pct_change": row.get("pct_change"),
                     "net_amount": row.get("net_amount"),
