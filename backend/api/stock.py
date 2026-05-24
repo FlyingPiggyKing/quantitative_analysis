@@ -109,6 +109,19 @@ async def get_dragon_tiger_list(days: int = Query(default=3, ge=1, le=10)):
     return AShareService.get_dragon_tiger_list(days)
 
 
+@router.get("/sector-money-flow")
+async def get_sector_money_flow(
+    days: int = Query(default=5, ge=1, le=30),
+    top_n: int = Query(default=6, ge=1, le=20)
+):
+    """Get sector-level money flow Sankey data.
+
+    Returns top N sectors per day for the past several trading days,
+    with net flow amounts, suitable for Sankey visualization.
+    """
+    return AShareService.get_sector_moneyflow(days=days, top_n=top_n)
+
+
 @router.get("/{symbol}")
 async def get_stock_info(symbol: str):
     """Get basic stock information."""

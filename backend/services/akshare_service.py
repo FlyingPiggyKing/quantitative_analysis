@@ -104,6 +104,29 @@ class _YFCache:
 _yf_cache = _YFCache(ttl=300)
 
 
+# Simple sector money flow cache - 5 minute TTL
+_sector_mf_cache: Dict[str, Any] = {}
+_sector_mf_cache_time: float = 0
+_SECTOR_MF_CACHE_TTL: int = 300  # 5 minutes
+
+
+def _get_cached_sector_mf(days: int, top_n: int, fetch_func) -> dict:
+    """Get sector money flow from cache or fetch if expired."""
+    global _sector_mf_cache, _sector_mf_cache_time
+    cache_key = f"{days}_{top_n}"
+    current_time = time.time()
+
+    if _sector_mf_cache and (current_time - _sector_mf_cache_time) < _SECTOR_MF_CACHE_TTL:
+        logger.info(f"[A股] Sector moneyflow cache hit for {cache_key}")
+        return _sector_mf_cache
+
+    logger.info(f"[A股] Sector moneyflow cache miss for {cache_key}, fetching...")
+    result = fetch_func()
+    _sector_mf_cache = result
+    _sector_mf_cache_time = current_time
+    return result
+
+
 class _ProxyContext:
     """Context manager for yfinance proxy - temporarily sets proxy for yfinance calls.
 
@@ -385,6 +408,124 @@ class AShareService:
             }
         except Exception as e:
             return {"symbol": symbol, "market": "A-share", "error": str(e)}
+
+    @staticmethod
+    def _fetch_sector_moneyflow(days: int, top_n: int) -> dict:
+        """Internal fetch without caching."""
+        try:
+            pro = ts.pro_api()
+
+            end_date = datetime.now().strftime("%Y%m%d")
+            start_date = (datetime.now() - timedelta(days=days * 3)).strftime("%Y%m%d")  # buffer for weekends
+
+            df = pro.moneyflow_ind_dc(start_date=start_date, end_date=end_date)
+
+            if df is None or df.empty:
+                return {"sectors": [], "daily_top": {}, "net_amounts": {}, "error": "No data returned"}
+
+            # Filter to only industry sectors (content_type = "行业")
+            if "content_type" in df.columns:
+                df = df[df["content_type"] == "行业"]
+
+            if df.empty:
+                return {"sectors": [], "daily_top": {}, "net_amounts": {}, "error": "No industry sector data"}
+
+            # Parse date format (Tushare returns as YYYYMMDD)
+            if "trade_date" in df.columns:
+                df["trade_date"] = pd.to_datetime(df["trade_date"], format="%Y%m%d").dt.strftime("%Y-%m-%d")
+
+            def safe_float(val):
+                try:
+                    return float(val) if pd.notna(val) else 0.0
+                except (TypeError, ValueError):
+                    return 0.0
+
+            # Build net_amounts dict: { date: { sector: amount_in_yi } }
+            # net_amount is in 元, convert to 亿元 (/ 1e8)
+            # Aggregate by sector name (sum) to handle same name with different DC codes
+            net_amounts: Dict[str, Dict[str, float]] = {}
+            all_sectors = set()
+
+            for _, row in df.iterrows():
+                date = row["trade_date"]
+                sector = row.get("name", "未知")
+                amount_in_yuan = safe_float(row.get("net_amount", 0))
+                amount_in_yi = amount_in_yuan / 1e8  # 元 -> 亿元
+
+                if date not in net_amounts:
+                    net_amounts[date] = {}
+                # Aggregate: sum if same sector name appears multiple times
+                if sector in net_amounts[date]:
+                    net_amounts[date][sector] += amount_in_yi
+                else:
+                    net_amounts[date][sector] = amount_in_yi
+                all_sectors.add(sector)
+
+            # Deduplicate: for names like "家电零部件Ⅱ" and "家电零部件Ⅲ",
+            # merge into single entry with base name and sum of amounts
+            import re
+            roman_pattern = r'[IVXⅰⅱⅲⅳⅴⅵⅷⅸⅹⅠ-Ⅿ]+$'
+            for date in net_amounts:
+                # Group sectors by base name
+                base_groups: Dict[str, List[str]] = {}
+                for s in list(net_amounts[date].keys()):
+                    base = re.sub(roman_pattern, '', s.strip())
+                    if base not in base_groups:
+                        base_groups[base] = []
+                    base_groups[base].append(s)
+
+                # Merge groups with multiple entries
+                for base, names in base_groups.items():
+                    if len(names) <= 1:
+                        continue
+                    # Sum all amounts in this group
+                    total = sum(net_amounts[date][n] for n in names)
+                    # Remove all entries
+                    for n in names:
+                        del net_amounts[date][n]
+                        all_sectors.discard(n)
+                    # Add merged entry with base name
+                    net_amounts[date][base] = total
+                    all_sectors.add(base)
+
+            # Sort dates descending (newest first) and take last `days` trading days
+            sorted_dates = sorted(net_amounts.keys(), reverse=True)[:days]
+
+            # Build daily_top: each day has top_n sectors sorted by net_amount desc
+            daily_top: Dict[str, List[str]] = {}
+            for date in sorted_dates:
+                sectors_with_amount = net_amounts.get(date, {})
+                sorted_sectors = sorted(sectors_with_amount.items(), key=lambda x: x[1], reverse=True)
+                daily_top[date] = [s[0] for s in sorted_sectors[:top_n]]
+
+            # Filter net_amounts to only include sectors and dates we care about
+            filtered_net_amounts: Dict[str, Dict[str, float]] = {}
+            for date in sorted_dates:
+                filtered_net_amounts[date] = {
+                    s: net_amounts[date].get(s, 0.0) for s in daily_top[date]
+                }
+
+            return {
+                "sectors": sorted(list(all_sectors)),
+                "daily_top": daily_top,
+                "net_amounts": filtered_net_amounts,
+            }
+        except Exception as e:
+            logger.error(f"[A股] Sector moneyflow error: {e}")
+            return {"sectors": [], "daily_top": {}, "net_amounts": {}, "error": str(e)}
+
+    @staticmethod
+    def get_sector_moneyflow(days: int = 5, top_n: int = 6) -> dict:
+        """Get sector-level money flow via Tushare moneyflow_industr API.
+
+        Returns aggregated data with:
+        - sectors: union of all sector names across days
+        - daily_top: top N sectors per day by net_amount
+        - net_amounts: net_amount per sector per day (in 亿元)
+
+        Results are cached for 5 minutes to avoid excessive API calls.
+        """
+        return _get_cached_sector_mf(days, top_n, lambda: AShareService._fetch_sector_moneyflow(days, top_n))
 
     @staticmethod
     def get_daily_basic_batch(symbols: List[str], days: int = 30) -> dict:
