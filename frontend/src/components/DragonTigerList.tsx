@@ -163,6 +163,11 @@ function DragonTigerRow({ item, isBuy }: DragonTigerRowProps) {
   );
 }
 
+interface DragonTigerListProps {
+  showHeader?: boolean;
+  onDateChange?: (date: string) => void;
+}
+
 interface DragonTigerTableProps {
   data: DragonTigerItem[];
   isBuy: boolean;
@@ -242,8 +247,7 @@ function MobileCard({ item, isBuy }: MobileCardProps) {
   );
 }
 
-export default function DragonTigerList() {
-  const [activeTab, setActiveTab] = useState<"buy" | "sell">("buy");
+export default function DragonTigerList({ showHeader = true, onDateChange }: DragonTigerListProps) {
   const [data, setData] = useState<DragonTigerData | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -257,43 +261,21 @@ export default function DragonTigerList() {
     fetchData();
   }, []);
 
-  const currentData = activeTab === "buy" ? data?.net_buy : data?.net_sell;
-  const displayDate = currentData && currentData.length > 0 ? formatDate(currentData[0].trade_date) : "";
+  const displayDate = data?.net_buy && data.net_buy.length > 0
+    ? formatDate(data.net_buy[0].trade_date)
+    : data?.net_sell && data.net_sell.length > 0
+    ? formatDate(data.net_sell[0].trade_date)
+    : "";
+
+  // Notify parent of date change
+  useEffect(() => {
+    if (displayDate && onDateChange) {
+      onDateChange(displayDate);
+    }
+  }, [displayDate, onDateChange]);
 
   return (
-    <div className="vt-panel p-3 sm:p-4">
-      {/* Section Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-[var(--font-playfair)] text-xl tracking-[0.18em] text-vt-parchment uppercase">
-          <span className="text-vt-brass-400">❖</span> 机 构 龙 虎 榜 <span className="text-vt-brass-400">❖</span>
-        </h2>
-        {displayDate && (
-          <span className="vt-engraved text-xs">{displayDate}</span>
-        )}
-      </div>
-
-      {/* Tab Bar */}
-      <div className="flex border-b border-vt-ink-700 mb-4">
-        <button
-          onClick={() => setActiveTab("buy")}
-          className={`vt-tab px-4 py-2 transition-colors relative ${activeTab === "buy" ? "vt-tab-active" : ""}`}
-        >
-          净买入
-          {activeTab === "buy" && (
-            <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("sell")}
-          className={`vt-tab px-4 py-2 transition-colors relative ${activeTab === "sell" ? "vt-tab-active" : ""}`}
-        >
-          净卖出
-          {activeTab === "sell" && (
-            <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
-          )}
-        </button>
-      </div>
-
+    <div className={showHeader ? "" : ""}>
       {/* Content */}
       {loading ? (
         <div className="vt-engraved text-center py-8 text-sm">加载中...</div>
@@ -301,18 +283,40 @@ export default function DragonTigerList() {
         <div className="vt-engraved text-center py-8 text-sm text-vt-pred-down">数据加载失败</div>
       ) : (
         <>
-          {/* Desktop Table */}
-          <DragonTigerTable data={currentData || []} isBuy={activeTab === "buy"} />
+          {/* Net Buy Section */}
+          <div className="mb-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-vt-pred-up text-sm">▲</span>
+              <span className="vt-tab text-sm">净买入</span>
+            </div>
+            <DragonTigerTable data={data?.net_buy || []} isBuy={true} />
+            <div className="sm:hidden">
+              {(data?.net_buy || []).length === 0 ? (
+                <div className="vt-engraved text-center py-4 text-sm">暂无数据</div>
+              ) : (
+                (data?.net_buy || []).map((item, idx) => (
+                  <MobileCard key={`buy-${item.ts_code}-${idx}`} item={item} isBuy={true} />
+                ))
+              )}
+            </div>
+          </div>
 
-          {/* Mobile Cards */}
-          <div className="sm:hidden space-y-3">
-            {(currentData || []).length === 0 ? (
-              <div className="vt-engraved text-center py-8 text-sm">暂无数据</div>
-            ) : (
-              (currentData || []).map((item, idx) => (
-                <MobileCard key={`${item.ts_code}-${idx}`} item={item} isBuy={activeTab === "buy"} />
-              ))
-            )}
+          {/* Net Sell Section */}
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-vt-pred-down text-sm">▼</span>
+              <span className="vt-tab text-sm">净卖出</span>
+            </div>
+            <DragonTigerTable data={data?.net_sell || []} isBuy={false} />
+            <div className="sm:hidden">
+              {(data?.net_sell || []).length === 0 ? (
+                <div className="vt-engraved text-center py-4 text-sm">暂无数据</div>
+              ) : (
+                (data?.net_sell || []).map((item, idx) => (
+                  <MobileCard key={`sell-${item.ts_code}-${idx}`} item={item} isBuy={false} />
+                ))
+              )}
+            </div>
           </div>
         </>
       )}

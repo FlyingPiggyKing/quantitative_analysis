@@ -6,7 +6,6 @@ import { getWatchlist, WatchlistItem } from "@/services/watchlist";
 import { getTrendPredictions, TrendPrediction } from "@/services/trendPrediction";
 import PETrendSparkline from "./PETrendSparkline";
 import MoneyFlowSparkline from "./MoneyFlowSparkline";
-import StockMarketTabs from "./StockMarketTabs";
 
 interface ValuationData {
   pe: number | null;
@@ -22,8 +21,7 @@ interface MoneyFlowData {
 
 interface WatchListProps {
   refreshTrigger?: number;
-  activeTab?: "A" | "US" | "HK";
-  onTabChange?: (tab: "A" | "US" | "HK") => void;
+  activeMarket?: "A" | "US" | "HK";
 }
 
 interface StockTableProps {
@@ -331,7 +329,7 @@ async function fetchMoneyFlowByMarket(
   return flowMap;
 }
 
-function MarketWatchlist({
+export function MarketWatchlist({
   market,
   loading,
   page,
@@ -379,7 +377,7 @@ function MarketWatchlist({
   );
 }
 
-export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }: WatchListProps) {
+export default function WatchList({ refreshTrigger = 0, activeMarket = "A" }: WatchListProps) {
   const [aShareItems, setAShareItems] = useState<WatchlistItem[]>([]);
   const [usItems, setUsItems] = useState<WatchlistItem[]>([]);
   const [hkItems, setHkItems] = useState<WatchlistItem[]>([]);
@@ -619,18 +617,23 @@ export default function WatchList({ refreshTrigger = 0, activeTab, onTabChange }
     />
   );
 
+  // Render content based on activeMarket
+  const renderContent = () => {
+    switch (activeMarket) {
+      case "A":
+        return aShareContent;
+      case "US":
+        return usContent;
+      case "HK":
+        return hkContent;
+      default:
+        return aShareContent;
+    }
+  };
+
   return (
     <div>
-      <h2 className="font-[var(--font-playfair)] text-xl tracking-[0.18em] text-vt-parchment mb-4 uppercase">
-        <span className="text-vt-brass-400">❖</span> 我 的 自 选 <span className="text-vt-brass-400">❖</span>
-      </h2>
-      <StockMarketTabs
-        aShareContent={aShareContent}
-        usContent={usContent}
-        hkContent={hkContent}
-        activeTab={activeTab}
-        onTabChange={onTabChange}
-      />
+      {renderContent()}
     </div>
   );
 }

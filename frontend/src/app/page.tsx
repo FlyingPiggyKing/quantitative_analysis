@@ -4,15 +4,31 @@ import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import WatchList from "@/components/WatchList";
-import StockMarketTabs from "@/components/StockMarketTabs";
+import ModuleTabs from "@/components/ModuleTabs";
+import SubModuleTabs from "@/components/SubModuleTabs";
 import { ASharePresetList, USPresetList, HKPresetList } from "@/components/PresetStockList";
 import DragonTigerList from "@/components/DragonTigerList";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
+
+function GuestWatchlistHeader() {
+  return (
+    <div className="flex items-center justify-between mb-4">
+      <h2 className="font-[var(--font-playfair)] text-xl tracking-[0.18em] text-vt-parchment uppercase">
+        <span className="text-vt-brass-400">❖</span> 热 门 股 <span className="text-vt-brass-400">❖</span>
+      </h2>
+      <span className="vt-engraved text-sm">游客预览</span>
+    </div>
+  );
+}
 import { getTaskStatus, runBatchAnalysisAsync, TaskStatusResponse } from "@/services/trendPrediction";
 import { useAuth } from "@/services/auth";
 
 const TASK_ID_STORAGE_KEY = "active_analysis_task_id";
 const DISMISSED_STORAGE_KEY = "progress_bar_dismissed";
+
+type ModuleType = "watchlist" | "analysis";
+type MarketType = "A" | "US" | "HK";
+type AnalysisSubModuleType = "dragonTiger";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("");
@@ -20,7 +36,23 @@ export default function Home() {
   const [activeTaskId, setActiveTaskId] = useState<string | null>(null);
   const [taskProgress, setTaskProgress] = useState<TaskStatusResponse | null>(null);
   const [isDismissed, setIsDismissed] = useState(false);
-  const [stockTab, setStockTab] = useState<"A" | "US" | "HK">("A");
+  const [activeModule, setActiveModule] = useState<ModuleType>("watchlist");
+  const [watchlistMarket, setWatchlistMarket] = useState<MarketType>("A");
+  const [analysisSubModule, setAnalysisSubModule] = useState<AnalysisSubModuleType>("dragonTiger");
+
+  // For backward compatibility with search placeholder
+  const stockTab = watchlistMarket;
+
+  // Save current sub-module state when switching modules
+  const handleModuleChange = (newModule: ModuleType) => {
+    // Reset sub-module to default when switching modules
+    if (newModule === "watchlist") {
+      setWatchlistMarket("A");
+    } else {
+      setAnalysisSubModule("dragonTiger");
+    }
+    setActiveModule(newModule);
+  };
 
   const isAnalyzing = activeTaskId !== null &&
     taskProgress !== null &&
@@ -177,31 +209,35 @@ export default function Home() {
         </form>
 
         <div className="mb-8">
-          {user ? (
-            <>
-              <WatchList
-                key={refreshTrigger}
-                activeTab={stockTab}
-                onTabChange={setStockTab}
-              />
-              <div className="mt-8">
-                <DragonTigerList />
+          <ModuleTabs
+            activeModule={activeModule}
+            onModuleChange={handleModuleChange}
+            watchlistContent={
+              <div>
+                {!user && <GuestWatchlistHeader />}
+                <SubModuleTabs
+                  activeModule="watchlist"
+                  activeSubModule={watchlistMarket}
+                  onSubModuleChange={(sub) => setWatchlistMarket(sub as MarketType)}
+                  watchlistSubContent={{
+                    aContent: user ? <WatchList key={`${refreshTrigger}-a`} activeMarket="A" /> : <ASharePresetList />,
+                    usContent: user ? <WatchList key={`${refreshTrigger}-us`} activeMarket="US" /> : <USPresetList />,
+                    hkContent: user ? <WatchList key={`${refreshTrigger}-hk`} activeMarket="HK" /> : <HKPresetList />,
+                  }}
+                />
               </div>
-            </>
-          ) : (
-            <>
-              <StockMarketTabs
-                aShareContent={<ASharePresetList />}
-                usContent={<USPresetList />}
-                hkContent={<HKPresetList />}
-                activeTab={stockTab}
-                onTabChange={setStockTab}
+            }
+            analysisContent={
+              <SubModuleTabs
+                activeModule="analysis"
+                analysisSubContent={{
+                  renderDragonTigerContent: (onDateChange) => (
+                    <DragonTigerList showHeader={false} onDateChange={onDateChange} />
+                  ),
+                }}
               />
-              <div className="mt-8">
-                <DragonTigerList />
-              </div>
-            </>
-          )}
+            }
+          />
         </div>
 
         {user ? (
