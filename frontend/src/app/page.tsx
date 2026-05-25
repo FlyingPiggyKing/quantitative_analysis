@@ -9,6 +9,7 @@ import SubModuleTabs from "@/components/SubModuleTabs";
 import { ASharePresetList, USPresetList, HKPresetList } from "@/components/PresetStockList";
 import DragonTigerList from "@/components/DragonTigerList";
 import SectorMoneyFlowSankey from "@/components/SectorMoneyFlowSankey";
+import IndexMetricsPanel from "@/components/IndexMetricsPanel";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
 
 function GuestWatchlistHeader() {
@@ -236,6 +237,7 @@ export default function Home() {
                     <DragonTigerList showHeader={false} onDateChange={onDateChange} />
                   ),
                   renderMoneyFlowContent: () => <SectorMoneyFlowSankey />,
+                  renderIndexMetricsContent: () => <IndexMetricsPanel />,
                 }}
               />
             }

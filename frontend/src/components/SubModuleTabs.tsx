@@ -3,7 +3,7 @@
 import { useState, ReactNode, useEffect } from "react";
 
 type WatchlistSubModule = "A" | "US" | "HK";
-type AnalysisSubModule = "dragonTiger" | "moneyFlow";
+type AnalysisSubModule = "dragonTiger" | "moneyFlow" | "indexMetrics";
 type SubModuleType = WatchlistSubModule | AnalysisSubModule;
 
 interface SubModuleTabsProps {
@@ -16,6 +16,7 @@ interface SubModuleTabsProps {
   analysisSubContent?: {
     renderDragonTigerContent: (onDateChange: (date: string) => void) => ReactNode;
     renderMoneyFlowContent: () => ReactNode;
+    renderIndexMetricsContent?: () => ReactNode;
   };
   activeSubModule?: SubModuleType;
   onSubModuleChange?: (subModule: SubModuleType) => void;
@@ -110,33 +111,47 @@ export default function SubModuleTabs({
 
     return (
       <div>
-        {/* Tab Bar with tabs for both sub-modules */}
+        {/* Tab Bar with horizontal scroll on mobile */}
         <div className="flex items-center border-b border-vt-ink-700 mb-4">
-          <button
-            onClick={() => handleSubModuleChange("moneyFlow")}
-            className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold ${
-              activeSubModule === "moneyFlow" ? "vt-tab-active" : ""
-            }`}
-          >
-            资 金 流 向
-            {activeSubModule === "moneyFlow" && (
-              <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+          <div className="flex flex-1 overflow-x-auto scrollbar-hide">
+            <button
+              onClick={() => handleSubModuleChange("moneyFlow")}
+              className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
+                activeSubModule === "moneyFlow" ? "vt-tab-active" : ""
+              }`}
+            >
+              资 金 流 向
+              {activeSubModule === "moneyFlow" && (
+                <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+              )}
+            </button>
+            <button
+              onClick={() => handleSubModuleChange("dragonTiger")}
+              className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
+                activeSubModule === "dragonTiger" ? "vt-tab-active" : ""
+              }`}
+            >
+              机 构 龙 虎 榜
+              {activeSubModule === "dragonTiger" && (
+                <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+              )}
+            </button>
+            {analysisSubContent.renderIndexMetricsContent && (
+              <button
+                onClick={() => handleSubModuleChange("indexMetrics")}
+                className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
+                  activeSubModule === "indexMetrics" ? "vt-tab-active" : ""
+                }`}
+              >
+                指 数 指 标
+                {activeSubModule === "indexMetrics" && (
+                  <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+                )}
+              </button>
             )}
-          </button>
-          <button
-            onClick={() => handleSubModuleChange("dragonTiger")}
-            className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold ${
-              activeSubModule === "dragonTiger" ? "vt-tab-active" : ""
-            }`}
-          >
-            机 构 龙 虎 榜
-            {activeSubModule === "dragonTiger" && (
-              <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
-            )}
-          </button>
-          <div className="flex-1" />
+          </div>
           {(dragonTigerDate || moneyFlowDate) && (
-            <span className="vt-engraved text-xs mr-2">
+            <span className="vt-engraved text-xs mr-2 shrink-0">
               {activeSubModule === "dragonTiger" ? dragonTigerDate : moneyFlowDate}
             </span>
           )}
@@ -148,6 +163,8 @@ export default function SubModuleTabs({
             analysisSubContent.renderDragonTigerContent((date) => setDragonTigerDate(date))
           ) : activeSubModule === "moneyFlow" ? (
             analysisSubContent.renderMoneyFlowContent()
+          ) : activeSubModule === "indexMetrics" && analysisSubContent.renderIndexMetricsContent ? (
+            analysisSubContent.renderIndexMetricsContent()
           ) : null}
         </div>
       </div>

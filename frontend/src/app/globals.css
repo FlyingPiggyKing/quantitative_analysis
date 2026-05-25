@@ -583,3 +583,12 @@ html { -webkit-overflow-scrolling: touch; }
 .vt-ornament-tr::before { top: 6px; right: 6px; border-left: 0; border-bottom: 0; }
 .vt-ornament-bl::before { bottom: 6px; left: 6px; border-right: 0; border-top: 0; }
 .vt-ornament-br::before { bottom: 6px; right: 6px; border-left: 0; border-top: 0; }
+
+/* Hide scrollbar while keeping scroll functionality */
+.scrollbar-hide {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}

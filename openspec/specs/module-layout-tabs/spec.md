@@ -46,7 +46,7 @@ The top-level module selection SHALL determine which sub-module tabs are display
 
 #### Scenario: Analysis module shows analysis sub-tabs
 - **WHEN** "投资分析" module is selected
-- **THEN** bottom tabs show "机构龙虎榜" option
+- **THEN** bottom tabs show "资金流向", "机构龙虎榜", "指数指标" options
 
 ### Requirement: Module state preserved during session
 The selected module SHALL be preserved in component state during the user's session.
