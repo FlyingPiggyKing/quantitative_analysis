@@ -30,7 +30,7 @@ export default function SubModuleTabs({
   onSubModuleChange,
 }: SubModuleTabsProps) {
   const getDefaultSubModule = (): SubModuleType => {
-    return activeModule === "watchlist" ? "A" : "moneyFlow";
+    return activeModule === "watchlist" ? "A" : "indexMetrics";
   };
 
   const [internalActiveSubModule, setInternalActiveSubModule] = useState<SubModuleType>(getDefaultSubModule);
@@ -46,7 +46,7 @@ export default function SubModuleTabs({
 
   // When module changes, reset sub-module to default
   const handleModuleChange = (newModule: "watchlist" | "analysis") => {
-    const defaultSub = newModule === "watchlist" ? "A" : "moneyFlow";
+    const defaultSub = newModule === "watchlist" ? "A" : "indexMetrics";
     setInternalActiveSubModule(defaultSub);
     if (onSubModuleChange) {
       onSubModuleChange(defaultSub);
@@ -114,6 +114,19 @@ export default function SubModuleTabs({
         {/* Tab Bar with horizontal scroll on mobile */}
         <div className="flex items-center border-b border-vt-ink-700 mb-4">
           <div className="flex flex-1 overflow-x-auto scrollbar-hide">
+            {analysisSubContent.renderIndexMetricsContent && (
+              <button
+                onClick={() => handleSubModuleChange("indexMetrics")}
+                className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
+                  activeSubModule === "indexMetrics" ? "vt-tab-active" : ""
+                }`}
+              >
+                指 数 指 标
+                {activeSubModule === "indexMetrics" && (
+                  <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+                )}
+              </button>
+            )}
             <button
               onClick={() => handleSubModuleChange("moneyFlow")}
               className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
@@ -136,19 +149,6 @@ export default function SubModuleTabs({
                 <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
               )}
             </button>
-            {analysisSubContent.renderIndexMetricsContent && (
-              <button
-                onClick={() => handleSubModuleChange("indexMetrics")}
-                className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
-                  activeSubModule === "indexMetrics" ? "vt-tab-active" : ""
-                }`}
-              >
-                指 数 指 标
-                {activeSubModule === "indexMetrics" && (
-                  <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
-                )}
-              </button>
-            )}
           </div>
           {(dragonTigerDate || moneyFlowDate) && (
             <span className="vt-engraved text-xs mr-2 shrink-0">

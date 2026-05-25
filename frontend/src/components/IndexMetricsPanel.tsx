@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { fetchIndexMetrics, fetchIndexHistory, fetchIndexList, fetchIndustryList, IndexMetricData, IndexInfo, PEHistoryItem, IndustryInfo } from "@/services/indexMetrics";
+import { fetchIndexMetrics, fetchIndexHistory, fetchIndexList, fetchIndustryList, fetchSubIndustryList, IndexMetricData, IndexInfo, PEHistoryItem, IndustryInfo, SubIndustryInfo } from "@/services/indexMetrics";
 import PEHistoryChart from "./PEHistoryChart";
 
 type TimeRange = 5 | 10;
@@ -230,6 +230,9 @@ export default function IndexMetricsPanel() {
   // Industry selection state
   const [industries, setIndustries] = useState<IndustryInfo[]>([]);
   const [selectedIndustry, setSelectedIndustry] = useState<string>("");
+  const [subIndustries, setSubIndustries] = useState<SubIndustryInfo[]>([]);
+  const [selectedSubIndustry, setSelectedSubIndustry] = useState<string>("");
+  const [subIndustryLoading, setSubIndustryLoading] = useState(false);
   const [industryHistory, setIndustryHistory] = useState<PEHistoryItem[]>([]);
   const [industryMetrics, setIndustryMetrics] = useState<IndexMetricData | null>(null);
   const [industryLoading, setIndustryLoading] = useState(false);
@@ -247,9 +250,12 @@ export default function IndexMetricsPanel() {
         }
         if (industriesResult.industries) {
           setIndustries(industriesResult.industries);
-          // Select first industry by default
           if (industriesResult.industries.length > 0) {
-            setSelectedIndustry(industriesResult.industries[0].ts_code);
+            const defaultIndustry =
+              industriesResult.industries.find((i) => i.name === "有色金属") ??
+              industriesResult.industries[0];
+            setSelectedIndustry(defaultIndustry.ts_code);
+            setSelectedSubIndustry(""); // Default to "行业汇总"
           }
         }
       } catch (err) {
@@ -265,12 +271,15 @@ export default function IndexMetricsPanel() {
   useEffect(() => {
     if (!selectedIndustry) return;
 
+    // Determine which ts_code to use: sub-industry if selected, otherwise Level-1
+    const targetTsCode = selectedSubIndustry || selectedIndustry;
+
     async function loadIndustryData() {
       setIndustryLoading(true);
       try {
         const [metricsResult, historyResult] = await Promise.all([
-          fetchIndexMetrics(selectedIndustry, industryYears),
-          fetchIndexHistory(selectedIndustry, industryYears),
+          fetchIndexMetrics(targetTsCode, industryYears),
+          fetchIndexHistory(targetTsCode, industryYears),
         ]);
         if (metricsResult && !metricsResult.error) {
           setIndustryMetrics(metricsResult);
@@ -285,7 +294,27 @@ export default function IndexMetricsPanel() {
       }
     }
     loadIndustryData();
-  }, [selectedIndustry, industryYears]);
+  }, [selectedIndustry, selectedSubIndustry, industryYears]);
+
+  // Fetch sub-industries when Level-1 industry changes
+  useEffect(() => {
+    if (!selectedIndustry) return;
+
+    async function loadSubIndustries() {
+      setSubIndustryLoading(true);
+      try {
+        const result = await fetchSubIndustryList(selectedIndustry);
+        if (result.sub_industries) {
+          setSubIndustries(result.sub_industries);
+        }
+      } catch (err) {
+        console.error("Failed to load sub-industries:", err);
+      } finally {
+        setSubIndustryLoading(false);
+      }
+    }
+    loadSubIndustries();
+  }, [selectedIndustry]);
 
   const handleYearsChange = useCallback((ts_code: string, years: TimeRange) => {
     setYearsMap((prev) => ({ ...prev, [ts_code]: years }));
@@ -305,28 +334,22 @@ export default function IndexMetricsPanel() {
 
   return (
     <div className="mt-4">
-      <div className="flex items-center justify-between mb-3 px-1">
-        <span className="vt-engraved not-italic text-[10px] tracking-[0.18em] uppercase">
-          指 数 估 值 · PE 百 分 位
-        </span>
-        <span className="vt-engraved text-[10px]">Tushare 每 日 更 新</span>
-      </div>
-      {indices.map((index) => (
-        <IndexCard
-          key={index.ts_code}
-          index={index}
-          years={yearsMap[index.ts_code] || 10}
-          onYearsChange={handleYearsChange}
-        />
-      ))}
-
-      {/* Industry PE Section */}
-      <div className="mt-6">
-        <div className="flex items-center justify-between mb-3 px-1">
-          <span className="vt-engraved not-italic text-[10px] tracking-[0.18em] uppercase">
-            行 业 估 值 · PE 百 分 位
-          </span>
-          <div className="flex items-center gap-2">
+      {/* Industry PE Section - moved to top */}
+      <div className="mb-4">
+        <div className="flex items-end justify-between mb-2 px-1 gap-3">
+          <div className="flex-1 min-w-0">
+            <h2 className="vt-engraved not-italic text-[13px] sm:text-sm tracking-[0.16em] text-vt-brass-300 leading-tight truncate">
+              行业估值 · PE 百分位
+            </h2>
+            <div
+              className="mt-1 h-px w-12 sm:w-16"
+              style={{
+                background:
+                  "linear-gradient(90deg, var(--vt-brass-600) 0%, transparent 100%)",
+              }}
+            />
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
             <select
               value={industryYears}
               onChange={(e) => setIndustryYears(parseInt(e.target.value) as TimeRange)}
@@ -339,29 +362,55 @@ export default function IndexMetricsPanel() {
           </div>
         </div>
 
-        <div className="vt-panel p-3 sm:p-4 mb-3">
-          {/* Industry selector */}
-          <div className="flex items-center gap-2 mb-3">
-            <label className="vt-engraved not-italic text-[10px] tracking-wider whitespace-nowrap">
-              行业选择：
-            </label>
-            <select
-              value={selectedIndustry}
-              onChange={(e) => setSelectedIndustry(e.target.value)}
-              className="vt-input text-[11px] px-2 flex-1"
-              style={{ height: "28px", lineHeight: "1" }}
-            >
-              {industries.map((ind) => (
-                <option key={ind.ts_code} value={ind.ts_code}>
-                  {ind.name}
-                </option>
-              ))}
-            </select>
-            {industryMetrics && (
-              <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wider ${status.color} ${status.bg} whitespace-nowrap`}>
-                {status.label}
-              </span>
-            )}
+        <div className="vt-panel p-3 sm:p-4">
+          {/* Industry selector - two level cascading; stacks on mobile, inline on desktop */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3 mb-3">
+            {/* Level 1 */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <label className="vt-engraved not-italic text-[10px] tracking-[0.18em] whitespace-nowrap shrink-0 w-[4.5rem]">
+                一 级 行 业
+              </label>
+              <select
+                value={selectedIndustry}
+                onChange={(e) => {
+                  setSelectedIndustry(e.target.value);
+                  setSelectedSubIndustry(""); // Reset to "行业汇总" when Level-1 changes
+                }}
+                className="vt-input text-[11px] px-2 flex-1 min-w-0"
+                style={{ height: "28px", lineHeight: "1" }}
+              >
+                {industries.map((ind) => (
+                  <option key={ind.ts_code} value={ind.ts_code}>
+                    {ind.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+            {/* Level 2 */}
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <label className="vt-engraved not-italic text-[10px] tracking-[0.18em] whitespace-nowrap shrink-0 w-[4.5rem]">
+                二 级 行 业
+              </label>
+              <select
+                value={selectedSubIndustry}
+                onChange={(e) => setSelectedSubIndustry(e.target.value)}
+                disabled={!selectedIndustry || subIndustryLoading}
+                className="vt-input text-[11px] px-2 flex-1 min-w-0"
+                style={{ height: "28px", lineHeight: "1" }}
+              >
+                <option value="">行业汇总</option>
+                {subIndustries.map((ind) => (
+                  <option key={ind.ts_code} value={ind.ts_code}>
+                    {ind.name}
+                  </option>
+                ))}
+              </select>
+              {industryMetrics && (
+                <span className={`px-1.5 py-0.5 rounded text-[10px] font-medium tracking-wider ${status.color} ${status.bg} whitespace-nowrap shrink-0`}>
+                  {status.label}
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Metrics grid */}
@@ -420,6 +469,29 @@ export default function IndexMetricsPanel() {
           </div>
         </div>
       </div>
+
+      <div className="flex items-end justify-between mb-2 px-1 gap-3">
+        <div className="flex-1 min-w-0">
+          <h2 className="vt-engraved not-italic text-[13px] sm:text-sm tracking-[0.16em] text-vt-brass-300 leading-tight truncate">
+            热门指数估值 · PE 百分位
+          </h2>
+          <div
+            className="mt-1 h-px w-12 sm:w-16"
+            style={{
+              background:
+                "linear-gradient(90deg, var(--vt-brass-600) 0%, transparent 100%)",
+            }}
+          />
+        </div>
+      </div>
+      {indices.map((index) => (
+        <IndexCard
+          key={index.ts_code}
+          index={index}
+          years={yearsMap[index.ts_code] || 10}
+          onYearsChange={handleYearsChange}
+        />
+      ))}
     </div>
   );
 }

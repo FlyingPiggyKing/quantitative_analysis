@@ -41,6 +41,157 @@ SW_INDUSTRY_LIST = [
     {"name": "综合", "ts_code": "801790.SI", "source": "sw"},
 ]
 
+# SW Level-2 sub-industries for each Level-1 industry
+# Mapping parent Level-1 ts_code to list of sub-industries
+SW_SUB_INDUSTRY_MAP = {
+    "801010.SI": [  # 农林牧渔
+        {"name": "种植业", "ts_code": "801011.SI"},
+        {"name": "林业", "ts_code": "801013.SI"},
+        {"name": "渔业", "ts_code": "801012.SI"},
+        {"name": "畜牧业", "ts_code": "801014.SI"},
+        {"name": "农业综合", "ts_code": "801016.SI"},
+        {"name": "农产品加工", "ts_code": "801015.SI"},
+    ],
+    "801020.SI": [  # 采掘
+        {"name": "煤炭开采", "ts_code": "801021.SI"},
+        {"name": "石油开采", "ts_code": "801023.SI"},
+        {"name": "金属采选", "ts_code": "801024.SI"},
+        {"name": "非金属采选", "ts_code": "801025.SI"},
+    ],
+    "801030.SI": [  # 化工
+        {"name": "化学制品", "ts_code": "801032.SI"},
+        {"name": "化学原料", "ts_code": "801031.SI"},
+        {"name": "化学纤维", "ts_code": "801033.SI"},
+        {"name": "石油化工", "ts_code": "801034.SI"},
+    ],
+    "801040.SI": [  # 钢铁
+        {"name": "钢铁", "ts_code": "801041.SI"},
+    ],
+    "801050.SI": [  # 有色金属
+        {"name": "金属非金属", "ts_code": "801051.SI"},
+        {"name": "稀有金属", "ts_code": "801056.SI"},
+    ],
+    "801080.SI": [  # 电子
+        {"name": "半导体", "ts_code": "801081.SI"},
+        {"name": "元件", "ts_code": "801082.SI"},
+        {"name": "光学光电子", "ts_code": "801083.SI"},
+        {"name": "其他电子", "ts_code": "801084.SI"},
+    ],
+    "801110.SI": [  # 汽车
+        {"name": "汽车整车", "ts_code": "801111.SI"},
+        {"name": "汽车零部件", "ts_code": "801112.SI"},
+        {"name": "汽车服务", "ts_code": "801113.SI"},
+    ],
+    "801120.SI": [  # 家用电器
+        {"name": "白色家电", "ts_code": "801121.SI"},
+        {"name": "黑色家电", "ts_code": "801122.SI"},
+        {"name": "小家电", "ts_code": "801123.SI"},
+    ],
+    "801130.SI": [  # 食品饮料
+        {"name": "食品加工", "ts_code": "801131.SI"},
+        {"name": "饮料制造", "ts_code": "801132.SI"},
+        {"name": "白酒", "ts_code": "801133.SI"},
+    ],
+    "801140.SI": [  # 纺织服装
+        {"name": "纺织制造", "ts_code": "801141.SI"},
+        {"name": "服装家纺", "ts_code": "801142.SI"},
+        {"name": "饰品", "ts_code": "801143.SI"},
+    ],
+    "801150.SI": [  # 轻工制造
+        {"name": "造纸", "ts_code": "801151.SI"},
+        {"name": "包装印刷", "ts_code": "801152.SI"},
+        {"name": "家用轻工", "ts_code": "801153.SI"},
+    ],
+    "801160.SI": [  # 医药生物
+        {"name": "化学制药", "ts_code": "801161.SI"},
+        {"name": "中药", "ts_code": "801162.SI"},
+        {"name": "生物制品", "ts_code": "801163.SI"},
+        {"name": "医疗器械", "ts_code": "801164.SI"},
+        {"name": "医药商业", "ts_code": "801165.SI"},
+    ],
+    "801170.SI": [  # 公用事业
+        {"name": "电力", "ts_code": "801171.SI"},
+        {"name": "燃气", "ts_code": "801172.SI"},
+        {"name": "水务", "ts_code": "801173.SI"},
+    ],
+    "801180.SI": [  # 交通运输
+        {"name": "港口航运", "ts_code": "801181.SI"},
+        {"name": "公路铁路", "ts_code": "801182.SI"},
+        {"name": "航空机场", "ts_code": "801183.SI"},
+        {"name": "物流", "ts_code": "801184.SI"},
+    ],
+    "801190.SI": [  # 房地产
+        {"name": "房地产开发", "ts_code": "801191.SI"},
+        {"name": "房地产服务", "ts_code": "801192.SI"},
+    ],
+    "801200.SI": [  # 商业贸易
+        {"name": "零售", "ts_code": "801201.SI"},
+        {"name": "批发", "ts_code": "801202.SI"},
+        {"name": "商业物业经营", "ts_code": "801203.SI"},
+    ],
+    "801210.SI": [  # 休闲服务
+        {"name": "旅游", "ts_code": "801211.SI"},
+        {"name": "酒店餐饮", "ts_code": "801212.SI"},
+        {"name": "休闲服务", "ts_code": "801213.SI"},
+    ],
+    "801220.SI": [  # 银行
+        {"name": "银行", "ts_code": "801221.SI"},
+    ],
+    "801230.SI": [  # 非银金融
+        {"name": "证券", "ts_code": "801231.SI"},
+        {"name": "保险", "ts_code": "801232.SI"},
+        {"name": "多元金融", "ts_code": "801233.SI"},
+    ],
+    "801710.SI": [  # 建筑材料
+        {"name": "水泥制造", "ts_code": "801711.SI"},
+        {"name": "玻璃制造", "ts_code": "801712.SI"},
+        {"name": "其他建材", "ts_code": "801713.SI"},
+    ],
+    "801720.SI": [  # 建筑装饰
+        {"name": "房屋建设", "ts_code": "801721.SI"},
+        {"name": "装修装饰", "ts_code": "801722.SI"},
+        {"name": "园林工程", "ts_code": "801723.SI"},
+        {"name": "基础建设", "ts_code": "801724.SI"},
+    ],
+    "801730.SI": [  # 电气设备
+        {"name": "电机", "ts_code": "801731.SI"},
+        {"name": "电气自动化设备", "ts_code": "801732.SI"},
+        {"name": "电源设备", "ts_code": "801733.SI"},
+        {"name": "高低压设备", "ts_code": "801734.SI"},
+    ],
+    "801740.SI": [  # 国防军工
+        {"name": "航天装备", "ts_code": "801741.SI"},
+        {"name": "航空装备", "ts_code": "801742.SI"},
+        {"name": "地面兵装", "ts_code": "801743.SI"},
+        {"name": "船舶制造", "ts_code": "801744.SI"},
+    ],
+    "801750.SI": [  # 计算机
+        {"name": "计算机设备", "ts_code": "801751.SI"},
+        {"name": "软件开发", "ts_code": "801752.SI"},
+        {"name": "IT服务", "ts_code": "801753.SI"},
+    ],
+    "801760.SI": [  # 传媒
+        {"name": "广告营销", "ts_code": "801761.SI"},
+        {"name": "影视院线", "ts_code": "801762.SI"},
+        {"name": "游戏", "ts_code": "801763.SI"},
+        {"name": "出版", "ts_code": "801764.SI"},
+    ],
+    "801770.SI": [  # 通信
+        {"name": "通信设备", "ts_code": "801771.SI"},
+        {"name": "通信服务", "ts_code": "801772.SI"},
+        {"name": "通信运营", "ts_code": "801773.SI"},
+    ],
+    "801780.SI": [  # 机械设备
+        {"name": "通用设备", "ts_code": "801781.SI"},
+        {"name": "专用设备", "ts_code": "801782.SI"},
+        {"name": "仪器仪表", "ts_code": "801783.SI"},
+    ],
+    "801790.SI": [  # 综合
+        {"name": "综合", "ts_code": "801791.SI"},
+    ],
+}
+
+
 # SW Industry Indices list in display order
 # Using 4 SW industry indices to represent tech sector
 SW_INDEX_LIST = [
@@ -65,6 +216,11 @@ INDEX_LIST = SW_INDEX_LIST + BROAD_INDEX_LIST
 # Combined lookup: all indices and industries
 ALL_INDEX_LOOKUP = {idx["ts_code"]: idx for idx in INDEX_LIST}
 ALL_INDEX_LOOKUP.update({ind["ts_code"]: ind for ind in SW_INDUSTRY_LIST})
+
+# Add sub-industries to lookup (they use same SW API as Level-1)
+for sub_industries in SW_SUB_INDUSTRY_MAP.values():
+    for sub in sub_industries:
+        ALL_INDEX_LOOKUP[sub["ts_code"]] = {"name": sub["name"], "ts_code": sub["ts_code"], "source": "sw"}
 
 # Cache key format: index_metrics:{ts_code}:{years}:{date}
 _cache_store = {}
@@ -225,6 +381,15 @@ async def get_index_list():
 async def get_industry_list():
     """Get list of SW industries for selection."""
     return {"industries": SW_INDUSTRY_LIST}
+
+
+@router.get("/industry/subindustry")
+async def get_subindustry_list(
+    ts_code: str = Query(..., description="Level-1 industry ts_code, e.g., 801010.SI")
+):
+    """Get list of sub-industries for a given Level-1 SW industry."""
+    sub_industries = SW_SUB_INDUSTRY_MAP.get(ts_code, [])
+    return {"sub_industries": sub_industries}
 
 
 @router.get("/history")

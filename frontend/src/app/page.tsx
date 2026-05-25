@@ -191,23 +191,25 @@ export default function Home() {
             />
           </div>
 
-          <button
-            type="submit"
-            className="vt-btn-primary w-full px-4 py-3 text-base min-h-[44px]"
-          >
-            查 询
-          </button>
-
-          {user && (
+          <div className={user ? "flex gap-3" : ""}>
             <button
-              type="button"
-              onClick={handleTrendAnalysis}
-              disabled={isAnalyzing}
-              className="vt-btn-oxblood w-full px-4 py-3 text-base min-h-[44px]"
+              type="submit"
+              className={`vt-btn-primary px-4 py-3 text-base min-h-[44px] ${user ? "flex-1" : "w-full"}`}
             >
-              {isAnalyzing ? "分 析 中 …" : "趋 势 分 析"}
+              查 询
             </button>
-          )}
+
+            {user && (
+              <button
+                type="button"
+                onClick={handleTrendAnalysis}
+                disabled={isAnalyzing}
+                className="vt-btn-oxblood flex-1 px-4 py-3 text-base min-h-[44px]"
+              >
+                {isAnalyzing ? "分 析 中 …" : "趋 势 分 析"}
+              </button>
+            )}
+          </div>
         </form>
 
         <div className="mb-8">

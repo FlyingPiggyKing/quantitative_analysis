@@ -1,5 +1,19 @@
 ## ADDED Requirements
 
+### Requirement: Search and trend analysis button layout
+The homepage SHALL display 查询 and 趋 势 分 析 buttons, with 趋 势 分 析 only visible to authenticated users.
+
+#### Scenario: Logged-out user sees single button
+- **WHEN** an unauthenticated user views the homepage search form
+- **THEN** only the "查 询" button is displayed
+- **AND** it spans the full width of the form
+
+#### Scenario: Logged-in user sees two buttons side by side
+- **WHEN** an authenticated user views the homepage search form
+- **THEN** "查 询" and "趋 势 分 析" buttons are displayed on the same row
+- **AND** each button takes 50% of the available width (flex-1)
+- **AND** buttons are separated by a gap-3 gap
+
 ### Requirement: Stock information query
 The system SHALL provide stock basic information (name, market, sector) when given a valid 6-digit Chinese stock symbol.
 

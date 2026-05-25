@@ -36,8 +36,8 @@ export default function ModuleTabs({
       <div className="flex border-b border-vt-ink-700 mb-4">
         <button
           onClick={() => handleModuleChange("watchlist")}
-          className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold ${
-            activeModule === "watchlist" ? "vt-tab-active" : ""
+          className={`vt-tab px-5 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] ${
+            activeModule === "watchlist" ? "vt-tab-active vt-emboss" : ""
           }`}
         >
           我 的 自 选
@@ -47,8 +47,8 @@ export default function ModuleTabs({
         </button>
         <button
           onClick={() => handleModuleChange("analysis")}
-          className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold ${
-            activeModule === "analysis" ? "vt-tab-active" : ""
+          className={`vt-tab px-5 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] ${
+            activeModule === "analysis" ? "vt-tab-active vt-emboss" : ""
           }`}
         >
           投 资 分 析

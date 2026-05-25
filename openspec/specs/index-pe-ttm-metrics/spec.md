@@ -117,14 +117,39 @@ The system SHALL provide a dropdown to select from 28 申万一级行业 indices
 #### Scenario: Industry dropdown displays all industries
 - **WHEN** user views the industry metrics panel
 - **THEN** dropdown shows all 28 申万一级行业 options
-- **AND** "农林牧渔" is selected by default
+- **AND** "有色金属" is selected by default
 
 #### Scenario: Select different industry
 - **WHEN** user selects a different industry from dropdown
 - **THEN** metrics and chart update to show selected industry's data
-- **AND** "农林牧渔" is selected by default
+- **AND** "有色金属" remains selected on subsequent visits
 
-### Requirement: Industry metrics display
+### Requirement: Industry selector mobile layout
+The industry selector SHALL display as a stacked two-row layout on mobile and inline single-row layout on desktop.
+
+#### Scenario: Mobile displays selectors stacked
+- **WHEN** user views industry metrics on a screen narrower than 640px
+- **THEN** the Level-1 selector (一级行业) occupies one full row with its label
+- **AND** the Level-2 selector (二级行业) occupies a second full row with its label
+- **AND** the 估值状态 badge sits inline with the Level-2 selector
+
+#### Scenario: Desktop displays selectors inline
+- **WHEN** user views industry metrics on a screen 640px or wider
+- **THEN** the Level-1 and Level-2 selectors appear on a single row side by side
+
+### Requirement: Section header titles and visual hierarchy
+The index metrics panel SHALL display two section headers with distinct visual prominence.
+
+#### Scenario: Section header text content
+- **WHEN** user views the index metrics panel
+- **THEN** the first section header displays "行业估值 · PE 百分位"
+- **AND** the second section header displays "热门指数估值 · PE 百分位"
+
+#### Scenario: Section headers are visually subdued
+- **WHEN** user views the section headers
+- **THEN** headers use vt-engraved parchment serif styling (not the bold brass-emboss used by top-level tabs)
+- **AND** headers display at text-[13px] on mobile and text-sm on desktop
+- **AND** each header has a subtle 1px brass hairline underline accent
 Selected industry SHALL display PE metrics similar to broad indices.
 
 #### Scenario: Industry displays same metrics as index

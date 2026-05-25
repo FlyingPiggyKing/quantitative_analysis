@@ -46,6 +46,16 @@ export interface IndustryListResponse {
   error?: string;
 }
 
+export interface SubIndustryInfo {
+  name: string;
+  ts_code: string;
+}
+
+export interface SubIndustryListResponse {
+  sub_industries?: SubIndustryInfo[];
+  error?: string;
+}
+
 export async function fetchIndexList(): Promise<IndexMetricsResponse> {
   const res = await fetch(`${API_BASE}/api/index/list`);
   return res.json();
@@ -53,6 +63,11 @@ export async function fetchIndexList(): Promise<IndexMetricsResponse> {
 
 export async function fetchIndustryList(): Promise<IndustryListResponse> {
   const res = await fetch(`${API_BASE}/api/index/industry/list`);
+  return res.json();
+}
+
+export async function fetchSubIndustryList(ts_code: string): Promise<SubIndustryListResponse> {
+  const res = await fetch(`${API_BASE}/api/index/industry/subindustry?ts_code=${ts_code}`);
   return res.json();
 }
 

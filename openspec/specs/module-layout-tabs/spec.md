@@ -31,11 +31,18 @@ The top-level module tabs SHALL be displayed at the position where the current "
 - **AND** no duplicate "我的自选" title is displayed
 
 ### Requirement: Module tab text styling
-The module tab text SHALL be displayed with larger font size (text-base) and semibold weight.
+The module tab text SHALL be displayed with large font size and prominent styling. The active tab SHALL use brass-emboss styling while the inactive tab remains subdued.
 
 #### Scenario: Tab text appearance
 - **WHEN** module tabs are rendered
-- **THEN** "我的自选" and "投资分析" use text-base font size and font-semibold class
+- **THEN** "我的自选" and "投资分析" use text-lg font size on mobile and text-xl on desktop
+- **AND** letter-spacing is tracking-[0.24em]
+
+#### Scenario: Active tab uses brass-emboss styling
+- **WHEN** a tab is active (selected)
+- **THEN** the tab label uses vt-emboss (cast brass gradient) in addition to vt-tab-active
+- **AND** the tab shows a glowing brass underline accent (vt-tab-underline)
+- **AND** the inactive tab remains in vt-engraved parchment-dim style
 
 ### Requirement: Module state affects sub-module tabs
 The top-level module selection SHALL determine which sub-module tabs are displayed at the bottom.
