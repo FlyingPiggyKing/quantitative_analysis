@@ -14,7 +14,7 @@ The system SHALL display the top 5 A-share stocks with highest cumulative positi
 #### Scenario: Net buy data is available
 - **WHEN** "净买入" tab is selected
 - **THEN** system displays up to 5 stocks ranked by cumulative net_amount (summed across N trading days) in descending order
-- **AND** each row shows: 日期, 代码, 名称(上榜次数), 收盘价, 涨幅, 净买入额, 上榜原因
+- **AND** each row shows: 代码, 名称(上榜次数), 收盘价, 涨跌幅, 净买入额, **上榜时间**, 上榜原因
 
 #### Scenario: Net buy data is empty
 - **WHEN** "净买入" tab is selected and no data is available
@@ -26,7 +26,7 @@ The system SHALL display the top 5 A-share stocks with highest cumulative net se
 #### Scenario: Net sell data is available
 - **WHEN** "净卖出" tab is selected
 - **THEN** system displays up to 5 stocks ranked by cumulative net_amount (summed across N trading days) in ascending order (most negative first)
-- **AND** each row shows: 日期, 代码, 名称(上榜次数), 收盘价, 涨幅, 净卖出额 (displayed as positive/absolute value), 上榜原因
+- **AND** each row shows: 代码, 名称(上榜次数), 收盘价, 涨跌幅, 净卖出额 (displayed as positive/absolute value), **上榜时间**, 上榜原因
 
 #### Scenario: Net sell data is empty
 - **WHEN** "净卖出" tab is selected and no data is available

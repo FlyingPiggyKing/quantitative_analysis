@@ -11,7 +11,7 @@ Users want to see institutional trading activity data for A-shares. The Dragon T
 - Display top 5 stocks by cumulative net buy amount and top 5 by cumulative net sell amount
 - Show appearance count (上榜次数) to indicate how many days a stock appeared
 - Add backend API endpoint to serve Dragon Tiger List data
-- Display columns: 日期 (date), 代码 (code), 名称+次数 (name with appear_count), 收盘价 (close), 涨幅 (pct_change), 净买入额/净卖出额 (net_amount cumulative), 上榜原因 (reason)
+- Display columns: 代码 (code), 名称+次数 (name with appear_count), 收盘价 (close), 涨跌幅 (pct_change), 净买入额/净卖出额 (net_amount cumulative), **上榜时间 (trade_date)**, 上榜原因 (reason)
 
 ## Capabilities
 

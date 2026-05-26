@@ -156,6 +156,9 @@ function DragonTigerRow({ item, isBuy }: DragonTigerRowProps) {
       <div className={`w-24 text-right font-[var(--font-geist-mono)] text-xs shrink-0 ${isBuy ? "text-vt-pred-up" : "text-vt-pred-down"}`}>
         {formatNetAmount(item.net_amount, isBuy)}
       </div>
+      <div className="w-20 text-right font-[var(--font-geist-mono)] text-xs shrink-0 text-vt-parchment-dim">
+        {formatDate(item.trade_date)}
+      </div>
       <div className="flex-1 flex justify-end pr-4">
         <AIPredictionCell symbol={symbol} />
       </div>
@@ -189,6 +192,7 @@ function DragonTigerTable({ data, isBuy }: DragonTigerTableProps) {
         <div className="w-20 shrink-0 vt-tab text-right">收盘价</div>
         <div className="w-20 shrink-0 vt-tab text-right">涨跌幅</div>
         <div className="w-24 shrink-0 vt-tab text-right">{isBuy ? "净买入" : "净卖出"}</div>
+        <div className="w-20 shrink-0 vt-tab text-right">上榜时间</div>
         <div className="flex-1 flex justify-end vt-pred-col-header text-right pr-4">
           AI龙虎预测
         </div>
@@ -233,7 +237,7 @@ function MobileCard({ item, isBuy }: MobileCardProps) {
         </div>
         <AIPredictionCell symbol={symbol} asLink={false} />
       </div>
-      {/* Row 3: PctChange | Industry */}
+      {/* Row 3: PctChange | Industry | Date */}
       <div className="flex items-center gap-4 text-xs font-[var(--font-geist-mono)]">
         <span className={item.pct_change != null && item.pct_change >= 0 ? "text-vt-pred-up" : "text-vt-pred-down"}>
           {formatPctChange(item.pct_change)}
@@ -242,6 +246,7 @@ function MobileCard({ item, isBuy }: MobileCardProps) {
         {item.industry && (
           <span className="text-vt-parchment font-semibold">{item.industry}</span>
         )}
+        <span className="text-vt-parchment-dim ml-auto">{formatDate(item.trade_date)}</span>
       </div>
     </Link>
   );
@@ -261,11 +266,14 @@ export default function DragonTigerList({ showHeader = true, onDateChange }: Dra
     fetchData();
   }, []);
 
-  const displayDate = data?.net_buy && data.net_buy.length > 0
-    ? formatDate(data.net_buy[0].trade_date)
-    : data?.net_sell && data.net_sell.length > 0
-    ? formatDate(data.net_sell[0].trade_date)
-    : "";
+  // Find the most recent trade date across all items (not just the first one)
+  const displayDate = (() => {
+    if (!data) return "";
+    const allItems = [...(data.net_buy || []), ...(data.net_sell || [])];
+    if (allItems.length === 0) return "";
+    const dates = allItems.map(item => item.trade_date).filter(Boolean).sort();
+    return dates.length > 0 ? formatDate(dates[dates.length - 1]) : "";
+  })();
 
   // Notify parent of date change
   useEffect(() => {

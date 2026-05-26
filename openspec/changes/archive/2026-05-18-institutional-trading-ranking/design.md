@@ -53,6 +53,19 @@ Target structure:
 - [Risk] Empty data if no Dragon Tiger List activity → Mitigation: Show "暂无数据" placeholder
 - [Trade-off] No real-time updates → Acceptable for this feature (daily institutional data)
 
+## Implementation Notes (2026-05-26)
+
+### Date Display Fix
+- Each stock in the Dragon Tiger List has its own `trade_date` field indicating when that stock last appeared on the list
+- The page header date label shows the **most recent** date across all items (not just `net_buy[0]`)
+- Different stocks may have different `trade_date` values since they were featured on different days
+
+### Column Addition: 上榜时间 (trade_date)
+- Added a dedicated "上榜时间" column in the table view (desktop) and inline display (mobile)
+- This column displays the `trade_date` for each individual stock record
+- Format: YYYY-MM-DD (e.g., "2026-05-26")
+- Rationale: Users need to see when each stock actually appeared on the Dragon Tiger List, as stocks can appear on different dates within the aggregation window
+
 ## Independence from Hot Stocks
 
 The Dragon Tiger List feature is **completely independent** from the Hot Stocks (热门股) section:
