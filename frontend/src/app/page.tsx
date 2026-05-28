@@ -12,6 +12,7 @@ import SectorMoneyFlowSankey from "@/components/SectorMoneyFlowSankey";
 import IndexMetricsPanel from "@/components/IndexMetricsPanel";
 import HourlyNewsPanel from "@/components/HourlyNewsPanel";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
+import SystemAdminPanel from "@/components/SystemAdminPanel";
 
 function GuestWatchlistHeader() {
   return (
@@ -24,12 +25,12 @@ function GuestWatchlistHeader() {
   );
 }
 import { getTaskStatus, runBatchAnalysisAsync, TaskStatusResponse } from "@/services/trendPrediction";
-import { useAuth } from "@/services/auth";
+import { useAuth, useSystemAdminAccess } from "@/services/auth";
 
 const TASK_ID_STORAGE_KEY = "active_analysis_task_id";
 const DISMISSED_STORAGE_KEY = "progress_bar_dismissed";
 
-type ModuleType = "watchlist" | "analysis";
+type ModuleType = "watchlist" | "analysis" | "admin";
 type MarketType = "A" | "US" | "HK";
 type AnalysisSubModuleType = "dragonTiger" | "news";
 
@@ -62,6 +63,7 @@ export default function Home() {
     (taskProgress.status === "pending" || taskProgress.status === "running");
   const router = useRouter();
   const { user, isLoading } = useAuth();
+  const { hasAccess: hasAdminAccess } = useSystemAdminAccess();
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -245,6 +247,7 @@ export default function Home() {
                 }}
               />
             }
+            adminContent={hasAdminAccess ? <SystemAdminPanel /> : undefined}
           />
         </div>
 

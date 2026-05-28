@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
-from backend.api import stock, watchlist, trend_prediction, auth, captcha, institutional_trading_analysis, index_metrics, hourly_news
+from backend.api import stock, watchlist, trend_prediction, auth, captcha, institutional_trading_analysis, index_metrics, hourly_news, admin
 
 # Load .env file from backend directory
 env_path = Path(__file__).parent / ".env"
@@ -34,6 +34,7 @@ app.include_router(captcha.router)
 app.include_router(institutional_trading_analysis.router)
 app.include_router(index_metrics.router)
 app.include_router(hourly_news.router)
+app.include_router(admin.router)
 
 
 def start_scheduler():

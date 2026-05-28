@@ -2,11 +2,12 @@
 
 import { useState, ReactNode } from "react";
 
-type ModuleType = "watchlist" | "analysis";
+type ModuleType = "watchlist" | "analysis" | "admin";
 
 interface ModuleTabsProps {
   watchlistContent: ReactNode;
   analysisContent: ReactNode;
+  adminContent?: ReactNode;
   activeModule?: ModuleType;
   onModuleChange?: (module: ModuleType) => void;
   defaultModule?: ModuleType;
@@ -15,6 +16,7 @@ interface ModuleTabsProps {
 export default function ModuleTabs({
   watchlistContent,
   analysisContent,
+  adminContent,
   activeModule: controlledActiveModule,
   onModuleChange,
   defaultModule = "watchlist"
@@ -56,10 +58,23 @@ export default function ModuleTabs({
             <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
           )}
         </button>
+        {adminContent && (
+          <button
+            onClick={() => handleModuleChange("admin")}
+            className={`vt-tab px-5 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] ${
+              activeModule === "admin" ? "vt-tab-active vt-emboss" : ""
+            }`}
+          >
+            系 统 管 理
+            {activeModule === "admin" && (
+              <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+            )}
+          </button>
+        )}
       </div>
 
       {/* Tab Content */}
-      {activeModule === "watchlist" ? watchlistContent : analysisContent}
+      {activeModule === "watchlist" ? watchlistContent : activeModule === "analysis" ? analysisContent : adminContent}
     </div>
   );
 }

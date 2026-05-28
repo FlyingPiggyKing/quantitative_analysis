@@ -98,6 +98,28 @@ export function useAuth() {
   return context;
 }
 
+export function useSystemAdminAccess() {
+  const { user, isLoading } = useAuth();
+  const [hasAccess, setHasAccess] = useState(false);
+  const [checking, setChecking] = useState(true);
+
+  useEffect(() => {
+    if (isLoading) return;
+    if (!user) {
+      setHasAccess(false);
+      setChecking(false);
+      return;
+    }
+
+    checkPermission("system_statistics").then((result) => {
+      setHasAccess(result);
+      setChecking(false);
+    });
+  }, [user, isLoading]);
+
+  return { hasAccess, checking, isLoading };
+}
+
 export function getToken(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(TOKEN_KEY);
@@ -118,4 +140,16 @@ export function getAuthHeaders(): HeadersInit {
     return { "Authorization": `Bearer ${token}` };
   }
   return {};
+}
+
+export async function checkPermission(permission: string): Promise<boolean> {
+  const token = getToken();
+  if (!token) return false;
+
+  const res = await fetch(`${API_BASE}/api/admin/permissions?permission=${encodeURIComponent(permission)}`, {
+    headers: { "Authorization": `Bearer ${token}` },
+  });
+  if (!res.ok) return false;
+  const data = await res.json();
+  return data.has_permission === true;
 }
