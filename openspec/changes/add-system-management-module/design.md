@@ -6,7 +6,7 @@ The system has a role-based permission system where `admin` role has `system_sta
 
 **Goals:**
 - Add "系统管理" (System Administration) tab visible only to users with `system_statistics` permission
-- Display stock statistics: list all stocks in the global watchlist with count
+- Display stock statistics: list all unique stocks from `user_watchlist` across all users, with market and user count
 - Display user statistics: list all registered users with count
 
 **Non-Goals:**
@@ -18,7 +18,9 @@ The system has a role-based permission system where `admin` role has `system_sta
 
 ### 1. New API Endpoint Structure
 Create a new backend API route `/api/admin/stats` that returns:
-- `watchlist_stocks`: Array of all stocks in global `watchlist` table
+- `watchlist_stocks`: Array of stocks from `user_watchlist` table, deduplicated by symbol, with market and user_count
+- `watchlist_count`: Total number of unique stocks
+- `users`: Array of registered users
 - `user_count`: Total number of registered users
 
 **Rationale**: Keeps admin-related functionality under `/api/admin/` prefix for clear separation.
@@ -39,4 +41,4 @@ The frontend already has `useAuth()` hook that provides user info.
 ## Risks / Trade-offs
 
 - [Risk] User list exposure → [Mitigation] Only users with `system_statistics` permission can access this endpoint. The API should also validate the session token.
-- [Risk] Performance with large watchlist → [Mitigation] Global watchlist is expected to be small (<1000 stocks). If needed, add pagination later.
+- [Risk] Performance with large user_watchlist → [Mitigation] User watchlist is expected to be small (<10000 entries). If needed, add pagination later.

@@ -18,19 +18,25 @@ class AdminService:
 
     @staticmethod
     def get_watchlist_stocks() -> List[Dict[str, Any]]:
-        """Get all stocks from the global watchlist table."""
+        """Get all stocks from user_watchlist across all users (deduplicated by symbol)."""
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
             rows = cursor.execute(
-                "SELECT id, symbol, name, added_at FROM watchlist ORDER BY added_at DESC"
+                """
+                SELECT symbol, name, market, MAX(added_at) as added_at, COUNT(DISTINCT user_id) as user_count
+                FROM user_watchlist
+                GROUP BY symbol, name, market
+                ORDER BY added_at DESC
+                """
             ).fetchall()
             return [
                 {
-                    "id": row["id"],
                     "symbol": row["symbol"],
                     "name": row["name"],
+                    "market": row["market"],
                     "added_at": row["added_at"],
+                    "user_count": row["user_count"],
                 }
                 for row in rows
             ]

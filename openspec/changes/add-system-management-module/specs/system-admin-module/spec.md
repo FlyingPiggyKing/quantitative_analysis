@@ -23,8 +23,9 @@ The system SHALL display two statistics blocks within the System Administration 
 #### Scenario: System Administration module displays stock statistics block
 - **WHEN** admin user views the System Administration module
 - **THEN** a "股票统计" (Stock Statistics) block is displayed
-- **AND** it lists all stocks from the global watchlist table
-- **AND** it shows the total count of stocks (e.g., "共 X 只股票")
+- **AND** it lists all unique stocks from `user_watchlist` across all users (deduplicated by symbol)
+- **AND** each stock shows: symbol, name, market, added_at, user_count (number of users following this stock)
+- **AND** it shows the total count of unique stocks (e.g., "共 X 只股票")
 
 #### Scenario: System Administration module displays user statistics block
 - **WHEN** admin user views the System Administration module
@@ -37,7 +38,7 @@ The system SHALL provide an API endpoint `/api/admin/stats` that returns watchli
 
 #### Scenario: Authorized user can access admin stats endpoint
 - **WHEN** a user with `system_statistics` permission calls `GET /api/admin/stats` with valid authentication
-- **THEN** the response contains `watchlist_stocks` array with symbol, name, added_at for each stock
+- **THEN** the response contains `watchlist_stocks` array with symbol, name, market, added_at, user_count for each unique stock
 - **AND** the response contains `users` array with id, username, created_at for each user
 - **AND** the response contains `watchlist_count` and `user_count` integers
 

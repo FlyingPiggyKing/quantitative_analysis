@@ -6,10 +6,11 @@ import { getAuthHeaders } from "@/services/auth";
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 interface WatchlistStock {
-  id: number;
   symbol: string;
   name: string;
+  market: string;
   added_at: string;
+  user_count: number;
 }
 
 interface User {
@@ -84,17 +85,21 @@ export default function SystemAdminPanel() {
                   <tr className="text-vt-brass-400 text-xs">
                     <th className="py-1 px-2">代码</th>
                     <th className="py-1 px-2">名称</th>
+                    <th className="py-1 px-2">市场</th>
                     <th className="py-1 px-2">添加日期</th>
+                    <th className="py-1 px-2">关注人数</th>
                   </tr>
                 </thead>
                 <tbody>
                   {stats.watchlist_stocks.map((stock) => (
-                    <tr key={stock.id} className="border-t border-vt-ink-800">
+                    <tr key={stock.symbol} className="border-t border-vt-ink-800">
                       <td className="py-1 px-2 vt-engraved">{stock.symbol}</td>
                       <td className="py-1 px-2 vt-engraved">{stock.name}</td>
+                      <td className="py-1 px-2 vt-engraved">{stock.market}</td>
                       <td className="py-1 px-2 vt-engraved text-vt-parchment-dim">
                         {new Date(stock.added_at).toLocaleDateString("zh-CN")}
                       </td>
+                      <td className="py-1 px-2 vt-engraved">{stock.user_count}</td>
                     </tr>
                   ))}
                 </tbody>
