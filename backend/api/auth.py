@@ -1,13 +1,59 @@
 """Authentication API routes."""
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from fastapi import APIRouter, HTTPException, Header
 from pydantic import BaseModel
 from typing import Optional
 from backend.services.user_service import UserService
 from backend.services.auth_service import create_access_token, decode_token
 from backend.services.db_migration import get_db_connection
+from backend.services.role_service import RoleService
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
+
+
+def require_permission(permission: str):
+    """Decorator to require a specific permission for an endpoint."""
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # Extract authorization from kwargs or args
+            authorization = None
+            for arg_name, arg_value in list(kwargs.items()) + [(None, None)]:
+                if arg_name == "authorization":
+                    authorization = arg_value
+                    break
+
+            if not authorization or not authorization.startswith("Bearer "):
+                raise HTTPException(status_code=401, detail="Authentication required")
+
+            token = authorization.split(" ")[1]
+            payload = decode_token(token)
+            if not payload:
+                raise HTTPException(status_code=401, detail="Invalid or expired token")
+
+            user_id = int(payload["sub"])
+
+            # Verify session exists
+            conn = get_db_connection()
+            try:
+                cursor = conn.cursor()
+                row = cursor.execute(
+                    "SELECT user_id FROM user_sessions WHERE token_jti = ? AND expires_at > ?",
+                    (payload["jti"], datetime.now(timezone.utc).isoformat())
+                ).fetchone()
+                if not row:
+                    raise HTTPException(status_code=401, detail="Session expired")
+            finally:
+                conn.close()
+
+            # Check permission
+            if not RoleService.user_has_permission(user_id, permission):
+                raise HTTPException(status_code=403, detail=f"Insufficient permissions: {permission} required")
+
+            return await func(*args, **kwargs)
+        return wrapper
+    return decorator
 
 
 class RegisterRequest(BaseModel):
