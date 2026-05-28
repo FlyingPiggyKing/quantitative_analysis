@@ -115,6 +115,19 @@ export default function SubModuleTabs({
         {/* Tab Bar with horizontal scroll on mobile */}
         <div className="flex items-center border-b border-vt-ink-700 mb-4">
           <div className="flex flex-1 overflow-x-auto scrollbar-hide">
+            {analysisSubContent.renderNewsContent && (
+              <button
+                onClick={() => handleSubModuleChange("news")}
+                className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
+                  activeSubModule === "news" ? "vt-tab-active" : ""
+                }`}
+              >
+                盘 面 新 闻
+                {activeSubModule === "news" && (
+                  <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+                )}
+              </button>
+            )}
             {analysisSubContent.renderIndexMetricsContent && (
               <button
                 onClick={() => handleSubModuleChange("indexMetrics")}
@@ -150,19 +163,6 @@ export default function SubModuleTabs({
                 <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
               )}
             </button>
-            {analysisSubContent.renderNewsContent && (
-              <button
-                onClick={() => handleSubModuleChange("news")}
-                className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
-                  activeSubModule === "news" ? "vt-tab-active" : ""
-                }`}
-              >
-                盘 面 新 闻
-                {activeSubModule === "news" && (
-                  <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
-                )}
-              </button>
-            )}
           </div>
           {(dragonTigerDate || moneyFlowDate) && (
             <span className="vt-engraved text-xs mr-2 shrink-0">

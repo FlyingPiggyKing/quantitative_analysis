@@ -30,7 +30,7 @@ function HourlyNewsCard({ summary }: HourlyNewsCardProps) {
           {summary.hour} 新闻摘要
         </h3>
         <span className={`px-2 py-0.5 text-xs font-medium rounded ${getDirectionBg(direction)} ${getDirectionColor(direction)}`}>
-          {direction}
+          资金 -&gt; {direction}
         </span>
       </div>
 
