@@ -34,11 +34,11 @@ export default function ModuleTabs({
 
   return (
     <div className="vt-panel p-3 sm:p-4">
-      {/* Tab Bar */}
-      <div className="flex border-b border-vt-ink-700 mb-4">
+      {/* Tab Bar — horizontally scrollable, single-line labels */}
+      <div className="flex border-b border-vt-ink-700 mb-4 overflow-x-auto scrollbar-hide">
         <button
           onClick={() => handleModuleChange("watchlist")}
-          className={`vt-tab px-5 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] ${
+          className={`vt-tab px-4 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] whitespace-nowrap shrink-0 ${
             activeModule === "watchlist" ? "vt-tab-active vt-emboss" : ""
           }`}
         >
@@ -49,7 +49,7 @@ export default function ModuleTabs({
         </button>
         <button
           onClick={() => handleModuleChange("analysis")}
-          className={`vt-tab px-5 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] ${
+          className={`vt-tab px-4 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] whitespace-nowrap shrink-0 ${
             activeModule === "analysis" ? "vt-tab-active vt-emboss" : ""
           }`}
         >
@@ -61,7 +61,7 @@ export default function ModuleTabs({
         {adminContent && (
           <button
             onClick={() => handleModuleChange("admin")}
-            className={`vt-tab px-5 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] ${
+            className={`vt-tab px-4 sm:px-6 py-2.5 transition-colors relative text-lg sm:text-xl tracking-[0.24em] whitespace-nowrap shrink-0 ${
               activeModule === "admin" ? "vt-tab-active vt-emboss" : ""
             }`}
           >
