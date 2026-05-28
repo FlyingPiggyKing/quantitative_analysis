@@ -71,6 +71,43 @@ def init_db():
         conn.close()
 
 
+def init_hourly_news_db():
+    """Initialize the hourly_news table if it doesn't exist."""
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS hourly_news (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                hour_timestamp TEXT NOT NULL,
+                summary_json TEXT NOT NULL,
+                created_at REAL NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_hourly_news_timestamp
+            ON hourly_news(hour_timestamp DESC)
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def cleanup_old_hourly_news(max_age_days: int = 7):
+    """Delete hourly_news records older than max_age_days."""
+    import time
+    conn = get_db_connection()
+    try:
+        cutoff = time.time() - (max_age_days * 86400)
+        cursor = conn.cursor()
+        cursor.execute("DELETE FROM hourly_news WHERE created_at < ?", (cutoff,))
+        deleted = cursor.rowcount
+        conn.commit()
+        if deleted > 0:
+            logger.info(f"Cleaned up {deleted} old hourly_news records")
+    finally:
+        conn.close()
+
+
 class TrendPredictionService:
     """Service for trend prediction database operations."""
 

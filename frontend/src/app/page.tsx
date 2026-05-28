@@ -10,6 +10,7 @@ import { ASharePresetList, USPresetList, HKPresetList } from "@/components/Prese
 import DragonTigerList from "@/components/DragonTigerList";
 import SectorMoneyFlowSankey from "@/components/SectorMoneyFlowSankey";
 import IndexMetricsPanel from "@/components/IndexMetricsPanel";
+import HourlyNewsPanel from "@/components/HourlyNewsPanel";
 import AnalysisProgressBar from "@/components/AnalysisProgressBar";
 
 function GuestWatchlistHeader() {
@@ -30,7 +31,7 @@ const DISMISSED_STORAGE_KEY = "progress_bar_dismissed";
 
 type ModuleType = "watchlist" | "analysis";
 type MarketType = "A" | "US" | "HK";
-type AnalysisSubModuleType = "dragonTiger";
+type AnalysisSubModuleType = "dragonTiger" | "news";
 
 export default function Home() {
   const [symbol, setSymbol] = useState("");
@@ -51,7 +52,7 @@ export default function Home() {
     if (newModule === "watchlist") {
       setWatchlistMarket("A");
     } else {
-      setAnalysisSubModule("dragonTiger");
+      setAnalysisSubModule("news");
     }
     setActiveModule(newModule);
   };
@@ -240,6 +241,7 @@ export default function Home() {
                   ),
                   renderMoneyFlowContent: () => <SectorMoneyFlowSankey />,
                   renderIndexMetricsContent: () => <IndexMetricsPanel />,
+                  renderNewsContent: () => <HourlyNewsPanel />,
                 }}
               />
             }

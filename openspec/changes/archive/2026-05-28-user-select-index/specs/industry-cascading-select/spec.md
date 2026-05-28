@@ -46,6 +46,9 @@ The system SHALL provide an endpoint to fetch sub-industries for a given Level-1
 - **AND** each sub-industry has `ts_code` and `name` fields
 
 ### Requirement: Default to 行业汇总 on initial load
+The Level-2 dropdown SHALL default to "行业汇总" when the panel loads.
+
+#### Scenario: Initial load defaults Level-2 to 行业汇总
 - **WHEN** IndexMetricsPanel loads and Level-1 industry is auto-selected
 - **THEN** Level-2 defaults to "行业汇总"
 - **AND** metrics displayed are for the Level-1 industry (aggregated)

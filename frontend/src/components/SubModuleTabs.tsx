@@ -3,7 +3,7 @@
 import { useState, ReactNode, useEffect } from "react";
 
 type WatchlistSubModule = "A" | "US" | "HK";
-type AnalysisSubModule = "dragonTiger" | "moneyFlow" | "indexMetrics";
+type AnalysisSubModule = "dragonTiger" | "moneyFlow" | "indexMetrics" | "news";
 type SubModuleType = WatchlistSubModule | AnalysisSubModule;
 
 interface SubModuleTabsProps {
@@ -17,6 +17,7 @@ interface SubModuleTabsProps {
     renderDragonTigerContent: (onDateChange: (date: string) => void) => ReactNode;
     renderMoneyFlowContent: () => ReactNode;
     renderIndexMetricsContent?: () => ReactNode;
+    renderNewsContent?: () => ReactNode;
   };
   activeSubModule?: SubModuleType;
   onSubModuleChange?: (subModule: SubModuleType) => void;
@@ -30,7 +31,7 @@ export default function SubModuleTabs({
   onSubModuleChange,
 }: SubModuleTabsProps) {
   const getDefaultSubModule = (): SubModuleType => {
-    return activeModule === "watchlist" ? "A" : "indexMetrics";
+    return activeModule === "watchlist" ? "A" : "news";
   };
 
   const [internalActiveSubModule, setInternalActiveSubModule] = useState<SubModuleType>(getDefaultSubModule);
@@ -46,7 +47,7 @@ export default function SubModuleTabs({
 
   // When module changes, reset sub-module to default
   const handleModuleChange = (newModule: "watchlist" | "analysis") => {
-    const defaultSub = newModule === "watchlist" ? "A" : "indexMetrics";
+    const defaultSub = newModule === "watchlist" ? "A" : "news";
     setInternalActiveSubModule(defaultSub);
     if (onSubModuleChange) {
       onSubModuleChange(defaultSub);
@@ -149,6 +150,19 @@ export default function SubModuleTabs({
                 <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
               )}
             </button>
+            {analysisSubContent.renderNewsContent && (
+              <button
+                onClick={() => handleSubModuleChange("news")}
+                className={`vt-tab px-4 py-2 transition-colors relative text-base font-semibold whitespace-nowrap shrink-0 ${
+                  activeSubModule === "news" ? "vt-tab-active" : ""
+                }`}
+              >
+                盘 面 新 闻
+                {activeSubModule === "news" && (
+                  <span className="vt-tab-underline absolute bottom-0 left-0 right-0 h-[2px]" />
+                )}
+              </button>
+            )}
           </div>
           {(dragonTigerDate || moneyFlowDate) && (
             <span className="vt-engraved text-xs mr-2 shrink-0">
@@ -165,6 +179,8 @@ export default function SubModuleTabs({
             analysisSubContent.renderMoneyFlowContent()
           ) : activeSubModule === "indexMetrics" && analysisSubContent.renderIndexMetricsContent ? (
             analysisSubContent.renderIndexMetricsContent()
+          ) : activeSubModule === "news" && analysisSubContent.renderNewsContent ? (
+            analysisSubContent.renderNewsContent()
           ) : null}
         </div>
       </div>

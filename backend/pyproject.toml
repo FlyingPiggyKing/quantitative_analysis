@@ -23,6 +23,7 @@ dependencies = [
     "langchain-mcp-adapters>=0.2.2",
     "requests>=2.31.0",
     "futu-api>=10.4.6408",
+    "apscheduler>=3.10.0",
 ]
 
 [tool.uv]
