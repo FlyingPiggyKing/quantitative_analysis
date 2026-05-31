@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { fetchSectorMoneyFlow, SectorMoneyFlowResponse } from "@/services/sectorMoneyFlow";
+import SectorTopStocksPanel from "@/components/SectorTopStocksPanel";
 
 // Brass/parchment-aligned palette for sector colors (warm, vintage)
 const SECTOR_PALETTE = [
@@ -430,6 +431,16 @@ export default function SectorMoneyFlowSankey() {
           </button>
         </div>
       )}
+      {highlightedSector && data && (() => {
+        // Derive which dates this sector appears in from daily_top
+        const sectorDates = Object.entries(data.daily_top)
+          .filter(([, sectors]) => sectors.includes(highlightedSector))
+          .map(([date]) => date)
+          .sort()
+          .reverse();
+        if (sectorDates.length === 0) return null;
+        return <SectorTopStocksPanel sector={highlightedSector} dates={sectorDates} top_n={5} />;
+      })()}
       {legendItems.length > 0 && (
         <div className="flex flex-wrap justify-center gap-x-3 gap-y-2 mt-3 text-xs">
           {legendItems.map(({ sector, color, total }) => {

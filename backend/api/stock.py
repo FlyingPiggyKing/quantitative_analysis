@@ -99,6 +99,21 @@ async def get_batch_info(
     return {"results": results, "errors": errors}
 
 
+@router.get("/sector-top-stocks")
+async def get_sector_top_stocks(
+    sector: str = Query(..., description="Sector name (e.g. 白酒)"),
+    dates: str = Query(..., description="Comma-separated YYYY-MM-DD dates"),
+    top_n: int = Query(default=5, ge=1, le=20)
+):
+    """Get top N stocks by main-force net inflow for a sector on given dates.
+
+    Resolves the sector name to SW2021 index members, fetches per-stock money flow,
+    and returns the top N companies ranked by net inflow (亿元) per date.
+    """
+    date_list = [d.strip() for d in dates.split(",") if d.strip()]
+    return AShareService.get_sector_top_stocks(sector, date_list, top_n)
+
+
 @router.get("/dragon-tiger-list")
 async def get_dragon_tiger_list(days: int = Query(default=3, ge=1, le=10)):
     """Get Dragon Tiger List (机构龙虎榜) aggregated data.

@@ -109,6 +109,31 @@ _sector_mf_cache: Dict[str, Any] = {}
 _sector_mf_cache_time: float = 0
 _SECTOR_MF_CACHE_TTL: int = 300  # 5 minutes
 
+# SW2021 classification table cache - refreshed daily
+_sw_classify_cache: Dict[str, Any] = {}
+_sw_classify_cache_date: str = ""  # YYYYMMDD of last fetch
+
+# Index member cache - keyed by index_code, refreshed daily
+_index_member_cache: Dict[str, Any] = {}
+_index_member_cache_date: str = ""
+
+# Stock basic name cache - refreshed daily
+_stock_basic_name_cache: Dict[str, str] = {}  # ts_code -> name
+_stock_basic_name_cache_date: str = ""
+
+# Per-date moneyflow cache - keyed by trade_date (YYYYMMDD), long TTL for closed days
+_moneyflow_day_cache: Dict[str, Any] = {}  # trade_date -> {ts_code: net_inflow_yi}
+_moneyflow_day_cache_time: Dict[str, float] = {}
+_MONEYFLOW_DAY_CACHE_TTL_CLOSED: int = 86400  # 24 hours for closed days
+_MONEYFLOW_DAY_CACHE_TTL_TODAY: int = 300  # 5 minutes for today
+
+# Per-date stock basics cache - keyed by trade_date (YYYYMMDD), long TTL for closed days
+# Value: {ts_code: {pe_ttm, total_mv_yi}}
+_stock_basics_cache: Dict[str, Dict[str, Any]] = {}
+_stock_basics_cache_time: Dict[str, float] = {}
+_STOCK_BASICS_CACHE_TTL_CLOSED: int = 86400
+_STOCK_BASICS_CACHE_TTL_TODAY: int = 300
+
 
 def _get_cached_sector_mf(days: int, top_n: int, fetch_func) -> dict:
     """Get sector money flow from cache or fetch if expired."""
@@ -686,13 +711,27 @@ class AShareService:
                 logger.warning(f"[A股] Failed to fetch industry data: {e}")
                 aggregated['industry'] = ''
 
-            # Top 5 by cumulative net buy (descending)
-            net_buy_df = aggregated.nlargest(5, "net_amount")
-            net_buy = []
-            for _, row in net_buy_df.iterrows():
-                net_buy.append({
+            # Batch fetch valuation metrics for all unique ts_codes
+            all_ts_codes = aggregated['ts_code'].unique().tolist()
+            valuation_map = {}  # ts_code -> {pe_ttm, total_mv_yi}
+            if all_ts_codes:
+                val_result = AShareService.get_daily_basic_batch(all_ts_codes, days=1)
+                for val_item in val_result.get("results", []):
+                    sym = val_item.get("symbol", "")
+                    latest = val_item.get("latest")
+                    if latest:
+                        total_mv = latest.get("total_mv")
+                        pe_ttm = latest.get("pe_ttm")
+                        # total_mv in 万元 (Tushare convention), convert to 亿元 (/10000); null/0 market cap → null
+                        total_mv_yi = round(total_mv / 10000, 2) if total_mv and total_mv > 0 else None
+                        valuation_map[sym] = {"pe_ttm": pe_ttm, "total_mv_yi": total_mv_yi}
+
+            def make_item(row) -> dict:
+                ts = row.get("ts_code", "")
+                val = valuation_map.get(ts, {})
+                return {
                     "trade_date": str(row.get("query_date", "")),
-                    "ts_code": row.get("ts_code", ""),
+                    "ts_code": ts,
                     "name": row.get("name", ""),
                     "industry": row.get("industry", ""),
                     "close": row.get("close"),
@@ -700,23 +739,17 @@ class AShareService:
                     "net_amount": row.get("net_amount"),
                     "reason": row.get("reason", ""),
                     "appear_count": int(row.get("appear_count", 1)),
-                })
+                    "pe_ttm": val.get("pe_ttm"),
+                    "total_mv_yi": val.get("total_mv_yi"),
+                }
+
+            # Top 5 by cumulative net buy (descending)
+            net_buy_df = aggregated.nlargest(5, "net_amount")
+            net_buy = [make_item(row) for _, row in net_buy_df.iterrows()]
 
             # Top 5 by cumulative net sell (ascending - most negative first)
             net_sell_df = aggregated.nsmallest(5, "net_amount")
-            net_sell = []
-            for _, row in net_sell_df.iterrows():
-                net_sell.append({
-                    "trade_date": str(row.get("query_date", "")),
-                    "ts_code": row.get("ts_code", ""),
-                    "name": row.get("name", ""),
-                    "industry": row.get("industry", ""),
-                    "close": row.get("close"),
-                    "pct_change": row.get("pct_change"),
-                    "net_amount": row.get("net_amount"),
-                    "reason": row.get("reason", ""),
-                    "appear_count": int(row.get("appear_count", 1)),
-                })
+            net_sell = [make_item(row) for _, row in net_sell_df.iterrows()]
 
             logger.info(f"[A股] DragonTigerList: net_buy={len(net_buy)}, net_sell={len(net_sell)}")
 
@@ -855,6 +888,314 @@ class AShareService:
         except Exception as e:
             logger.error(f"[A股] {symbol} financial fundamentals error: {e}")
             return {"symbol": symbol, "error": str(e), "data": None}
+
+    # ---------- SW2021 sector-to-stocks helpers ----------
+
+    @staticmethod
+    def _get_sw_classify() -> Dict[str, Any]:
+        """Fetch and cache the full SW2021 index_classify table (L1+L2+L3) once per day."""
+        global _sw_classify_cache, _sw_classify_cache_date
+        today = datetime.now().strftime("%Y%m%d")
+        if _sw_classify_cache and _sw_classify_cache_date == today:
+            return _sw_classify_cache
+        try:
+            pro = ts.pro_api()
+            # Fetch all three levels
+            df = pro.index_classify(src='SW2021')
+            if df is None or df.empty:
+                return {}
+            # Build: index_code -> {name, level, ...}
+            by_code: Dict[str, Any] = {}
+            for _, row in df.iterrows():
+                code = str(row.get("index_code", ""))
+                if code:
+                    by_code[code] = {
+                        "index_code": code,
+                        "name": str(row.get("industry_name", "")),
+                        "level": str(row.get("level", "")),
+                        "industry_code": str(row.get("industry_code", "")),
+                        "src": str(row.get("src", "")),
+                    }
+            _sw_classify_cache = by_code
+            _sw_classify_cache_date = today
+            logger.info(f"[A股] SW2021 classify cached: {len(by_code)} entries")
+            return by_code
+        except Exception as e:
+            logger.error(f"[A股] _get_sw_classify error: {e}")
+            return _sw_classify_cache if _sw_classify_cache else {}
+
+    @staticmethod
+    def _resolve_sector_to_sw(name: str) -> tuple:
+        """Resolve a DC sector name to an SW2021 index_code.
+
+        Normalizes the name (trim whitespace, strip trailing roman numerals using
+        the existing regex pattern) and matches against SW2021:
+        1. Exact normalized match
+        2. L2 normalized match
+        3. Substring containment
+
+        Returns (index_code, matched_name) or (None, None) on no match.
+        """
+        import re
+        roman_pattern = r'[IVXⅰⅱⅲⅳⅴⅵⅷⅸⅹⅠ-Ⅿ]+$'
+        normalized = re.sub(roman_pattern, '', name.strip())
+
+        sw_table = AShareService._get_sw_classify()
+        if not sw_table:
+            return None, None
+
+        # Strategy 1: exact normalized match at any level
+        for code, info in sw_table.items():
+            sw_norm = re.sub(roman_pattern, '', info["name"].strip())
+            if sw_norm == normalized:
+                return code, info["name"]
+
+        # Strategy 2: L2 exact normalized match
+        l2_matches = [
+            (code, info["name"]) for code, info in sw_table.items()
+            if info["level"] == "L2" and re.sub(roman_pattern, '', info["name"].strip()) == normalized
+        ]
+        if len(l2_matches) == 1:
+            return l2_matches[0]
+        if len(l2_matches) > 1:
+            # Prefer exact string match over substring
+            exact = [m for m in l2_matches if m[1] == normalized]
+            if exact:
+                return exact[0]
+
+        # Strategy 3: substring containment
+        substring_matches = [
+            (code, info["name"]) for code, info in sw_table.items()
+            if normalized in re.sub(roman_pattern, '', info["name"].strip())
+        ]
+        if len(substring_matches) == 1:
+            return substring_matches[0]
+        if len(substring_matches) > 1:
+            # Prefer L2
+            l2 = [m for m in substring_matches if sw_table[m[0]]["level"] == "L2"]
+            if len(l2) == 1:
+                return l2[0]
+
+        return None, None
+
+    @staticmethod
+    def _get_index_members(index_code: str) -> list:
+        """Fetch and cache member ts_code list for an SW2021 index via index_member."""
+        global _index_member_cache, _index_member_cache_date
+        today = datetime.now().strftime("%Y%m%d")
+        if index_code in _index_member_cache and _index_member_cache_date == today:
+            return _index_member_cache[index_code]
+        try:
+            pro = ts.pro_api()
+            df = pro.index_member(index_code=index_code)
+            if df is None or df.empty:
+                members = []
+            else:
+                members = df["con_code"].tolist()
+            if _index_member_cache_date != today:
+                _index_member_cache = {}
+                _index_member_cache_date = today
+            _index_member_cache[index_code] = members
+            logger.info(f"[A股] index_member {index_code}: {len(members)} members cached")
+            return members
+        except Exception as e:
+            logger.error(f"[A股] _get_index_members error for {index_code}: {e}")
+            return _index_member_cache.get(index_code, [])
+
+    @staticmethod
+    def _get_moneyflow_day(trade_date: str) -> dict:
+        """Fetch full moneyflow table for a date and return {ts_code: net_inflow_yi}.
+
+        net_inflow = ((buy_elg_amount - sell_elg_amount) + (buy_lg_amount - sell_lg_amount)) / 10000
+        Detects Tushare permission/rate-limit errors and propagates a clear error.
+        """
+        global _moneyflow_day_cache, _moneyflow_day_cache_time
+        today = datetime.now().strftime("%Y%m%d")
+        is_today = (trade_date == today)
+
+        # Check cache
+        if trade_date in _moneyflow_day_cache:
+            cached_time = _moneyflow_day_cache_time.get(trade_date, 0)
+            ttl = _MONEYFLOW_DAY_CACHE_TTL_TODAY if is_today else _MONEYFLOW_DAY_CACHE_TTL_CLOSED
+            if time.time() - cached_time < ttl:
+                return _moneyflow_day_cache[trade_date]
+
+        try:
+            pro = ts.pro_api()
+            df = pro.moneyflow(trade_date=trade_date, fields='ts_code,buy_elg_amount,sell_elg_amount,buy_lg_amount,sell_lg_amount,net_mf_amount')
+            if df is None or df.empty:
+                result = {}
+            else:
+                result = {}
+                for _, row in df.iterrows():
+                    ts_code = str(row.get("ts_code", ""))
+                    buy_elg = float(row.get("buy_elg_amount", 0) or 0)
+                    sell_elg = float(row.get("sell_elg_amount", 0) or 0)
+                    buy_lg = float(row.get("buy_lg_amount", 0) or 0)
+                    sell_lg = float(row.get("sell_lg_amount", 0) or 0)
+                    net_inflow_yi = ((buy_elg - sell_elg) + (buy_lg - sell_lg)) / 10000
+                    result[ts_code] = net_inflow_yi
+            _moneyflow_day_cache[trade_date] = result
+            _moneyflow_day_cache_time[trade_date] = time.time()
+            logger.info(f"[A股] moneyflow {trade_date}: {len(result)} stocks cached")
+            return result
+        except Exception as e:
+            err_str = str(e)
+            if "权限" in err_str or "每分钟" in err_str or "Connection" in err_str:
+                logger.warning(f"[A股] moneyflow {trade_date} permission/rate-limit error: {err_str[:80]}")
+                return {"__error__": f"Tushare权限或速率限制: {err_str[:100]}"}
+            logger.error(f"[A股] _get_moneyflow_day error for {trade_date}: {e}")
+            return {"__error__": str(e)}
+
+    @staticmethod
+    def _get_stock_names(ts_codes: list) -> dict:
+        """Resolve a list of ts_codes to company names via cached stock_basic."""
+        global _stock_basic_name_cache, _stock_basic_name_cache_date
+        today = datetime.now().strftime("%Y%m%d")
+
+        # Return cached subset
+        if _stock_basic_name_cache and _stock_basic_name_cache_date == today:
+            return {code: _stock_basic_name_cache.get(code, code) for code in ts_codes}
+
+        try:
+            pro = ts.pro_api()
+            df = pro.stock_basic(exchange='', list_status='L', fields='ts_code,name')
+            if df is not None and not df.empty:
+                if _stock_basic_name_cache_date != today:
+                    _stock_basic_name_cache.clear()
+                    _stock_basic_name_cache_date = today
+                for _, row in df.iterrows():
+                    _stock_basic_name_cache[str(row["ts_code"])] = str(row["name"])
+                logger.info(f"[A股] stock_basic name cache: {len(_stock_basic_name_cache)} entries")
+        except Exception as e:
+            logger.error(f"[A股] _get_stock_names error: {e}")
+
+        return {code: _stock_basic_name_cache.get(code, code) for code in ts_codes}
+
+    @staticmethod
+    def _get_stock_basics(trade_date: str) -> dict:
+        """Fetch daily_basic for all stocks on a given trade date and return {ts_code: {pe_ttm, total_mv_yi}}.
+
+        Caches per date with long TTL for closed days.
+        total_mv is in 元; divide by 1e4 to get 市值 in 万亿 (displayed as e.g. "1.29万亿").
+        """
+        global _stock_basics_cache, _stock_basics_cache_time
+        today = datetime.now().strftime("%Y%m%d")
+        is_today = (trade_date == today)
+        ttl = _STOCK_BASICS_CACHE_TTL_TODAY if is_today else _STOCK_BASICS_CACHE_TTL_CLOSED
+
+        if trade_date in _stock_basics_cache:
+            if time.time() - _stock_basics_cache_time.get(trade_date, 0) < ttl:
+                return _stock_basics_cache[trade_date]
+
+        try:
+            pro = ts.pro_api()
+            # Fetch all stocks' daily_basic for this date
+            df = pro.daily_basic(trade_date=trade_date, fields='ts_code,pe_ttm,total_mv')
+            if df is None or df.empty:
+                result = {}
+            else:
+                result = {}
+                for _, row in df.iterrows():
+                    ts_code = str(row.get("ts_code", ""))
+                    pe_ttm = float(row["pe_ttm"]) if pd.notna(row.get("pe_ttm")) else None
+                    total_mv_yi = float(row["total_mv"]) / 1e8 if pd.notna(row.get("total_mv")) else None
+                    # total_mv is in 元; display as 万亿 (divide by 1e4) or 亿 (divide by 1e8)
+                    # 1.29万亿 = 1.29×10¹² 元 → /1e4 = 12930.66亿 → display as "1.29万亿"
+                    total_mv_yi = float(row["total_mv"]) / 1e4 if pd.notna(row.get("total_mv")) else None
+                    result[ts_code] = {"pe_ttm": pe_ttm, "total_mv_yi": total_mv_yi}
+            _stock_basics_cache[trade_date] = result
+            _stock_basics_cache_time[trade_date] = time.time()
+            logger.info(f"[A股] daily_basic {trade_date}: {len(result)} stocks cached")
+            return result
+        except Exception as e:
+            err_str = str(e)
+            if "权限" in err_str or "每分钟" in err_str or "Connection" in err_str:
+                logger.warning(f"[A股] daily_basic {trade_date} permission/rate-limit: {err_str[:80]}")
+                return {"__error__": f"Tushare权限或速率限制: {err_str[:100]}"}
+            logger.error(f"[A股] _get_stock_basics error for {trade_date}: {e}")
+            return {"__error__": str(e)}
+
+    @staticmethod
+    def get_sector_top_stocks(sector: str, dates: List[str], top_n: int = 5) -> dict:
+        """Get top N stocks by main-force net inflow for a sector on given dates.
+
+        Resolves sector name to SW2021 index, fetches members, ranks per date.
+        Returns {sector, index_code, matched_name, by_date, error}.
+        """
+        # Step 1: resolve sector -> SW2021 index_code
+        index_code, matched_name = AShareService._resolve_sector_to_sw(sector)
+        if not index_code:
+            return {
+                "sector": sector,
+                "index_code": None,
+                "matched_name": None,
+                "by_date": {},
+                "error": "无法匹配到申万行业成分股",
+            }
+
+        # Step 2: get members
+        members = AShareService._get_index_members(index_code)
+        if not members:
+            return {
+                "sector": sector,
+                "index_code": index_code,
+                "matched_name": matched_name,
+                "by_date": {},
+                "error": f"指数 {index_code} 无成分股",
+            }
+
+        member_set = set(members)
+
+        # Step 3: for each date, rank members by net inflow
+        by_date: Dict[str, list] = {}
+        for date_str in dates:
+            # Accept YYYY-MM-DD or YYYYMMDD
+            trade_date = date_str.replace("-", "")
+            mf_map = AShareService._get_moneyflow_day(trade_date)
+
+            if "__error__" in mf_map:
+                return {
+                    "sector": sector,
+                    "index_code": index_code,
+                    "matched_name": matched_name,
+                    "by_date": {},
+                    "error": mf_map["__error__"],
+                }
+
+            # Filter to members and build ranked list
+            ranked = []
+            for ts_code, net_inflow_yi in mf_map.items():
+                if ts_code in member_set:
+                    ranked.append((ts_code, net_inflow_yi))
+
+            # Sort by net_inflow descending (top_n regardless of sign)
+            ranked.sort(key=lambda x: x[1], reverse=True)
+            top_stocks = ranked[:top_n]
+
+            # Resolve names and basics
+            ts_codes_needed = [r[0] for r in top_stocks]
+            names = AShareService._get_stock_names(ts_codes_needed)
+            basics = AShareService._get_stock_basics(trade_date)
+
+            by_date[date_str] = [
+                {
+                    "ts_code": ts_code,
+                    "name": names.get(ts_code, ts_code),
+                    "net_inflow": round(ni, 2),
+                    "pe_ttm": basics.get(ts_code, {}).get("pe_ttm"),
+                    "total_mv_yi": basics.get(ts_code, {}).get("total_mv_yi"),
+                }
+                for ts_code, ni in top_stocks
+            ]
+
+        return {
+            "sector": sector,
+            "index_code": index_code,
+            "matched_name": matched_name,
+            "by_date": by_date,
+            "error": None,
+        }
 
 
 class USStockService:
