@@ -136,6 +136,38 @@ def cleanup_old_hourly_news(max_age_days: int = 7):
         conn.close()
 
 
+# Keys stored inside the `extended_analysis` JSON blob: the regular trend
+# analysis fields plus the six-dimensional institutional (龙虎榜) fields.
+# Single source of truth so every read/write path stays in sync — history:
+# get_today_prediction once dropped the first three here, which silently hid
+# the full analysis on the stock page (only "分析摘要" rendered).
+EXTENDED_ANALYSIS_KEYS = (
+    # Regular stock trend analysis
+    "情绪分析", "技术分析", "趋势判断",
+    # Six-dimensional institutional analysis
+    "宏观产业周期", "板块行业景气", "公司基本面质变",
+    "资金筹码结构", "技术形态量价", "波段操作执行", "综合判断",
+)
+
+
+def _hydrate_extended_fields(result: dict, extended) -> None:
+    """Copy extended-analysis fields into `result`.
+
+    `extended` may be the raw JSON string from the DB or an already-parsed
+    dict (as built in save_prediction). Missing or malformed data is ignored.
+    """
+    if not extended:
+        return
+    if isinstance(extended, str):
+        import json
+        try:
+            extended = json.loads(extended)
+        except (json.JSONDecodeError, ValueError):
+            return
+    for key in EXTENDED_ANALYSIS_KEYS:
+        result[key] = extended.get(key)
+
+
 class TrendPredictionService:
     """Service for trend prediction database operations."""
 
@@ -204,18 +236,7 @@ class TrendPredictionService:
                 "analyzed_at": analyzed_at,
             }
             if extended_analysis:
-                # Old format fields (for backward compatibility)
-                result["情绪分析"] = extended_analysis.get("情绪分析")
-                result["技术分析"] = extended_analysis.get("技术分析")
-                result["趋势判断"] = extended_analysis.get("趋势判断")
-                # Six-dimensional fields
-                result["宏观产业周期"] = extended_analysis.get("宏观产业周期")
-                result["板块行业景气"] = extended_analysis.get("板块行业景气")
-                result["公司基本面质变"] = extended_analysis.get("公司基本面质变")
-                result["资金筹码结构"] = extended_analysis.get("资金筹码结构")
-                result["技术形态量价"] = extended_analysis.get("技术形态量价")
-                result["波段操作执行"] = extended_analysis.get("波段操作执行")
-                result["综合判断"] = extended_analysis.get("综合判断")
+                _hydrate_extended_fields(result, extended_analysis)
             return result
         finally:
             conn.close()
@@ -223,7 +244,6 @@ class TrendPredictionService:
     @staticmethod
     def get_latest_prediction(symbol: str, source: str = "trend") -> Optional[dict]:
         """Get the latest prediction for a specific stock symbol and source."""
-        import json as json_lib
         init_db()
         conn = get_db_connection()
         try:
@@ -246,23 +266,7 @@ class TrendPredictionService:
                     "summary": row["summary"],
                     "analyzed_at": row["analyzed_at"],
                 }
-                if row["extended_analysis"]:
-                    try:
-                        extended = json_lib.loads(row["extended_analysis"])
-                        # Old format fields (for regular stock analysis)
-                        result["情绪分析"] = extended.get("情绪分析")
-                        result["技术分析"] = extended.get("技术分析")
-                        result["趋势判断"] = extended.get("趋势判断")
-                        # Six-dimensional fields (for institutional analysis)
-                        result["宏观产业周期"] = extended.get("宏观产业周期")
-                        result["板块行业景气"] = extended.get("板块行业景气")
-                        result["公司基本面质变"] = extended.get("公司基本面质变")
-                        result["资金筹码结构"] = extended.get("资金筹码结构")
-                        result["技术形态量价"] = extended.get("技术形态量价")
-                        result["波段操作执行"] = extended.get("波段操作执行")
-                        result["综合判断"] = extended.get("综合判断")
-                    except (json_lib.JSONDecodeError, ValueError):
-                        pass
+                _hydrate_extended_fields(result, row["extended_analysis"])
                 return result
             return None
         finally:
@@ -271,7 +275,6 @@ class TrendPredictionService:
     @staticmethod
     def get_all_latest_predictions() -> List[dict]:
         """Get the latest prediction for each stock that has been analyzed."""
-        import json as json_lib
         init_db()
         conn = get_db_connection()
         try:
@@ -299,23 +302,7 @@ class TrendPredictionService:
                     "summary": row["summary"],
                     "analyzed_at": row["analyzed_at"],
                 }
-                if row["extended_analysis"]:
-                    try:
-                        extended = json_lib.loads(row["extended_analysis"])
-                        # Old format fields (for regular stock analysis)
-                        result["情绪分析"] = extended.get("情绪分析")
-                        result["技术分析"] = extended.get("技术分析")
-                        result["趋势判断"] = extended.get("趋势判断")
-                        # Six-dimensional fields (for institutional analysis)
-                        result["宏观产业周期"] = extended.get("宏观产业周期")
-                        result["板块行业景气"] = extended.get("板块行业景气")
-                        result["公司基本面质变"] = extended.get("公司基本面质变")
-                        result["资金筹码结构"] = extended.get("资金筹码结构")
-                        result["技术形态量价"] = extended.get("技术形态量价")
-                        result["波段操作执行"] = extended.get("波段操作执行")
-                        result["综合判断"] = extended.get("综合判断")
-                    except (json_lib.JSONDecodeError, ValueError):
-                        pass
+                _hydrate_extended_fields(result, row["extended_analysis"])
                 results.append(result)
             return results
         finally:
@@ -328,7 +315,6 @@ class TrendPredictionService:
         Returns None if no prediction exists for today or if the existing prediction
         has confidence = 0 (failed analysis).
         """
-        import json as json_lib
         init_db()
         conn = get_db_connection()
         try:
@@ -352,18 +338,7 @@ class TrendPredictionService:
                     "summary": row["summary"],
                     "analyzed_at": row["analyzed_at"],
                 }
-                if row["extended_analysis"]:
-                    try:
-                        extended = json_lib.loads(row["extended_analysis"])
-                        result["宏观产业周期"] = extended.get("宏观产业周期")
-                        result["板块行业景气"] = extended.get("板块行业景气")
-                        result["公司基本面质变"] = extended.get("公司基本面质变")
-                        result["资金筹码结构"] = extended.get("资金筹码结构")
-                        result["技术形态量价"] = extended.get("技术形态量价")
-                        result["波段操作执行"] = extended.get("波段操作执行")
-                        result["综合判断"] = extended.get("综合判断")
-                    except (json_lib.JSONDecodeError, ValueError):
-                        pass
+                _hydrate_extended_fields(result, row["extended_analysis"])
                 return result
             return None
         finally:
@@ -372,7 +347,6 @@ class TrendPredictionService:
     @staticmethod
     def get_predictions_by_symbol(symbol: str, limit: int = 7) -> List[dict]:
         """Get recent predictions for a stock (for history/trends)."""
-        import json as json_lib
         init_db()
         conn = get_db_connection()
         try:
@@ -396,23 +370,7 @@ class TrendPredictionService:
                     "summary": row["summary"],
                     "analyzed_at": row["analyzed_at"],
                 }
-                if row["extended_analysis"]:
-                    try:
-                        extended = json_lib.loads(row["extended_analysis"])
-                        # Old format fields (for regular stock analysis)
-                        result["情绪分析"] = extended.get("情绪分析")
-                        result["技术分析"] = extended.get("技术分析")
-                        result["趋势判断"] = extended.get("趋势判断")
-                        # Six-dimensional fields (for institutional analysis)
-                        result["宏观产业周期"] = extended.get("宏观产业周期")
-                        result["板块行业景气"] = extended.get("板块行业景气")
-                        result["公司基本面质变"] = extended.get("公司基本面质变")
-                        result["资金筹码结构"] = extended.get("资金筹码结构")
-                        result["技术形态量价"] = extended.get("技术形态量价")
-                        result["波段操作执行"] = extended.get("波段操作执行")
-                        result["综合判断"] = extended.get("综合判断")
-                    except (json_lib.JSONDecodeError, ValueError):
-                        pass
+                _hydrate_extended_fields(result, row["extended_analysis"])
                 results.append(result)
             return results
         finally:
