@@ -92,6 +92,34 @@ def init_hourly_news_db():
         conn.close()
 
 
+def init_trend_runs_db():
+    """Initialize the trend_runs table if it doesn't exist."""
+    conn = get_db_connection()
+    try:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trend_runs (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_date TEXT NOT NULL,
+                trigger_type TEXT NOT NULL,
+                status TEXT NOT NULL,
+                total_stocks INTEGER NOT NULL DEFAULT 0,
+                batch_count INTEGER NOT NULL DEFAULT 4,
+                current_batch INTEGER NOT NULL DEFAULT 0,
+                batch_total INTEGER NOT NULL DEFAULT 0,
+                batch_completed INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        conn.execute("""
+            CREATE INDEX IF NOT EXISTS idx_trend_runs_run_date
+            ON trend_runs(run_date DESC)
+        """)
+        conn.commit()
+    finally:
+        conn.close()
+
+
 def cleanup_old_hourly_news(max_age_days: int = 7):
     """Delete hourly_news records older than max_age_days."""
     import time

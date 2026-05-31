@@ -24,7 +24,7 @@ function GuestWatchlistHeader() {
     </div>
   );
 }
-import { getTaskStatus, runBatchAnalysisAsync, TaskStatusResponse } from "@/services/trendPrediction";
+import { getTaskStatus, TaskStatusResponse } from "@/services/trendPrediction";
 import { useAuth, useSystemAdminAccess } from "@/services/auth";
 
 const TASK_ID_STORAGE_KEY = "active_analysis_task_id";
@@ -58,9 +58,6 @@ export default function Home() {
     setActiveModule(newModule);
   };
 
-  const isAnalyzing = activeTaskId !== null &&
-    taskProgress !== null &&
-    (taskProgress.status === "pending" || taskProgress.status === "running");
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const { hasAccess: hasAdminAccess } = useSystemAdminAccess();
@@ -138,18 +135,6 @@ export default function Home() {
     setIsDismissed(false);
   }, []);
 
-  const handleTrendAnalysis = useCallback(async () => {
-    try {
-      const result = await runBatchAnalysisAsync();
-      if (result.task_id) {
-        setActiveTaskId(result.task_id);
-        setIsDismissed(false);
-      }
-    } catch (err) {
-      console.error("Failed to start trend analysis:", err);
-    }
-  }, []);
-
   // Show loading state
   if (isLoading) {
     return (
@@ -194,25 +179,12 @@ export default function Home() {
             />
           </div>
 
-          <div className={user ? "flex gap-3" : ""}>
-            <button
-              type="submit"
-              className={`vt-btn-primary px-4 py-3 text-base min-h-[44px] ${user ? "flex-1" : "w-full"}`}
-            >
-              查 询
-            </button>
-
-            {user && (
-              <button
-                type="button"
-                onClick={handleTrendAnalysis}
-                disabled={isAnalyzing}
-                className="vt-btn-oxblood flex-1 px-4 py-3 text-base min-h-[44px]"
-              >
-                {isAnalyzing ? "分 析 中 …" : "趋 势 分 析"}
-              </button>
-            )}
-          </div>
+          <button
+            type="submit"
+            className="vt-btn-primary w-full px-4 py-3 text-base min-h-[44px]"
+          >
+            查 询
+          </button>
         </form>
 
         <div className="mb-8">

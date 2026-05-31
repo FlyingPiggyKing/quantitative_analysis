@@ -38,15 +38,25 @@ app.include_router(admin.router)
 
 
 def start_scheduler():
-    """Start the background scheduler for hourly news analysis."""
-    from backend.services.trend_prediction_service import init_hourly_news_db, cleanup_old_hourly_news
+    """Start the background scheduler for hourly news and daily trend analysis."""
+    from backend.services.trend_prediction_service import (
+        init_hourly_news_db,
+        cleanup_old_hourly_news,
+        init_trend_runs_db,
+    )
+    from backend.services.trend_run_service import mark_stale_runs_interrupted
     from backend.services.news_analysis_task_queue import run_hourly_news_analysis
+    from backend.services import trend_run_queue
 
     # Initialize hourly_news database table
     init_hourly_news_db()
 
     # Cleanup old news on startup
     cleanup_old_hourly_news(max_age_days=7)
+
+    # Initialize trend_runs table and reconcile any stale runs from a prior process
+    init_trend_runs_db()
+    mark_stale_runs_interrupted()
 
     scheduler = BackgroundScheduler()
 
@@ -62,8 +72,22 @@ def start_scheduler():
         replace_existing=True,
     )
 
+    # Daily weekday trend analysis: start a run at 17:00 Mon-Fri (batches 2-4 are
+    # scheduled dynamically by start_run at +5h/+10h/+15h).
+    trend_run_queue.set_scheduler(scheduler)
+    scheduler.add_job(
+        trend_run_queue.run_scheduled_trend_analysis,
+        'cron',
+        day_of_week='mon-fri',
+        hour=17,
+        minute=0,
+        id='daily_trend_analysis',
+        name='Daily Trend Analysis',
+        replace_existing=True,
+    )
+
     scheduler.start()
-    print("[Scheduler] Hourly news analysis scheduler started")
+    print("[Scheduler] Hourly news + daily trend analysis scheduler started")
     return scheduler
 
 
