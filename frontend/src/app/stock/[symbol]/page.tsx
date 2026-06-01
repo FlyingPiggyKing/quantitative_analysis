@@ -6,6 +6,8 @@ import Link from "next/link";
 import StockChart from "@/components/StockChart";
 import IndicatorPanel from "@/components/IndicatorPanel";
 import FinancialIndicatorsPanel from "@/components/FinancialIndicatorsPanel";
+import CompanyInfoPanel from "@/components/CompanyInfoPanel";
+import MainBusinessPanel from "@/components/MainBusinessPanel";
 import TrendAnalysisPanel from "@/components/TrendAnalysisPanel";
 import PETrendSparkline from "@/components/PETrendSparkline";
 import MoneyFlowSparkline from "@/components/MoneyFlowSparkline";
@@ -13,6 +15,8 @@ import AuthModal from "@/components/AuthModal";
 import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/watchlist";
 import { getTrendPrediction, TrendPrediction, runForcedSingleAnalysis, runForcedSingleAnalysisAsync, pollTaskStatus, getCooldownEndTime, setCooldownEndTime, clearCooldownEndTime } from "@/services/trendPrediction";
 import { fetchStockValuation, ValuationRecord } from "@/services/stock";
+import { getCompanyInfo, CompanyInfo } from "@/services/companyInfo";
+import { getMainBusiness, getMainBusinessHistory, MainBusinessResponse, MainBusinessHistoryResponse } from "@/services/mainBusiness";
 import { useAuth } from "@/services/auth";
 
 interface StockInfo {
@@ -83,6 +87,19 @@ export default function StockDetailPage() {
   const [authModalMessage, setAuthModalMessage] = useState("");
   const [fundamentals, setFundamentals] = useState<{ data: Record<string, unknown> | null; error: string | null } | null>(null);
   const [fundamentalsLoading, setFundamentalsLoading] = useState(false);
+  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [companyInfoLoading, setCompanyInfoLoading] = useState(false);
+  const [companyInfoError, setCompanyInfoError] = useState<string | null>(null);
+
+  // Main business composition: 4 parallel data sources (P, D, I, history) — each with its own
+  // loading state so the section skeletons render independently.
+  const [mainBizProduct, setMainBizProduct] = useState<MainBusinessResponse | null>(null);
+  const [mainBizRegion, setMainBizRegion] = useState<MainBusinessResponse | null>(null);
+  const [mainBizIndustry, setMainBizIndustry] = useState<MainBusinessResponse | null>(null);
+  const [mainBizHistory, setMainBizHistory] = useState<MainBusinessHistoryResponse | null>(null);
+  const [mainBizLoading, setMainBizLoading] = useState({ p: false, d: false, i: false, h: false });
+  const [mainBizError, setMainBizError] = useState<string | null>(null);
+  const [hasDistinctIndustry, setHasDistinctIndustry] = useState(false);
 
   // Allow guest access - no redirect to login
 
@@ -196,6 +213,86 @@ export default function StockDetailPage() {
 
     fetchFundamentals();
   }, [symbol]);
+
+  // Fetch company basic info (A-share only, non-blocking)
+  useEffect(() => {
+    if (!symbol) return;
+    if (!/^\d{6}$/.test(symbol)) return;
+
+    const fetchCompany = async () => {
+      setCompanyInfoLoading(true);
+      setCompanyInfoError(null);
+      try {
+        const res = await getCompanyInfo(symbol);
+        if (res.error) {
+          setCompanyInfo(null);
+          setCompanyInfoError(res.error);
+        } else {
+          setCompanyInfo(res.data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch company info:", err);
+        setCompanyInfo(null);
+        setCompanyInfoError("数据加载失败");
+      } finally {
+        setCompanyInfoLoading(false);
+      }
+    };
+
+    fetchCompany();
+  }, [symbol]);
+
+  // Fetch main business composition (A-share only, non-blocking).
+  // 4 parallel calls (P / D / I / history); each with its own loading state.
+  useEffect(() => {
+    if (!symbol) return;
+    if (!/^\d{6}$/.test(symbol)) return;
+
+    let cancelled = false;
+    setMainBizError(null);
+    setMainBizProduct(null);
+    setMainBizRegion(null);
+    setMainBizIndustry(null);
+    setMainBizHistory(null);
+    setHasDistinctIndustry(false);
+
+    const fetchOne = async <T,>(
+      type: "p" | "d" | "i" | "h",
+      fn: () => Promise<T>,
+      setter: (v: T) => void,
+    ) => {
+      setMainBizLoading((s) => ({ ...s, [type]: true }));
+      try {
+        const data = await fn();
+        if (!cancelled) setter(data);
+      } catch (err) {
+        console.error(`[MainBiz] ${type} fetch failed:`, err);
+        if (!cancelled && type === "p") {
+          // Surface a single error on the panel; the rest stay null and render skeletons.
+          setMainBizError("数据加载失败，请稍后重试");
+        }
+      } finally {
+        if (!cancelled) setMainBizLoading((s) => ({ ...s, [type]: false }));
+      }
+    };
+
+    fetchOne("p", () => getMainBusiness(symbol, "P"), setMainBizProduct);
+    fetchOne("d", () => getMainBusiness(symbol, "D"), setMainBizRegion);
+    fetchOne("i", () => getMainBusiness(symbol, "I"), setMainBizIndustry);
+    fetchOne("h", () => getMainBusinessHistory(symbol, "P", 3), setMainBizHistory);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [symbol]);
+
+  // Compute hasDistinctIndustry client-side: true if any I row's item is not in P.
+  useEffect(() => {
+    if (!mainBizProduct || !mainBizIndustry) return;
+    const productItems = new Set(mainBizProduct.rows.map((r) => r.item));
+    const industryItems = new Set(mainBizIndustry.rows.map((r) => r.item));
+    setHasDistinctIndustry(industryItems.size > 0 && ![...industryItems].every((i) => productItems.has(i)));
+  }, [mainBizProduct, mainBizIndustry]);
 
   // Fetch existing trend prediction (non-force, just to display cached data)
   useEffect(() => {
@@ -636,43 +733,62 @@ export default function StockDetailPage() {
           </section>
         )}
 
-        {/* Data Table */}
-        {klineData.length > 0 && (
-          <section className="vt-panel p-3 sm:p-4">
-            <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
-              <span className="text-vt-brass-400">❖</span> 近 期 行 情
-            </h2>
-            <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-              <table className="w-full text-sm min-w-[600px] sm:min-w-0">
-                <thead>
-                  <tr className="border-b border-vt-ink-700">
-                    <th className="text-left py-2 px-3 vt-tab text-xs">日期</th>
-                    <th className="text-right py-2 px-3 vt-tab text-xs">开盘</th>
-                    <th className="text-right py-2 px-3 vt-tab text-xs">收盘</th>
-                    <th className="text-right py-2 px-3 vt-tab text-xs">最高</th>
-                    <th className="text-right py-2 px-3 vt-tab text-xs">最低</th>
-                    <th className="text-right py-2 px-3 vt-tab text-xs">成交量</th>
-                    <th className="text-right py-2 px-3 vt-tab text-xs">涨跌幅</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {klineData.slice(-10).reverse().map((row, idx) => (
-                    <tr key={idx} className="text-vt-parchment border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors">
-                      <td className="py-2 px-3 font-[var(--font-geist-mono)] text-vt-parchment-dim">{row.date}</td>
-                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.open.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.close.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.high.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.low.toFixed(2)}</td>
-                      <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{(row.volume / 10000).toFixed(2)}万</td>
-                      <td className={`text-right py-2 px-3 font-[var(--font-geist-mono)] font-bold ${row.change_pct! >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"}`}>
-                        {row.change_pct!.toFixed(2)}%
-                      </td>
+        {/* Data Table - A-share shows company info; non-A-share shows recent quotes */}
+        {/^\d{6}$/.test(symbol) ? (
+          <>
+            <CompanyInfoPanel
+              data={companyInfo}
+              loading={companyInfoLoading}
+              error={companyInfoError}
+            />
+            <MainBusinessPanel
+              product={mainBizProduct}
+              region={mainBizRegion}
+              industry={mainBizIndustry}
+              history={mainBizHistory}
+              loading={mainBizLoading}
+              error={mainBizError}
+              hasDistinctIndustry={hasDistinctIndustry}
+            />
+          </>
+        ) : (
+          klineData.length > 0 && (
+            <section className="vt-panel p-3 sm:p-4">
+              <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
+                <span className="text-vt-brass-400">❖</span> 近 期 行 情
+              </h2>
+              <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
+                <table className="w-full text-sm min-w-[600px] sm:min-w-0">
+                  <thead>
+                    <tr className="border-b border-vt-ink-700">
+                      <th className="text-left py-2 px-3 vt-tab text-xs">日期</th>
+                      <th className="text-right py-2 px-3 vt-tab text-xs">开盘</th>
+                      <th className="text-right py-2 px-3 vt-tab text-xs">收盘</th>
+                      <th className="text-right py-2 px-3 vt-tab text-xs">最高</th>
+                      <th className="text-right py-2 px-3 vt-tab text-xs">最低</th>
+                      <th className="text-right py-2 px-3 vt-tab text-xs">成交量</th>
+                      <th className="text-right py-2 px-3 vt-tab text-xs">涨跌幅</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </section>
+                  </thead>
+                  <tbody>
+                    {klineData.slice(-10).reverse().map((row, idx) => (
+                      <tr key={idx} className="text-vt-parchment border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors">
+                        <td className="py-2 px-3 font-[var(--font-geist-mono)] text-vt-parchment-dim">{row.date}</td>
+                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.open.toFixed(2)}</td>
+                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.close.toFixed(2)}</td>
+                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.high.toFixed(2)}</td>
+                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.low.toFixed(2)}</td>
+                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{(row.volume / 10000).toFixed(2)}万</td>
+                        <td className={`text-right py-2 px-3 font-[var(--font-geist-mono)] font-bold ${row.change_pct! >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"}`}>
+                          {row.change_pct!.toFixed(2)}%
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </section>
+          )
         )}
       </main>
 

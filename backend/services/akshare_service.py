@@ -103,6 +103,15 @@ class _YFCache:
 # Global cache for US stock data - 5 minute TTL
 _yf_cache = _YFCache(ttl=300)
 
+# Global cache for A-share company info (Tushare stock_company) - 24 hour TTL
+# Company profile data rarely changes; long TTL keeps us well under the 120-point rate limit.
+_company_cache = _YFCache(ttl=86400)
+
+# Global cache for A-share main business composition (Tushare fina_mainbz) - 24 hour TTL
+# Main business data updates only on quarterly reports; long TTL keeps us well under
+# the 2000-point rate limit.
+_main_biz_cache = _YFCache(ttl=86400)
+
 
 # Simple sector money flow cache - 5 minute TTL
 _sector_mf_cache: Dict[str, Any] = {}
@@ -192,6 +201,90 @@ def _symbol_to_ts_code(symbol: str) -> str:
         else:
             return f"{symbol}.SZ"
     return symbol
+
+
+def _safe_float(val) -> Optional[float]:
+    """Convert pandas/NumPy value to float or None."""
+    try:
+        if pd.isna(val):
+            return None
+        return float(val)
+    except (TypeError, ValueError):
+        return None
+
+
+# Keywords that mark a fina_mainbz row as an inter-segment adjustment rather than a real product.
+# These rows (e.g. 内部抵销, 抵减, 合计) carry negative values that net out inter-segment revenue
+# and should not be treated as first-class products in the visualization.
+_ADJUSTMENT_KEYWORDS = ("抵销", "抵减", "调整", "合计")
+
+
+def _is_adjustment_row(item: str, sales: float) -> bool:
+    """True if a fina_mainbz row is an inter-segment adjustment (not a real product)."""
+    if sales < 0:
+        return True
+    return any(kw in str(item) for kw in _ADJUSTMENT_KEYWORDS)
+
+
+def _build_series_for_item(df, periods, item, ts_code, type_code):
+    """Build a single-item time series across `periods` from a fina_mainbz DataFrame.
+
+    Returns ``{item, values: [{period, sales, profit, cost, gross_margin_pct, yoy_pct}]}``.
+    """
+    values = []
+    for p in periods:
+        match = df[(df["end_date"].astype(str) == str(p)) & (df["bz_item"] == item)]
+        if match.empty:
+            values.append({"period": p, "sales": None, "profit": None,
+                           "cost": None, "gross_margin_pct": None, "yoy_pct": None})
+            continue
+        row = match.iloc[0]
+        sales = _safe_float(row.get("bz_sales"))
+        profit = _safe_float(row.get("bz_profit"))
+        cost = _safe_float(row.get("bz_cost"))
+        gm = ((sales - cost) / sales * 100) if (sales and cost is not None) else None
+        values.append({
+            "period": p, "sales": sales, "profit": profit, "cost": cost,
+            "gross_margin_pct": round(gm, 2) if gm is not None else None,
+            "yoy_pct": None,  # filled in after the loop
+        })
+
+    # Compute yoy_pct now that we have the full series.
+    prev = None
+    for v in values:
+        if v["sales"] is not None and prev is not None and prev > 0:
+            v["yoy_pct"] = round((v["sales"] - prev) / prev * 100, 2)
+        prev = v["sales"] if v["sales"] is not None else prev
+
+    return {"item": item, "values": values}
+
+
+def _build_series_for_others(df, periods, other_items, ts_code, type_code, top_items):
+    """Aggregate the non-top items into a single "其他" series across `periods`."""
+    values = []
+    for p in periods:
+        period_df = df[(df["end_date"].astype(str) == str(p)) & (df["bz_item"].isin(other_items))]
+        if period_df.empty:
+            values.append({"period": p, "sales": None, "profit": None,
+                           "cost": None, "gross_margin_pct": None, "yoy_pct": None})
+            continue
+        sales = _safe_float(period_df["bz_sales"].sum())
+        profit = _safe_float(period_df["bz_profit"].sum())
+        cost = _safe_float(period_df["bz_cost"].sum())
+        gm = ((sales - cost) / sales * 100) if (sales and cost is not None) else None
+        values.append({
+            "period": p, "sales": sales, "profit": profit, "cost": cost,
+            "gross_margin_pct": round(gm, 2) if gm is not None else None,
+            "yoy_pct": None,
+        })
+
+    prev = None
+    for v in values:
+        if v["sales"] is not None and prev is not None and prev > 0:
+            v["yoy_pct"] = round((v["sales"] - prev) / prev * 100, 2)
+        prev = v["sales"] if v["sales"] is not None else prev
+
+    return {"item": "其他", "values": values}
 
 
 def _us_symbol_to_yf_code(symbol: str) -> str:
@@ -332,6 +425,298 @@ class AShareService:
             }
         except Exception as e:
             return {"symbol": symbol, "error": str(e)}
+
+    @staticmethod
+    def get_company_info(symbol: str) -> dict:
+        """Get A-share listed-company basic info from Tushare stock_company.
+
+        Cached for 24h (company profile changes rarely). Returns shape
+        ``{"data": <row or null>, "error": <str or null>}``.
+        """
+        try:
+            ts_code = _symbol_to_ts_code(symbol)
+        except Exception:
+            return {"data": None, "error": "Invalid A-share symbol"}
+
+        cache_key = f"company:{ts_code}"
+
+        def fetch():
+            pro = ts.pro_api()
+            df = pro.stock_company(ts_code=ts_code)
+            if df is None or df.empty:
+                return {"data": None, "error": "未找到该公司信息"}
+            row = df.iloc[0]
+
+            def safe_str(val):
+                if val is None:
+                    return None
+                try:
+                    if pd.isna(val):
+                        return None
+                except (TypeError, ValueError):
+                    pass
+                s = str(val).strip()
+                return s if s else None
+
+            def safe_float(val):
+                try:
+                    return float(val) if pd.notna(val) else None
+                except (TypeError, ValueError):
+                    return None
+
+            def safe_int(val):
+                try:
+                    return int(val) if pd.notna(val) else None
+                except (TypeError, ValueError):
+                    return None
+
+            def safe_date(val):
+                s = safe_str(val)
+                if s is None:
+                    return None
+                # Tushare returns dates as 'YYYYMMDD'; normalize to 'YYYY-MM-DD'
+                if len(s) == 8 and s.isdigit():
+                    return f"{s[:4]}-{s[4:6]}-{s[6:8]}"
+                return s
+
+            return {
+                "data": {
+                    "ts_code": safe_str(row.get("ts_code")) or ts_code,
+                    "com_name": safe_str(row.get("com_name")),
+                    "com_id": safe_str(row.get("com_id")),
+                    "exchange": safe_str(row.get("exchange")),
+                    "chairman": safe_str(row.get("chairman")),
+                    "manager": safe_str(row.get("manager")),
+                    "secretary": safe_str(row.get("secretary")),
+                    "reg_capital": safe_float(row.get("reg_capital")),
+                    "setup_date": safe_date(row.get("setup_date")),
+                    "province": safe_str(row.get("province")),
+                    "city": safe_str(row.get("city")),
+                    "introduction": safe_str(row.get("introduction")),
+                    "website": safe_str(row.get("website")),
+                    "email": safe_str(row.get("email")),
+                    "office": safe_str(row.get("office")),
+                    "employees": safe_int(row.get("employees")),
+                    "main_business": safe_str(row.get("main_business")),
+                    "business_scope": safe_str(row.get("business_scope")),
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_cache.get_or_fetch(cache_key, fetch)
+        except Exception as e:
+            logger.warning(f"[A股] {ts_code} stock_company failed: {e}")
+            return {"data": None, "error": f"获取公司信息失败: {str(e)[:120]}"}
+
+    @staticmethod
+    def get_main_business_composition(symbol: str, period: Optional[str] = None, type: str = "P") -> dict:
+        """Get A-share main business composition from Tushare fina_mainbz (doc_id=81).
+
+        Returns revenue / profit / cost rows for a given (ts_code, period, type),
+        with derived share and margin metrics precomputed. Cached 24h per
+        (ts_code, type, period) key.
+
+        Args:
+            symbol: 6-digit A-share code (e.g. "600519").
+            period: Optional reporting period in YYYYMMDD. None = latest.
+            type: One of "P" (product), "D" (region), "I" (industry).
+
+        Returns:
+            ``{ts_code, period, type, rows: [...], source: "tushare", updated_at}``
+            on success; ``{rows: []}`` when Tushare returns nothing.
+        """
+        try:
+            ts_code = _symbol_to_ts_code(symbol)
+        except Exception:
+            return {"rows": [], "error": "Invalid A-share symbol"}
+
+        if type not in ("P", "D", "I"):
+            return {"rows": [], "error": f"Invalid type '{type}', must be P/D/I"}
+
+        cache_key = f"main_biz:{ts_code}:{type}:{period or 'latest'}"
+
+        def fetch():
+            pro = ts.pro_api()
+            kwargs = {"ts_code": ts_code, "type": type}
+            if period:
+                kwargs["period"] = period
+            df = pro.fina_mainbz(**kwargs)
+
+            if df is None or df.empty:
+                return {"ts_code": ts_code, "period": period, "type": type,
+                        "rows": [], "source": "tushare", "updated_at": datetime.now().isoformat()}
+
+            # When period is None, restrict to the most recent end_date in the response.
+            if not period and "end_date" in df.columns and len(df):
+                latest_end = str(df["end_date"].max())
+                df = df[df["end_date"].astype(str) == latest_end].copy()
+                actual_period = latest_end
+            else:
+                actual_period = str(df["end_date"].iloc[0]) if "end_date" in df.columns and len(df) else period
+
+            # 1. Drop rows where bz_sales is NaN/0 (not meaningful).
+            df = df[pd.notna(df["bz_sales"]) & (df["bz_sales"] != 0)].copy()
+
+            # 2. Drop exact-duplicate (item, sales, cost, curr_type) tuples — keep first.
+            #    Catches cases like 茅台 "系列酒" / "其他酒系列" with identical numbers.
+            df = df.drop_duplicates(subset=["bz_item", "bz_sales", "bz_cost", "curr_type"], keep="first")
+
+            # 3. Compute derived metrics; sort by sales desc.
+            #    `gross_sales` = sum of positive values only (used for revenue_share_pct denominator
+            #    so positive rows always sum to 100% in the visualization). `total_sales` = net sum
+            #    including adjustment rows (used to surface the reconciliation in the footnote).
+            gross_sales = float(df.loc[df["bz_sales"] > 0, "bz_sales"].sum()) if len(df) else 0.0
+            total_sales = float(df["bz_sales"].sum()) if len(df) else 0.0
+            total_profit = float(df["bz_profit"].sum()) if len(df) and pd.notna(df["bz_profit"]).any() else 0.0
+
+            rows = []
+            for _, row in df.iterrows():
+                sales = float(row["bz_sales"]) if pd.notna(row["bz_sales"]) else 0.0
+                profit_raw = row["bz_profit"]
+                cost_raw = row["bz_cost"]
+                profit = float(profit_raw) if pd.notna(profit_raw) else None
+                cost = float(cost_raw) if pd.notna(cost_raw) else None
+                item = str(row["bz_item"]).strip() if pd.notna(row["bz_item"]) else ""
+
+                # revenue_share_pct uses gross (positive-only) as denominator so positive rows
+                # naturally sum to ~100%. Adjustment rows get a negative share by the same math.
+                revenue_share = (sales / gross_sales * 100) if gross_sales else 0.0
+                profit_share = (profit / total_profit * 100) if (profit is not None and total_profit) else None
+                gross_margin = ((sales - cost) / sales * 100) if (cost is not None and sales) else None
+                is_adjustment = _is_adjustment_row(item, sales)
+
+                rows.append({
+                    "item": item,
+                    "sales": sales,
+                    "profit": profit,
+                    "cost": cost,
+                    "curr_type": str(row["curr_type"]).strip() if pd.notna(row.get("curr_type")) else "CNY",
+                    "revenue_share_pct": round(revenue_share, 2),
+                    "profit_share_pct": round(profit_share, 2) if profit_share is not None else None,
+                    "gross_margin_pct": round(gross_margin, 2) if gross_margin is not None else None,
+                    "is_adjustment": is_adjustment,
+                })
+
+            rows.sort(key=lambda r: r["sales"], reverse=True)
+
+            return {
+                "ts_code": ts_code,
+                "period": actual_period,
+                "type": type,
+                "rows": rows,
+                "gross_sales": gross_sales,
+                "total_sales": total_sales,
+                "source": "tushare",
+                "updated_at": datetime.now().isoformat(),
+            }
+
+        try:
+            return _main_biz_cache.get_or_fetch(cache_key, fetch)
+        except Exception as e:
+            logger.warning(f"[A股] {ts_code} fina_mainbz ({type}, {period}) failed: {e}")
+            return {"rows": [], "error": f"获取主营业务构成失败: {str(e)[:120]}"}
+
+    @staticmethod
+    def get_main_business_history(symbol: str, type: str = "P", top: int = 3) -> dict:
+        """Get last N annual periods of by-product (or by-region/industry) data for cross-period view.
+
+        Computes top-N series by latest-period revenue, buckets the rest as `其他`,
+        and computes yoy_pct per period (null for the earliest).
+
+        Args:
+            symbol: 6-digit A-share code.
+            type: "P" / "D" / "I".
+            top: Number of top series to keep; rest aggregated as "其他".
+
+        Returns:
+            ``{ts_code, type, periods, series: [{item, values: [{period, sales, profit,
+            cost, gross_margin_pct, yoy_pct}]}], source: "tushare"}``
+        """
+        try:
+            ts_code = _symbol_to_ts_code(symbol)
+        except Exception:
+            return {"rows": [], "error": "Invalid A-share symbol"}
+
+        if type not in ("P", "D", "I"):
+            return {"rows": [], "error": f"Invalid type '{type}', must be P/D/I"}
+
+        # Last 4 annual periods (Dec 31). If current month >= 5, last year is finalized; else year-1.
+        now = datetime.now()
+        last_full_year = now.year if now.month >= 5 else now.year - 1
+        periods = [f"{y}1231" for y in range(last_full_year - 3, last_full_year + 1)]
+        latest_period = periods[-1]
+
+        cache_key = f"main_biz_history:{ts_code}:{type}:{top}:{latest_period}"
+
+        def fetch():
+            pro = ts.pro_api()
+            df = pro.fina_mainbz(ts_code=ts_code, type=type, end_date=latest_period)
+            if df is None or df.empty:
+                return {
+                    "ts_code": ts_code, "type": type, "periods": periods,
+                    "series": [], "source": "tushare",
+                    "updated_at": datetime.now().isoformat(),
+                }
+
+            df = df[pd.notna(df["bz_sales"]) & (df["bz_sales"] != 0)].copy()
+            df = df.drop_duplicates(subset=["end_date", "bz_item", "bz_sales", "bz_cost"], keep="first")
+
+            # 1. Determine top-N items by latest period revenue.
+            latest = df[df["end_date"].astype(str) == str(latest_period)]
+            if latest.empty:
+                latest_period_actual = str(df["end_date"].max())
+                latest = df[df["end_date"].astype(str) == latest_period_actual]
+            else:
+                latest_period_actual = str(latest_period)
+
+            top_items = (latest.sort_values("bz_sales", ascending=False)["bz_item"]
+                         .head(top).tolist())
+            # Exclude adjustment rows (inter-segment elimination) from the "其他" bucket so the
+            # historical chart doesn't show a negative or misleading series.
+            latest_items_with_sales = {
+                i: float(latest.loc[latest["bz_item"] == i, "bz_sales"].iloc[0])
+                for i in latest["bz_item"].unique()
+            }
+            other_items = [
+                i for i, s in latest_items_with_sales.items()
+                if i not in top_items and not _is_adjustment_row(i, s)
+            ]
+
+            # 2. Build per-item series across all 4 periods (with "其他" bucket).
+            series = []
+            for item in top_items:
+                series.append(_build_series_for_item(df, periods, item, ts_code, type))
+            if other_items:
+                series.append(_build_series_for_others(df, periods, other_items, ts_code, type, top_items))
+
+            return {
+                "ts_code": ts_code,
+                "type": type,
+                "periods": periods,
+                "series": series,
+                "source": "tushare",
+                "updated_at": datetime.now().isoformat(),
+            }
+
+        try:
+            return _main_biz_cache.get_or_fetch(cache_key, fetch)
+        except Exception as e:
+            logger.warning(f"[A股] {ts_code} fina_mainbz history ({type}) failed: {e}")
+            return {"periods": periods, "series": [], "error": f"获取跨期数据失败: {str(e)[:120]}"}
+
+    @staticmethod
+    def has_distinct_industry(symbol: str, period: Optional[str] = None) -> dict:
+        """Check whether by-industry rows add items not present in by-product rows.
+
+        Returns ``{has_distinct: bool, industry_items: [...]}``.
+        """
+        product = AShareService.get_main_business_composition(symbol, period=period, type="P")
+        industry = AShareService.get_main_business_composition(symbol, period=period, type="I")
+        product_items = {r["item"] for r in product.get("rows", [])}
+        industry_items = {r["item"] for r in industry.get("rows", [])}
+        distinct = bool(industry_items - product_items)
+        return {"has_distinct": distinct, "industry_items": sorted(industry_items)}
 
     @staticmethod
     def get_daily_basic(symbol: str, days: int = 30) -> dict:

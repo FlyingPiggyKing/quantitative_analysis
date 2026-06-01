@@ -1,6 +1,6 @@
 """Stock API routes."""
-from fastapi import APIRouter, Query
-from typing import List
+from fastapi import APIRouter, Query, HTTPException
+from typing import List, Optional
 from backend.services.akshare_service import AShareService, USStockService, HKStockService, _is_us_stock_symbol, _is_hk_stock_symbol, calculate_indicators
 
 router = APIRouter(prefix="/api/stock", tags=["stock"])
@@ -135,6 +135,86 @@ async def get_sector_money_flow(
     with net flow amounts, suitable for Sankey visualization.
     """
     return AShareService.get_sector_moneyflow(days=days, top_n=top_n)
+
+
+@router.get("/company")
+async def get_company_info(symbol: str = Query(..., description="6-digit A-share symbol, e.g., 601899")):
+    """Get A-share listed-company basic info via Tushare stock_company.
+
+    Returns shape ``{data: <row or null>, error: <str or null>}``.
+    """
+    if not (isinstance(symbol, str) and symbol.isdigit() and len(symbol) == 6):
+        raise HTTPException(status_code=400, detail={"error": "A-share symbol required (6-digit numeric)"})
+    return AShareService.get_company_info(symbol)
+
+
+@router.get("/main-business")
+async def get_main_business(
+    symbol: str = Query(..., description="6-digit A-share symbol, e.g., 601899"),
+    type: str = Query(default="P", description="P=product, D=region, I=industry"),
+    period: Optional[str] = Query(default=None, description="Reporting period YYYYMMDD; default = latest"),
+):
+    """Get A-share main business composition via Tushare fina_mainbz (doc_id=81).
+
+    Returns shape ``{ts_code, period, type, rows, source, updated_at}`` on success
+    or ``{rows: []}`` when Tushare has no data. Cached 24h per (ts_code, type, period).
+    """
+    if not (isinstance(symbol, str) and symbol.isdigit() and len(symbol) == 6):
+        raise HTTPException(status_code=400, detail={"error": "仅支持 A 股 6 位代码"})
+    if type not in ("P", "D", "I"):
+        raise HTTPException(status_code=400, detail={"error": f"type 必须是 P/D/I，当前: {type}"})
+    if period is not None and (not period.isdigit() or len(period) != 8):
+        raise HTTPException(status_code=400, detail={"error": "period 必须是 YYYYMMDD 格式"})
+    try:
+        return AShareService.get_main_business_composition(symbol, period=period, type=type)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail={"error": "Tushare 数据源异常", "ts_code": _symbol_to_ts_code_safe(symbol), "detail": str(e)[:200]})
+
+
+@router.get("/main-business/history")
+async def get_main_business_history(
+    symbol: str = Query(..., description="6-digit A-share symbol, e.g., 601899"),
+    type: str = Query(default="P", description="P=product, D=region, I=industry"),
+    top: int = Query(default=3, ge=1, le=10, description="Number of top series to keep; rest aggregated as '其他'"),
+):
+    """Get last 4 annual periods of by-product/by-region/by-industry data for cross-period view.
+
+    Returns shape ``{ts_code, type, periods, series: [{item, values}], source, updated_at}``.
+    """
+    if not (isinstance(symbol, str) and symbol.isdigit() and len(symbol) == 6):
+        raise HTTPException(status_code=400, detail={"error": "仅支持 A 股 6 位代码"})
+    if type not in ("P", "D", "I"):
+        raise HTTPException(status_code=400, detail={"error": f"type 必须是 P/D/I，当前: {type}"})
+    try:
+        return AShareService.get_main_business_history(symbol, type=type, top=top)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail={"error": "Tushare 数据源异常", "ts_code": _symbol_to_ts_code_safe(symbol), "detail": str(e)[:200]})
+
+
+@router.get("/main-business/has-distinct-industry")
+async def get_has_distinct_industry(
+    symbol: str = Query(..., description="6-digit A-share symbol"),
+    period: Optional[str] = Query(default=None, description="Reporting period YYYYMMDD; default = latest"),
+):
+    """Whether the by-industry rows add items not present in by-product rows.
+
+    Returns ``{has_distinct: bool, industry_items: [...]}``.
+    """
+    if not (isinstance(symbol, str) and symbol.isdigit() and len(symbol) == 6):
+        raise HTTPException(status_code=400, detail={"error": "仅支持 A 股 6 位代码"})
+    try:
+        return AShareService.has_distinct_industry(symbol, period=period)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail={"error": "Tushare 数据源异常", "detail": str(e)[:200]})
+
+
+def _symbol_to_ts_code_safe(symbol: str) -> str:
+    """Best-effort convert 6-digit symbol to ts_code; never raises."""
+    from backend.services.akshare_service import _symbol_to_ts_code
+    try:
+        return _symbol_to_ts_code(symbol)
+    except Exception:
+        return symbol
 
 
 @router.get("/{symbol}")
