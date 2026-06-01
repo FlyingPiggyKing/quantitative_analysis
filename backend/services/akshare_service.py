@@ -715,7 +715,7 @@ class AShareService:
             all_ts_codes = aggregated['ts_code'].unique().tolist()
             valuation_map = {}  # ts_code -> {pe_ttm, total_mv_yi}
             if all_ts_codes:
-                val_result = AShareService.get_daily_basic_batch(all_ts_codes, days=1)
+                val_result = AShareService.get_daily_basic_batch(all_ts_codes, days=30)
                 for val_item in val_result.get("results", []):
                     sym = val_item.get("symbol", "")
                     latest = val_item.get("latest")
