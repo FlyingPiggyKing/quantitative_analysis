@@ -50,15 +50,15 @@ function HourlyNewsCard({ summary }: HourlyNewsCardProps) {
       <div className="mb-4">
         <ul className="space-y-3">
           {summary.top3_news && summary.top3_news.length > 0 ? (
-            summary.top3_news.map((news, idx) => (
+            summary.top3_news.filter(Boolean).map((news, idx) => (
               <li key={idx}>
                 <p className="text-vt-parchment text-sm leading-relaxed break-words">
                   <span className="text-vt-brass-300 font-[var(--font-playfair)] font-bold mr-1">
                     {idx + 1}.
                   </span>
-                  {news.summary}
+                  {news?.summary ?? "暂无摘要"}
                 </p>
-                {news.impact_reason && (
+                {news?.impact_reason && (
                   <p className="text-vt-parchment-dim text-xs mt-1 leading-relaxed border-l-2 border-vt-brass-700/50 pl-2">
                     {news.impact_reason}
                   </p>
