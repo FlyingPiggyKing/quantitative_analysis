@@ -1643,6 +1643,26 @@ class USStockService:
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_company_info(symbol)
 
+    @staticmethod
+    def get_revenue_breakdown(symbol: str) -> dict:
+        """Get US listed-company main-business composition via Futu
+        ``get_financials_revenue_breakdown`` (proto 3228).
+
+        Returns a single payload with all four breakdown dimensions
+        (Product / Industry / Region / Business). See
+        ``FutuQuoteService.get_revenue_breakdown`` for the response shape.
+        """
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_revenue_breakdown(symbol)
+
+    @staticmethod
+    def get_revenue_breakdown_history(symbol: str, n_periods: int = 4) -> dict:
+        """Get last N annual periods of US by-product data via Futu
+        ``get_financials_revenue_breakdown`` (parallel per-period calls).
+        """
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_revenue_breakdown_history(symbol, n_periods)
+
 
 class HKStockService:
     """Service wrapper for HK stock data via Futu OpenAPI.
@@ -1702,6 +1722,22 @@ class HKStockService:
         """Get HK listed-company basic info via Futu get_company_profile + get_company_executives."""
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_company_info(symbol)
+
+    @staticmethod
+    def get_revenue_breakdown(symbol: str) -> dict:
+        """Get HK listed-company main-business composition via Futu
+        ``get_financials_revenue_breakdown`` (proto 3228).
+        """
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_revenue_breakdown(symbol)
+
+    @staticmethod
+    def get_revenue_breakdown_history(symbol: str, n_periods: int = 4) -> dict:
+        """Get last N annual periods of HK by-product data via Futu
+        ``get_financials_revenue_breakdown`` (parallel per-period calls).
+        """
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_revenue_breakdown_history(symbol, n_periods)
 
 
 # Backward compatibility - AkshareService now points to AShareService

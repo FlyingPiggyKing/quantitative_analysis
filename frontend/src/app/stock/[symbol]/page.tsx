@@ -16,7 +16,7 @@ import { checkWatchlist, addToWatchlist, removeFromWatchlist } from "@/services/
 import { getTrendPrediction, TrendPrediction, runForcedSingleAnalysis, runForcedSingleAnalysisAsync, pollTaskStatus, getCooldownEndTime, setCooldownEndTime, clearCooldownEndTime } from "@/services/trendPrediction";
 import { fetchStockValuation, ValuationRecord } from "@/services/stock";
 import { getCompanyInfo, CompanyInfo } from "@/services/companyInfo";
-import { getMainBusiness, getMainBusinessHistory, MainBusinessResponse, MainBusinessHistoryResponse } from "@/services/mainBusiness";
+import { getMainBusiness, getMainBusinessHistory, getFutuMainBusiness, getFutuMainBusinessHistory, MainBusinessResponse, MainBusinessHistoryResponse, FutuMainBusinessResponse, FutuMainBusinessHistoryResponse } from "@/services/mainBusiness";
 import { useAuth } from "@/services/auth";
 
 interface StockInfo {
@@ -97,6 +97,14 @@ export default function StockDetailPage() {
   const [mainBizRegion, setMainBizRegion] = useState<MainBusinessResponse | null>(null);
   const [mainBizIndustry, setMainBizIndustry] = useState<MainBusinessResponse | null>(null);
   const [mainBizHistory, setMainBizHistory] = useState<MainBusinessHistoryResponse | null>(null);
+
+  // HK / US main business composition (Futu). All four dimensions come in one
+  // payload (product / region / industry / business), so we cache the whole
+  // response and re-use it for the section sub-props.
+  const [futuMainBiz, setFutuMainBiz] = useState<FutuMainBusinessResponse | null>(null);
+  const [futuMainBizHistory, setFutuMainBizHistory] = useState<FutuMainBusinessHistoryResponse | null>(null);
+  const [futuMainBizLoading, setFutuMainBizLoading] = useState({ p: false, h: false });
+  const [futuMainBizError, setFutuMainBizError] = useState<string | null>(null);
   const [mainBizLoading, setMainBizLoading] = useState({ p: false, d: false, i: false, h: false });
   const [mainBizError, setMainBizError] = useState<string | null>(null);
   const [hasDistinctIndustry, setHasDistinctIndustry] = useState(false);
@@ -241,6 +249,50 @@ export default function StockDetailPage() {
     };
 
     fetchCompany();
+  }, [symbol]);
+
+  // Fetch HK / US main business composition via Futu
+  // `get_financials_revenue_breakdown` (proto 3228). Two parallel calls:
+  // one for the latest-period payload (all 4 dimensions) and one for the
+  // 4-year cross-period history. Skipped for A-share (6-digit) symbols.
+  useEffect(() => {
+    if (!symbol) return;
+    // Only HK (4-5 digit / HK.XXXXX) and US (1-5 letters / US.XXXXX) symbols.
+    const isHk = /^(\d{4,5}|HK\.\d{4,5})$/.test(symbol);
+    const isUs = /^([A-Z]{1,5}|US\.[A-Z]{1,5})$/.test(symbol);
+    if (!isHk && !isUs) return;
+
+    let cancelled = false;
+    setFutuMainBizError(null);
+    setFutuMainBiz(null);
+    setFutuMainBizHistory(null);
+    setFutuMainBizLoading({ p: true, h: true });
+
+    const run = async () => {
+      const [latest, history] = await Promise.all([
+        getFutuMainBusiness(symbol),
+        getFutuMainBusinessHistory(symbol, 4),
+      ]);
+      if (cancelled) return;
+      if (latest === null && history === null) {
+        setFutuMainBizError("数据加载失败，请稍后重试");
+      }
+      setFutuMainBiz(latest);
+      setFutuMainBizHistory(history);
+      setFutuMainBizLoading({ p: false, h: false });
+    };
+
+    run().catch((err) => {
+      console.error("[MainBiz-Futu] fetch failed:", err);
+      if (!cancelled) {
+        setFutuMainBizError("数据加载失败，请稍后重试");
+        setFutuMainBizLoading({ p: false, h: false });
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
   }, [symbol]);
 
   // Fetch main business composition (A-share only, non-blocking).
@@ -744,18 +796,35 @@ export default function StockDetailPage() {
           error={companyInfoError}
         />
 
-        {/* Main business composition — A-share only (Tushare fina_mainbz). */}
-        {/^\d{6}$/.test(symbol) && (
-          <MainBusinessPanel
-            product={mainBizProduct}
-            region={mainBizRegion}
-            industry={mainBizIndustry}
-            history={mainBizHistory}
-            loading={mainBizLoading}
-            error={mainBizError}
-            hasDistinctIndustry={hasDistinctIndustry}
-          />
-        )}
+        {/* Main business composition — renders for all markets. The panel
+            branches on the `market` prop: A-share uses Tushare fina_mainbz
+            (full columns: 毛利率 / 利润占比 / 跨期对比 YoY), HK and US use
+            Futu get_financials_revenue_breakdown (revenue-only columns). */}
+        <MainBusinessPanel
+          market={
+            /^\d{6}$/.test(symbol)
+              ? "A"
+              : companyInfo?.market === "HK"
+              ? "HK"
+              : companyInfo?.market === "US"
+              ? "US"
+              : "A"
+          }
+          product={mainBizProduct}
+          region={mainBizRegion}
+          industry={mainBizIndustry}
+          history={mainBizHistory}
+          loading={mainBizLoading}
+          error={mainBizError}
+          hasDistinctIndustry={hasDistinctIndustry}
+          futuProduct={futuMainBiz}
+          futuRegion={futuMainBiz}
+          futuIndustry={futuMainBiz}
+          futuBusiness={futuMainBiz}
+          futuHistory={futuMainBizHistory}
+          futuLoading={futuMainBizLoading}
+          futuError={futuMainBizError}
+        />
       </main>
 
       <AuthModal

@@ -63,4 +63,7 @@ npm run dev
 | `GET /api/stock/{symbol}/kline?days=100` | K 线数据 |
 | `GET /api/stock/{symbol}/realtime` | 实时行情 |
 | `GET /api/stock/{symbol}/indicators?days=100` | 技术指标 |
+| `GET /api/stock/main-business?symbol=600519&type=P` | A 股主营业务构成（Tushare fina_mainbz；按产品/地区/行业，含毛利率、利润占比、跨期对比） |
+| `GET /api/stock/main-business-futu?symbol=00700` | 港股 / 美股主营业务构成（Futu get_financials_revenue_breakdown；按产品/地区/行业/业务，仅收入与占比） |
+| `GET /api/stock/main-business-futu/history?symbol=00700` | 港股 / 美股最近 4 年按产品跨期对比（4 次并行 Futu 调用） |
 | `GET /health` | 健康检查 |

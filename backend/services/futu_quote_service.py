@@ -743,3 +743,464 @@ class FutuQuoteService:
                     "error": None,
                 }
             return {"data": None, "error": f"获取公司信息失败: {str(e)[:120]}"}
+
+    # ----------------------------------------------------------------------
+    # Main business composition (Futu get_financials_revenue_breakdown, proto 3228)
+    # ----------------------------------------------------------------------
+    # RevenueBreakdownType values from Qot_Common.proto:
+    #   1 = Product, 2 = Industry, 4 = Region, 8 = Business
+    # F10Type values:
+    #   7 = Annual report (preferred for cross-period history)
+    @classmethod
+    def get_revenue_breakdown(cls, symbol: str) -> dict:
+        """Get HK/US listed-company main-business composition via Futu
+        ``get_financials_revenue_breakdown`` (proto 3228, v10.7+).
+
+        Single call returns ALL breakdown dimensions in ``breakdown_list`` keyed
+        by ``type`` (Product=1, Industry=2, Region=4, Business=8). Each item is
+        ``{name, main_oper_income, ratio}``. No cost / profit / margin data is
+        provided by this Futu endpoint.
+
+        Returns ``{data: <normalized payload>, error: null}`` on success,
+        ``{data: <empty>, error: null}`` on empty data or older OpenD that
+        doesn't know the proto (treated as clean empty, mirroring
+        ``get_company_info``), or ``{data: null, error: <msg>}`` on other
+        upstream errors. Cached 24h in ``_company_info_cache``.
+        """
+        cache_key = f"revenue_breakdown:{symbol.upper()}"
+
+        def fetch_breakdown() -> dict:
+            futu_code, market = _get_futu_code(symbol)
+            ctx = FutuQuoteService._get_quote_context()
+            ret, data = ctx.get_financials_revenue_breakdown(futu_code)
+            if ret != 0:
+                raise Exception(f"Futu get_financials_revenue_breakdown error: {data}")
+
+            if not isinstance(data, dict):
+                return _empty_breakdown_payload(symbol, futu_code, market)
+
+            breakdown_list = data.get("breakdown_list") or []
+            if not breakdown_list:
+                # Still return screen_date_list so history() can be called without
+                # an extra Futu round-trip — cache it together.
+                return {
+                    "data": _empty_breakdown_payload(symbol, futu_code, market, data),
+                    "error": None,
+                }
+
+            product, industry, region, business = _split_breakdown_by_type(breakdown_list)
+            product_items = {row["item"] for row in product}
+            has_distinct_industry = any(
+                row["item"] not in product_items for row in industry
+            )
+
+            return {
+                "data": {
+                    "symbol": symbol.upper(),
+                    "code": futu_code,
+                    "market": market,
+                    "period": data.get("period", ""),
+                    "currency_code": data.get("currency_code", ""),
+                    "product": product,
+                    "region": region,
+                    "industry": industry,
+                    "business": business,
+                    "has_distinct_industry": has_distinct_industry,
+                    "screen_date_list": data.get("screen_date_list", []),
+                    "source": "futu",
+                    "updated_at": datetime.now().isoformat(),
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_info_cache.on_error_return_stale(cache_key, fetch_breakdown)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} revenue breakdown error: {e}")
+            err_msg = str(e).lower()
+            # Older OpenD (< 10.7.6708) doesn't know proto 3228. Treat as
+            # clean empty so the panel renders the "暂无主营业务构成数据"
+            # placeholder instead of leaking the raw protocol error.
+            if "unknown protocol" in err_msg or "unknown proto" in err_msg or "protocol id" in err_msg:
+                futu_code, market = _get_futu_code(symbol)
+                return {
+                    "data": _empty_breakdown_payload(symbol, futu_code, market),
+                    "error": None,
+                }
+            return {"data": None, "error": f"获取主营构成失败: {str(e)[:120]}"}
+
+    @classmethod
+    def get_revenue_breakdown_history(
+        cls, symbol: str, n_periods: int = 4
+    ) -> dict:
+        """Get last N annual periods of by-product data for cross-period view.
+
+        Strategy: first call ``get_revenue_breakdown`` to obtain the
+        ``screen_date_list``, filter for annual periods (preferring
+        ``financial_type == 7`` 年报, falling back to ``period_text`` ending in
+        ``/FY``), then fire N parallel ``get_financials_revenue_breakdown``
+        calls (each with a different ``date`` epoch-seconds value) and merge
+        the results into a ``{periods, items}`` shape similar to the A-share
+        history endpoint.
+
+        Top-3 items by latest-period revenue are kept; the rest are bucketed
+        as ``其他``. Each ``values`` array length equals ``periods.length``.
+        Cached 24h in ``_company_info_cache``.
+        """
+        cache_key = f"revenue_breakdown_history:{symbol.upper()}:{n_periods}"
+
+        def fetch_history() -> dict:
+            futu_code, market = _get_futu_code(symbol)
+            latest_resp = FutuQuoteService.get_revenue_breakdown(symbol)
+            latest_data = latest_resp.get("data") or {}
+            if latest_resp.get("error") or not latest_data:
+                return {
+                    "data": {
+                        "symbol": symbol.upper(),
+                        "code": futu_code,
+                        "market": market,
+                        "currency_code": latest_data.get("currency_code", ""),
+                        "periods": [],
+                        "items": [],
+                        "source": "futu",
+                        "updated_at": datetime.now().isoformat(),
+                    },
+                    "error": None,
+                }
+
+            screen_date_list = latest_data.get("screen_date_list", []) or []
+            annual_dates = _pick_annual_screen_dates(screen_date_list, n_periods)
+            if not annual_dates:
+                return {
+                    "data": {
+                        "symbol": symbol.upper(),
+                        "code": futu_code,
+                        "market": market,
+                        "currency_code": latest_data.get("currency_code", ""),
+                        "periods": [],
+                        "items": [],
+                        "source": "futu",
+                        "updated_at": datetime.now().isoformat(),
+                    },
+                    "error": None,
+                }
+
+            ctx = FutuQuoteService._get_quote_context()
+            period_results: Dict[int, dict] = {}
+            period_excs: Dict[int, str] = {}
+
+            import concurrent.futures
+
+            def fetch_one(d: int):
+                ret, data = ctx.get_financials_revenue_breakdown(
+                    futu_code, date=d
+                )
+                if ret != 0 or not isinstance(data, dict):
+                    raise Exception(
+                        f"Futu get_financials_revenue_breakdown(date={d}) error"
+                    )
+                return d, data
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=min(4, len(annual_dates))) as ex:
+                futures = [ex.submit(fetch_one, d) for d in annual_dates]
+                for fut in futures:
+                    try:
+                        d, data = fut.result()
+                        period_results[d] = data
+                    except Exception as e:
+                        # Record the first epoch-seconds we couldn't fetch (best-effort)
+                        period_excs[annual_dates[len(period_results)]] = str(e)[:80]
+
+            if not period_results:
+                return {
+                    "data": {
+                        "symbol": symbol.upper(),
+                        "code": futu_code,
+                        "market": market,
+                        "currency_code": latest_data.get("currency_code", ""),
+                        "periods": [],
+                        "items": [],
+                        "source": "futu",
+                        "updated_at": datetime.now().isoformat(),
+                    },
+                    "error": None,
+                }
+
+            # Order periods chronologically (oldest first) and remember each
+            # one's period_text for the x-axis.
+            ordered_dates = sorted(period_results.keys())
+            periods = [period_results[d].get("period", "") for d in ordered_dates]
+            currency_code = (
+                period_results[ordered_dates[-1]].get("currency_code")
+                or latest_data.get("currency_code", "")
+            )
+
+            # Latest-period by-product list (to pick top-3).
+            latest_breakdown = period_results[ordered_dates[-1]].get("breakdown_list", [])
+            latest_product = next(
+                (b.get("item_list", []) for b in latest_breakdown if b.get("type") == 1),
+                [],
+            )
+            latest_sorted = sorted(
+                [r for r in latest_product if _item_has_revenue(r)],
+                key=lambda r: r.get("main_oper_income", 0) or 0,
+                reverse=True,
+            )
+            top_items = [r["name"] for r in latest_sorted[:3]]
+            other_items = [
+                r["name"]
+                for r in latest_sorted[3:]
+            ]
+            kept_items = set(top_items) | set(other_items)
+            if other_items:
+                # "其他" bucket — keep the label distinct from any real item name.
+                pass
+
+            # Build the per-item series: for each kept item, collect revenue
+            # across the 4 ordered periods; for the "其他" bucket, sum the
+            # non-top-3 items per period.
+            series: Dict[str, Dict[str, Any]] = {}
+            for name in top_items:
+                series[name] = {
+                    "item": name,
+                    "currency_code": currency_code,
+                    "values": [],
+                }
+            if other_items:
+                series["其他"] = {
+                    "item": "其他",
+                    "currency_code": currency_code,
+                    "values": [],
+                }
+
+            for d in ordered_dates:
+                data = period_results[d]
+                breakdown = data.get("breakdown_list", [])
+                product_list = next(
+                    (b.get("item_list", []) for b in breakdown if b.get("type") == 1),
+                    [],
+                )
+                # Build a name -> item dict for this period
+                by_name = {
+                    r.get("name", ""): r
+                    for r in product_list
+                    if r.get("name")
+                }
+                period_label = data.get("period", "")
+                for name in top_items:
+                    r = by_name.get(name)
+                    series[name]["values"].append(
+                        {
+                            "period": period_label,
+                            "revenue": float(r.get("main_oper_income", 0) or 0)
+                            if r
+                            else 0.0,
+                            "ratio_pct": float(r.get("ratio", 0) or 0) if r else 0.0,
+                        }
+                    )
+                if other_items:
+                    other_revenue = 0.0
+                    other_ratio = 0.0
+                    for name in other_items:
+                        r = by_name.get(name)
+                        if r:
+                            other_revenue += float(r.get("main_oper_income", 0) or 0)
+                            other_ratio += float(r.get("ratio", 0) or 0)
+                    series["其他"]["values"].append(
+                        {
+                            "period": period_label,
+                            "revenue": other_revenue,
+                            "ratio_pct": other_ratio,
+                        }
+                    )
+
+            # Order items: top-3 first by latest-period revenue, "其他" last.
+            ordered_items: List[Dict[str, Any]] = []
+            for name in top_items:
+                if name in series:
+                    ordered_items.append(series[name])
+            if "其他" in series:
+                ordered_items.append(series["其他"])
+
+            return {
+                "data": {
+                    "symbol": symbol.upper(),
+                    "code": futu_code,
+                    "market": market,
+                    "currency_code": currency_code,
+                    "periods": periods,
+                    "items": ordered_items,
+                    "source": "futu",
+                    "updated_at": datetime.now().isoformat(),
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_info_cache.on_error_return_stale(cache_key, fetch_history)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} revenue breakdown history error: {e}")
+            err_msg = str(e).lower()
+            if "unknown protocol" in err_msg or "unknown proto" in err_msg or "protocol id" in err_msg:
+                futu_code, market = _get_futu_code(symbol)
+                return {
+                    "data": {
+                        "symbol": symbol.upper(),
+                        "code": futu_code,
+                        "market": market,
+                        "currency_code": "",
+                        "periods": [],
+                        "items": [],
+                        "source": "futu",
+                        "updated_at": datetime.now().isoformat(),
+                    },
+                    "error": None,
+                }
+            return {"data": None, "error": f"获取跨期主营构成失败: {str(e)[:120]}"}
+
+
+def _item_has_revenue(item: dict) -> bool:
+    """Return True if the breakdown item has a non-zero main_oper_income."""
+    val = item.get("main_oper_income")
+    if val is None:
+        return False
+    try:
+        return float(val) > 0
+    except (TypeError, ValueError):
+        return False
+
+
+def _normalize_breakdown_item(item: dict, default_currency: str) -> dict:
+    """Normalize a single breakdown item from the raw Futu shape to the
+    response shape used by the panel:
+    ``{item, revenue, ratio_pct, currency_code}``.
+    """
+    name = str(item.get("name", "")).strip() or ""
+    revenue = _to_python_type(item.get("main_oper_income"), 0.0) or 0.0
+    try:
+        revenue = float(revenue)
+    except (TypeError, ValueError):
+        revenue = 0.0
+    ratio = _to_python_type(item.get("ratio"), 0.0) or 0.0
+    try:
+        ratio = float(ratio)
+    except (TypeError, ValueError):
+        ratio = 0.0
+    return {
+        "item": name,
+        "revenue": revenue,
+        "ratio_pct": round(ratio, 2),
+        "currency_code": default_currency or "",
+    }
+
+
+def _split_breakdown_by_type(
+    breakdown_list: list,
+) -> tuple:
+    """Split Futu ``breakdown_list`` by ``type`` into 4 lists of normalized
+    items, sorted by revenue desc, deduped.
+
+    Types: 1=Product, 2=Industry, 4=Region, 8=Business. Items with zero/null
+    revenue are dropped. Fully duplicate ``(item, revenue, ratio_pct,
+    currency_code)`` tuples are deduplicated (keep first).
+    """
+    product: list = []
+    industry: list = []
+    region: list = []
+    business: list = []
+
+    for group in breakdown_list:
+        if not isinstance(group, dict):
+            continue
+        btype = group.get("type")
+        items = group.get("item_list") or []
+        if btype == 1:
+            target = product
+        elif btype == 2:
+            target = industry
+        elif btype == 4:
+            target = region
+        elif btype == 8:
+            target = business
+        else:
+            continue
+        for raw in items:
+            if not isinstance(raw, dict):
+                continue
+            if not _item_has_revenue(raw):
+                continue
+            item_currency = str(raw.get("currency_code", "")).strip()
+            if not item_currency:
+                item_currency = ""
+            target.append(_normalize_breakdown_item(raw, item_currency))
+
+    for bucket in (product, industry, region, business):
+        bucket.sort(key=lambda r: r["revenue"], reverse=True)
+        # Dedup by full tuple
+        seen = set()
+        deduped = []
+        for r in bucket:
+            key = (r["item"], r["revenue"], r["ratio_pct"], r["currency_code"])
+            if key in seen:
+                continue
+            seen.add(key)
+            deduped.append(r)
+        bucket[:] = deduped
+
+    return product, industry, region, business
+
+
+def _empty_breakdown_payload(
+    symbol: str, futu_code: str, market: str, raw: dict = None
+) -> dict:
+    """Build an empty (but well-formed) revenue breakdown payload."""
+    return {
+        "symbol": symbol.upper() if symbol else "",
+        "code": futu_code,
+        "market": market,
+        "period": (raw or {}).get("period", ""),
+        "currency_code": (raw or {}).get("currency_code", ""),
+        "product": [],
+        "region": [],
+        "industry": [],
+        "business": [],
+        "has_distinct_industry": False,
+        "screen_date_list": (raw or {}).get("screen_date_list", []),
+        "source": "futu",
+        "updated_at": datetime.now().isoformat(),
+    }
+
+
+def _pick_annual_screen_dates(screen_date_list: list, n: int) -> list:
+    """Pick up to ``n`` most recent annual period ``date`` values from
+    ``screen_date_list``.
+
+    Preference: entries with ``financial_type == 7`` (年报). Fallback: entries
+    whose ``period_text`` ends in ``/FY`` (case-insensitive). Returns the
+    epoch-seconds ``date`` values in descending order (most recent first).
+    """
+    if not screen_date_list:
+        return []
+
+    annual = [
+        e
+        for e in screen_date_list
+        if isinstance(e, dict) and e.get("financial_type") == 7
+    ]
+    if not annual:
+        annual = [
+            e
+            for e in screen_date_list
+            if isinstance(e, dict)
+            and isinstance(e.get("period_text"), str)
+            and e["period_text"].strip().upper().endswith("/FY")
+        ]
+    if not annual:
+        return []
+
+    annual_sorted = sorted(
+        [e for e in annual if isinstance(e.get("date"), int)],
+        key=lambda e: e["date"],
+        reverse=True,
+    )
+    return [e["date"] for e in annual_sorted[:n]]

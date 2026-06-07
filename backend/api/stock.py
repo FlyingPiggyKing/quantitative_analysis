@@ -221,6 +221,57 @@ async def get_has_distinct_industry(
         raise HTTPException(status_code=502, detail={"error": "Tushare 数据源异常", "detail": str(e)[:200]})
 
 
+@router.get("/main-business-futu")
+async def get_main_business_futu(
+    symbol: str = Query(..., description="HK: 4-5 digit (e.g. 00700) or HK.00700; US: 1-5 letters (e.g. AAPL) or US.AAPL"),
+):
+    """Get HK/US main-business composition via Futu ``get_financials_revenue_breakdown`` (proto 3228).
+
+    Returns ``{data: <payload>, error: null}`` on success,
+    ``{data: <empty payload>, error: null}`` on older OpenD / empty / unknown-protocol,
+    or ``{data: null, error: <msg>}`` on other upstream errors. A-share symbols
+    (6 digits) and other unsupported symbols return HTTP 400 — A-share data is
+    served by the existing ``/api/stock/main-business?type=...`` route.
+    """
+    import re
+
+    if not isinstance(symbol, str) or not symbol:
+        raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
+
+    if re.fullmatch(r"US\.[A-Z]{1,5}", symbol) or re.fullmatch(r"[A-Z]{1,5}", symbol):
+        return USStockService.get_revenue_breakdown(symbol)
+    if re.fullmatch(r"HK\.\d{4,5}", symbol) or re.fullmatch(r"\d{4,5}", symbol):
+        return HKStockService.get_revenue_breakdown(symbol)
+
+    raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
+
+
+@router.get("/main-business-futu/history")
+async def get_main_business_futu_history(
+    symbol: str = Query(..., description="HK: 4-5 digit or HK.XXXXX; US: 1-5 letters or US.XXXXX"),
+    n_periods: int = Query(default=4, ge=1, le=10, description="Number of annual periods to fetch (default 4)"),
+):
+    """Get last N annual periods of HK/US by-product data via parallel Futu
+    ``get_financials_revenue_breakdown`` calls.
+
+    Returns ``{data: {periods, items, ...}, error: null}`` on success,
+    ``{data: {periods: [], items: [], ...}, error: null}`` on older OpenD or
+    no annual data, or ``{data: null, error: <msg>}`` on other upstream errors.
+    A-share symbols and other unsupported inputs return HTTP 400.
+    """
+    import re
+
+    if not isinstance(symbol, str) or not symbol:
+        raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
+
+    if re.fullmatch(r"US\.[A-Z]{1,5}", symbol) or re.fullmatch(r"[A-Z]{1,5}", symbol):
+        return USStockService.get_revenue_breakdown_history(symbol, n_periods)
+    if re.fullmatch(r"HK\.\d{4,5}", symbol) or re.fullmatch(r"\d{4,5}", symbol):
+        return HKStockService.get_revenue_breakdown_history(symbol, n_periods)
+
+    raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
+
+
 def _symbol_to_ts_code_safe(symbol: str) -> str:
     """Best-effort convert 6-digit symbol to ts_code; never raises."""
     from backend.services.akshare_service import _symbol_to_ts_code
