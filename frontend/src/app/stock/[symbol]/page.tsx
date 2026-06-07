@@ -214,10 +214,11 @@ export default function StockDetailPage() {
     fetchFundamentals();
   }, [symbol]);
 
-  // Fetch company basic info (A-share only, non-blocking)
+  // Fetch company basic info for all markets (A-share, HK, US). The panel
+  // branches on `data.market` to pick the layout — A-share gets the Tushare
+  // schema, HK/US gets the Futu profile_labels + executives schema.
   useEffect(() => {
     if (!symbol) return;
-    if (!/^\d{6}$/.test(symbol)) return;
 
     const fetchCompany = async () => {
       setCompanyInfoLoading(true);
@@ -733,62 +734,27 @@ export default function StockDetailPage() {
           </section>
         )}
 
-        {/* Data Table - A-share shows company info; non-A-share shows recent quotes */}
-        {/^\d{6}$/.test(symbol) ? (
-          <>
-            <CompanyInfoPanel
-              data={companyInfo}
-              loading={companyInfoLoading}
-              error={companyInfoError}
-            />
-            <MainBusinessPanel
-              product={mainBizProduct}
-              region={mainBizRegion}
-              industry={mainBizIndustry}
-              history={mainBizHistory}
-              loading={mainBizLoading}
-              error={mainBizError}
-              hasDistinctIndustry={hasDistinctIndustry}
-            />
-          </>
-        ) : (
-          klineData.length > 0 && (
-            <section className="vt-panel p-3 sm:p-4">
-              <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
-                <span className="text-vt-brass-400">❖</span> 近 期 行 情
-              </h2>
-              <div className="overflow-x-auto -mx-3 sm:mx-0 px-3 sm:px-0">
-                <table className="w-full text-sm min-w-[600px] sm:min-w-0">
-                  <thead>
-                    <tr className="border-b border-vt-ink-700">
-                      <th className="text-left py-2 px-3 vt-tab text-xs">日期</th>
-                      <th className="text-right py-2 px-3 vt-tab text-xs">开盘</th>
-                      <th className="text-right py-2 px-3 vt-tab text-xs">收盘</th>
-                      <th className="text-right py-2 px-3 vt-tab text-xs">最高</th>
-                      <th className="text-right py-2 px-3 vt-tab text-xs">最低</th>
-                      <th className="text-right py-2 px-3 vt-tab text-xs">成交量</th>
-                      <th className="text-right py-2 px-3 vt-tab text-xs">涨跌幅</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {klineData.slice(-10).reverse().map((row, idx) => (
-                      <tr key={idx} className="text-vt-parchment border-b border-vt-ink-700/60 hover:bg-vt-ink-600/30 transition-colors">
-                        <td className="py-2 px-3 font-[var(--font-geist-mono)] text-vt-parchment-dim">{row.date}</td>
-                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.open.toFixed(2)}</td>
-                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.close.toFixed(2)}</td>
-                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.high.toFixed(2)}</td>
-                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{row.low.toFixed(2)}</td>
-                        <td className="text-right py-2 px-3 font-[var(--font-geist-mono)]">{(row.volume / 10000).toFixed(2)}万</td>
-                        <td className={`text-right py-2 px-3 font-[var(--font-geist-mono)] font-bold ${row.change_pct! >= 0 ? "text-vt-oxblood-400" : "text-vt-emerald-400"}`}>
-                          {row.change_pct!.toFixed(2)}%
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </section>
-          )
+        {/* Company info panel — renders for all markets. Panel branches on
+            `data.market`: A-share gets Tushare fields, HK/US gets Futu fields.
+            The trailing "近期行情" quotes table was redundant with the K-line
+            chart and is removed for all markets. */}
+        <CompanyInfoPanel
+          data={companyInfo}
+          loading={companyInfoLoading}
+          error={companyInfoError}
+        />
+
+        {/* Main business composition — A-share only (Tushare fina_mainbz). */}
+        {/^\d{6}$/.test(symbol) && (
+          <MainBusinessPanel
+            product={mainBizProduct}
+            region={mainBizRegion}
+            industry={mainBizIndustry}
+            history={mainBizHistory}
+            loading={mainBizLoading}
+            error={mainBizError}
+            hasDistinctIndustry={hasDistinctIndustry}
+          />
         )}
       </main>
 

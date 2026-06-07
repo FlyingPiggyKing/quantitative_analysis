@@ -82,11 +82,13 @@ class _FutuCache:
 
         logger.info(f"[Futu] Cache miss for {key}, fetching...")
         result = fetch_func()
-        # Only cache successful results (no "error" key)
-        if "error" not in result:
+        # Only cache successful results (error key absent or null).
+        # Callers that wrap responses as ``{data, error: None}`` are valid successes.
+        err = result.get("error") if isinstance(result, dict) else None
+        if not err:
             self.set(key, result)
         else:
-            logger.warning(f"[Futu] {key} fetch returned error, not caching: {result.get('error', '')[:50]}")
+            logger.warning(f"[Futu] {key} fetch returned error, not caching: {str(err)[:50]}")
         return result
 
     def on_error_return_stale(self, key: str, fetch_func, max_stale_seconds: int = 3600) -> Dict[str, Any]:
@@ -106,6 +108,10 @@ class _FutuCache:
 
 # Global cache for Futu data - 5 minute TTL
 _futu_cache = _FutuCache(ttl=300)
+
+# Global cache for Futu company profile / executives (get_company_info) - 24h TTL
+# Company profile data rarely changes; long TTL keeps OpenD pressure low.
+_company_info_cache = _FutuCache(ttl=86400)
 
 
 def _symbol_to_futu_code(symbol: str) -> str:
@@ -577,3 +583,163 @@ class FutuQuoteService:
         except Exception as e:
             logger.error(f"[Futu] {symbol} capital flow error: {e}")
             return {"symbol": symbol, "market": "HK/US", "error": str(e)}
+
+    @staticmethod
+    def get_company_info(symbol: str) -> dict:
+        """Get HK/US listed-company basic info via Futu get_company_profile + get_company_executives.
+
+        Calls both endpoints in parallel (2 threads), merges into a single response
+        dict, and caches the merged result for 24h. Returns shape
+        ``{data: {symbol, code, market, profile_labels, executives, name, error},
+        error: null}`` on success, or ``{data: None, error: <msg>}`` on failure.
+
+        `profile_labels` is the raw Futu key-value list (label name + value +
+        fieldType: 0=text, 1=link, 2=independent title). `executives` is the
+        director list (name, displayName, position, beginDate, gender, age,
+        education, annualSalary). `name` is derived from the first text-type
+        label whose value is non-empty (best-effort fallback to "").
+        """
+        cache_key = f"company_info:{symbol.upper()}"
+
+        def fetch_company_info() -> dict:
+            logger.info(f"[Futu] Fetching company info for {symbol}")
+            futu_code, market = _get_futu_code(symbol)
+            ctx = FutuQuoteService._get_quote_context()
+
+            import concurrent.futures
+
+            profile_exc: Optional[Exception] = None
+            executives_exc: Optional[Exception] = None
+            profile_df = None
+            executives_df = None
+
+            def fetch_profile():
+                ret, data = ctx.get_company_profile(futu_code)
+                if ret != 0:
+                    raise Exception(f"Futu get_company_profile error: {data}")
+                return data
+
+            def fetch_executives():
+                ret, data = ctx.get_company_executives(futu_code)
+                if ret != 0:
+                    raise Exception(f"Futu get_company_executives error: {data}")
+                return data
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
+                profile_future = executor.submit(fetch_profile)
+                executives_future = executor.submit(fetch_executives)
+                try:
+                    profile_df = profile_future.result()
+                except Exception as e:
+                    profile_exc = e
+                try:
+                    executives_df = executives_future.result()
+                except Exception as e:
+                    executives_exc = e
+
+            # Both endpoints failed → bubble up; outer except returns the error dict
+            if profile_exc and executives_exc:
+                raise profile_exc
+
+            # Normalize profile_labels: list of {name, value, fieldType}
+            profile_labels: List[Dict[str, Any]] = []
+            derived_name = ""
+            if profile_df is not None and len(profile_df):
+                for i in range(len(profile_df)):
+                    row = profile_df.iloc[i] if hasattr(profile_df, "iloc") else profile_df[i]
+                    name = _to_python_type(row.get("name"), "") or ""
+                    value = _to_python_type(row.get("value"), "") or ""
+                    # fieldType may be int, string, or None — coerce to int; treat 1/2 as link/title
+                    raw_ft = row.get("field_type")
+                    if raw_ft is None or (isinstance(raw_ft, float) and raw_ft != raw_ft):
+                        field_type = 0
+                    else:
+                        try:
+                            field_type = int(raw_ft)
+                        except (TypeError, ValueError):
+                            field_type = 0
+                    profile_labels.append({
+                        "name": str(name),
+                        "value": str(value),
+                        "fieldType": field_type,
+                    })
+                # Derive name from first text-type (fieldType == 0) label with non-empty value
+                for label in profile_labels:
+                    if label["fieldType"] == 0 and label["value"]:
+                        derived_name = label["value"]
+                        break
+
+            # Normalize executives: list of {name, displayName, position, beginDate, gender, age, education, annualSalary}
+            executives: List[Dict[str, Any]] = []
+            if executives_df is not None and len(executives_df):
+                for i in range(len(executives_df)):
+                    row = executives_df.iloc[i] if hasattr(executives_df, "iloc") else executives_df[i]
+                    name_val = _to_python_type(row.get("leader_name"), None)
+                    display_name = _to_python_type(row.get("display_leader_name"), None)
+                    position = _to_python_type(row.get("position_name"), None)
+                    begin_date = _to_python_type(row.get("begin_date_str"), None)
+                    gender = _to_python_type(row.get("leader_gender"), None)
+                    age = _to_python_type(row.get("leader_age"), None)
+                    education = _to_python_type(row.get("highest_education"), None)
+                    annual_salary = _to_python_type(row.get("annual_salary"), None)
+
+                    def _opt_str(v):
+                        if v is None:
+                            return None
+                        s = str(v).strip()
+                        return s if s else None
+
+                    def _opt_int(v):
+                        if v is None:
+                            return None
+                        try:
+                            return int(v)
+                        except (TypeError, ValueError):
+                            return None
+
+                    executives.append({
+                        "name": _opt_str(name_val),
+                        "displayName": _opt_str(display_name),
+                        "position": _opt_str(position),
+                        "beginDate": _opt_str(begin_date),
+                        "gender": _opt_str(gender),
+                        "age": _opt_str(age),
+                        "education": _opt_str(education),
+                        "annualSalary": _opt_int(annual_salary),
+                    })
+
+            return {
+                "data": {
+                    "symbol": symbol.upper(),
+                    "code": futu_code,
+                    "market": market,
+                    "name": derived_name,
+                    "profile_labels": profile_labels,
+                    "executives": executives,
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_info_cache.on_error_return_stale(cache_key, fetch_company_info)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} company info error: {e}")
+            err_msg = str(e).lower()
+            # Older OpenD (< 10.7.6708) doesn't know the new proto IDs for
+            # get_company_profile / get_company_executives. Treat that as
+            # "service unavailable" so the panel renders the clean 暂无公司信息
+            # placeholder instead of leaking the raw protocol error.
+            if "unknown protocol" in err_msg or "unknown proto" in err_msg or "protocol id" in err_msg:
+                futu_code, market = _get_futu_code(symbol)
+                return {
+                    "data": {
+                        "symbol": symbol.upper(),
+                        "code": futu_code,
+                        "market": market,
+                        "name": "",
+                        "profile_labels": [],
+                        "executives": [],
+                    },
+                    "error": None,
+                }
+            return {"data": None, "error": f"获取公司信息失败: {str(e)[:120]}"}

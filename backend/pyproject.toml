@@ -22,7 +22,7 @@ dependencies = [
     "Pillow>=10.0.0",
     "langchain-mcp-adapters>=0.2.2",
     "requests>=2.31.0",
-    "futu-api>=10.4.6408",
+    "futu-api>=10.7.6708",
     "apscheduler>=3.10.0",
 ]
 

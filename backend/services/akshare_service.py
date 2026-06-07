@@ -481,6 +481,7 @@ class AShareService:
 
             return {
                 "data": {
+                    "market": "A",
                     "ts_code": safe_str(row.get("ts_code")) or ts_code,
                     "com_name": safe_str(row.get("com_name")),
                     "com_id": safe_str(row.get("com_id")),
@@ -1636,6 +1637,12 @@ class USStockService:
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_capital_flow(symbol, days)
 
+    @staticmethod
+    def get_company_info(symbol: str) -> dict:
+        """Get US listed-company basic info via Futu get_company_profile + get_company_executives."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_company_info(symbol)
+
 
 class HKStockService:
     """Service wrapper for HK stock data via Futu OpenAPI.
@@ -1689,6 +1696,12 @@ class HKStockService:
         """Get main force net inflow for HK stock via Futu OpenAPI."""
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_capital_flow(symbol, days)
+
+    @staticmethod
+    def get_company_info(symbol: str) -> dict:
+        """Get HK listed-company basic info via Futu get_company_profile + get_company_executives."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_company_info(symbol)
 
 
 # Backward compatibility - AkshareService now points to AShareService

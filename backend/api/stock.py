@@ -138,14 +138,27 @@ async def get_sector_money_flow(
 
 
 @router.get("/company")
-async def get_company_info(symbol: str = Query(..., description="6-digit A-share symbol, e.g., 601899")):
-    """Get A-share listed-company basic info via Tushare stock_company.
+async def get_company_info(symbol: str = Query(..., description="Stock symbol. A-share: 6-digit (e.g. 601899); HK: 4-5 digit or HK.XXXXX; US: 1-5 letters or US.XXXXX")):
+    """Get listed-company basic info for A-share, HK, or US symbols.
 
-    Returns shape ``{data: <row or null>, error: <str or null>}``.
+    Returns shape ``{data: <row or null>, error: <str or null>}`` for A-share,
+    or ``{data: <row or null>, error: <str or null>}`` for HK/US (where ``data``
+    is the merged Futu profile_labels + executives dict). HTTP 400 for symbols
+    matching none of the supported patterns.
     """
-    if not (isinstance(symbol, str) and symbol.isdigit() and len(symbol) == 6):
-        raise HTTPException(status_code=400, detail={"error": "A-share symbol required (6-digit numeric)"})
-    return AShareService.get_company_info(symbol)
+    import re
+
+    if not isinstance(symbol, str) or not symbol:
+        raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
+
+    if re.fullmatch(r"\d{6}", symbol):
+        return AShareService.get_company_info(symbol)
+    if re.fullmatch(r"HK\.\d{4,5}", symbol) or re.fullmatch(r"\d{4,5}", symbol):
+        return HKStockService.get_company_info(symbol)
+    if re.fullmatch(r"US\.[A-Z]{1,5}", symbol) or re.fullmatch(r"[A-Z]{1,5}", symbol):
+        return USStockService.get_company_info(symbol)
+
+    raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
 
 
 @router.get("/main-business")
