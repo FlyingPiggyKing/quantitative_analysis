@@ -5,6 +5,18 @@ import { getHourlyNews, HourlyNewsSummary } from "@/services/hourlyNews";
 
 type DirectionTone = "up" | "down" | "flat";
 
+/**
+ * Build a "M月D日 00:00 ～ HH:00" label for the daily-news card header.
+ * Input format: "YYYY-MM-DD-HH" (the hour_timestamp returned by the API).
+ * Falls back to the raw timestamp if the shape is unexpected.
+ */
+function formatDailyLabel(hourTimestamp: string): string {
+  const parts = hourTimestamp.split("-");
+  if (parts.length !== 4) return hourTimestamp;
+  const [, month, day, hour] = parts;
+  return `${parseInt(month, 10)}月${parseInt(day, 10)}日 00:00 ～ ${hour}:00`;
+}
+
 function getDirectionTone(direction: string): DirectionTone {
   if (direction.includes("流入")) return "up";
   if (direction.includes("流出")) return "down";
@@ -35,10 +47,13 @@ function HourlyNewsCard({ summary }: HourlyNewsCardProps) {
 
   return (
     <div className="vt-panel p-4 sm:p-5 mb-4 relative vt-ornament-tl vt-ornament-tr vt-ornament-bl vt-ornament-br">
-      {/* Header with hour and market direction */}
-      <div className="flex items-center justify-between mb-4 gap-3">
-        <h3 className="font-[var(--font-playfair)] text-base sm:text-lg tracking-[0.18em] text-vt-brass-300 uppercase">
-          {summary.hour}
+      {/* Header with hour and market direction.
+          On mobile: stack the badge under the title and tighten the type so
+          "M月D日 00:00 ～ HH:00 新闻摘要" fits on one line.
+          On sm+:    side-by-side with the original wide tracking. */}
+      <div className="flex flex-col gap-2 mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
+        <h3 className="font-[var(--font-playfair)] text-sm sm:text-lg tracking-tight sm:tracking-[0.18em] text-vt-brass-300 uppercase whitespace-nowrap">
+          {formatDailyLabel(summary.hour_timestamp)}
           <span className="text-vt-parchment-dim ml-2 text-xs tracking-[0.12em] normal-case">新闻摘要</span>
         </h3>
         <DirectionBadge direction={direction} />
@@ -150,7 +165,7 @@ export default function HourlyNewsPanel() {
   if (!newsData || newsData.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-10 gap-3">
-        <span className="vt-engraved text-sm text-vt-parchment-dim">暂无小时资讯数据</span>
+        <span className="vt-engraved text-sm text-vt-parchment-dim">暂无当日资讯数据</span>
         <button onClick={loadData} className="vt-btn-secondary px-4 py-2 text-xs">
           刷 新
         </button>
@@ -162,7 +177,7 @@ export default function HourlyNewsPanel() {
     <div>
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-[var(--font-playfair)] text-base sm:text-lg tracking-[0.2em] text-vt-parchment uppercase">
-          <span className="text-vt-brass-400">❖</span> 小 时 资 讯 <span className="text-vt-brass-400">❖</span>
+          <span className="text-vt-brass-400">❖</span> 当 日 资 讯 <span className="text-vt-brass-400">❖</span>
         </h2>
         <button onClick={loadData} className="vt-btn-secondary px-3 py-1.5 text-xs shrink-0">
           刷 新

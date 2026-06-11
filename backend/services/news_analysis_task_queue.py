@@ -17,6 +17,21 @@ from backend.services.trend_prediction_service import init_hourly_news_db, clean
 logger = logging.getLogger(__name__)
 
 
+# Provider switch — current default: "major_news" (long-form, deep coverage).
+# If Tushare restores the realtime "news" interface for this token, change
+# this to "news" and the fetch layer will fall back to the original
+# `pro.news(src='sina')` path automatically.
+NEWS_PROVIDER = "major_news"
+
+# How far back to look, in minutes, per provider. major_news data is delayed
+# ~20h on this token, so a 60-min window would return zero rows. The realtime
+# `news` interface is genuinely fresh; 60 min is the right window there.
+PROVIDER_TIME_WINDOW_MINUTES = {
+    "major_news": 24 * 60,
+    "news": 60,
+}
+
+
 class TaskStatus(str, Enum):
     PENDING = "pending"
     RUNNING = "running"
@@ -67,21 +82,43 @@ class NewsAnalysisTaskQueue:
 
         return task_id
 
-    def _fetch_tushare_news(self, minutes: int = 60) -> List[Dict[str, Any]]:
+    def _fetch_tushare_news(self, minutes: Optional[int] = None) -> List[Dict[str, Any]]:
         """Fetch news from Tushare for the past N minutes.
 
+        Provider is selected via the module-level NEWS_PROVIDER constant.
+        Current data source: Tushare major_news (long-form, deep coverage).
+        Time window is provider-aware (see PROVIDER_TIME_WINDOW_MINUTES):
+        major_news data is delayed ~20h on this token, so we look back 24h
+        by default. The realtime `news` interface uses a 60-min window.
+
         Args:
-            minutes: Number of minutes to look back
+            minutes: Override the lookback window in minutes. None = use the
+                provider's default.
 
         Returns:
             List of news items with datetime, title, content, source, relevance
         """
+        if minutes is None:
+            minutes = PROVIDER_TIME_WINDOW_MINUTES.get(NEWS_PROVIDER, 60)
+
         try:
             pro = ts.pro_api()
 
             # Tushare news API returns news with datetime
             # The news API returns recent news from various sources
-            df = pro.news(src='sina')
+            if NEWS_PROVIDER == "major_news":
+                # major_news uses YYYYMMDD date range (no time component).
+                # Cover yesterday + today so we span the full lookback window
+                # (major_news data is delayed ~20h on this token).
+                from datetime import datetime, timedelta
+                now = datetime.now()
+                # Round the date range up to cover the lookback window
+                lookback_days = max(1, (minutes + 24 * 60 - 1) // (24 * 60))
+                start_date = (now - timedelta(days=lookback_days)).strftime('%Y%m%d')
+                end_date = now.strftime('%Y%m%d')
+                df = pro.major_news(src='', start_date=start_date, end_date=end_date)
+            else:
+                df = pro.news(src='sina')
 
             if df is None or df.empty:
                 logger.warning("[NewsTask] No news returned from Tushare")
@@ -94,8 +131,9 @@ class NewsAnalysisTaskQueue:
             results = []
             for _, row in df.iterrows():
                 try:
-                    # Parse datetime - Tushare news returns datetime as string
-                    news_dt = row.get('datetime')
+                    # Parse datetime - major_news returns 'pub_time';
+                    # the legacy 'news' interface returns 'datetime'. Accept both.
+                    news_dt = row.get('pub_time', row.get('datetime'))
                     if news_dt is None:
                         continue
 
@@ -108,8 +146,13 @@ class NewsAnalysisTaskQueue:
                     if dt < cutoff:
                         continue
 
-                    # Get relevance score (default to 0.5 if not available)
-                    relevance = float(row.get('rel', 0.5)) / 100.0 if row.get('rel') else 0.5
+                    # major_news has no 'rel' column → default relevance to 0.5
+                    # (the agent's filter threshold), so all news pass the gate.
+                    # The legacy 'news' interface returns 'rel' as a 0-100 score.
+                    if NEWS_PROVIDER == "news":
+                        relevance = float(row.get('rel', 0.5)) / 100.0 if row.get('rel') else 0.5
+                    else:
+                        relevance = 0.5
 
                     results.append({
                         "datetime": dt.strftime('%Y-%m-%d %H:%M:%S'),
@@ -172,7 +215,7 @@ class NewsAnalysisTaskQueue:
                 task.current = 1
                 task.progress = "1/3"
 
-            news_list = self._fetch_tushare_news(minutes=60)
+            news_list = self._fetch_tushare_news()  # use provider-default time window
             logger.info(f"[Task {task_id}] Fetched {len(news_list)} news items")
 
             if not news_list:
