@@ -61,6 +61,31 @@ The system SHALL associate permissions with roles as follows:
 - **THEN** they have both 'admin' and 'power_user' roles
 - **AND** they have all permissions: assign_role, system_statistics, customized_agent
 
+### Requirement: System Data Seeding
+The system SHALL seed roles, permissions, and role→permission mappings automatically as part of schema initialization, so the RBAC system is usable on first startup without a separate migration step.
+
+#### Scenario: Schema init creates the 4 default roles
+- **WHEN** `db_migration.init_schema()` runs (called by `main.py` on startup)
+- **THEN** the `roles` table is populated with: `admin`, `power_user`, `user`, `guest`
+- **AND** the `permissions` table is populated with: `assign_role`, `system_statistics`, `customized_agent`
+- **AND** `role_permissions` is populated per the table above
+- **AND** the operation is idempotent (safe to call repeatedly via `INSERT OR IGNORE`)
+
+#### Scenario: User creation is NOT seeded
+- **WHEN** `init_schema()` runs
+- **THEN** no user account is created
+- **AND** the legacy `scripts/migrate_roles_permissions.py` and any hardcoded `jack.zhu` user creation SHALL NOT exist in the codebase
+- **AND** the first user account (and admin role assignment) is created via a future dedicated `init_admin` flow, not by schema bootstrap
+
+### Requirement: Schema Bootstrap for Legacy Databases
+The system SHALL bring existing databases up to the current schema on startup, so DBs restored from older backups (which may pre-date columns like `users.is_guest`) work without manual SQL.
+
+#### Scenario: Missing column on existing users table
+- **WHEN** `init_schema()` runs against a DB where `users` exists but lacks the `is_guest` column
+- **THEN** the helper SHALL detect the missing column via `PRAGMA table_info(users)`
+- **AND** SHALL execute `ALTER TABLE users ADD COLUMN is_guest INTEGER DEFAULT 0`
+- **AND** the operation is idempotent (re-running against an already-current table is a no-op)
+
 ### Requirement: Permission Checking
 The system SHALL provide a way to check if a user has a specific permission.
 

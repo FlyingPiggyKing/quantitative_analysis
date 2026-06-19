@@ -17,8 +17,8 @@ def get_db_connection():
     return conn
 
 
-def init_db():
-    """Initialize the database, creating the predictions table if it doesn't exist."""
+def init_predictions_db():
+    """Initialize trend_predictions.db schema. Call once from app startup."""
     conn = get_db_connection()
     try:
         conn.execute("""
@@ -29,31 +29,22 @@ def init_db():
                 trend_direction TEXT NOT NULL,
                 confidence INTEGER NOT NULL,
                 summary TEXT NOT NULL,
+                extended_analysis TEXT,
                 analyzed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 source TEXT DEFAULT 'trend'
             )
         """)
-        # Add extended_analysis column if it doesn't exist (for backward compatibility)
-        try:
-            conn.execute("""
-                ALTER TABLE predictions ADD COLUMN extended_analysis TEXT
-            """)
-        except Exception:
-            pass  # Column already exists
-        # Add source column if it doesn't exist (for backward compatibility)
-        try:
-            conn.execute("""
-                ALTER TABLE predictions ADD COLUMN source TEXT DEFAULT 'trend'
-            """)
-        except Exception:
-            pass  # Column already exists
-        # Create index for faster lookups
+        # Bring legacy predictions tables up to current schema (column may be
+        # missing on DBs predating the extended_analysis addition).
+        cols = {row[1] for row in conn.execute("PRAGMA table_info(predictions)").fetchall()}
+        if "extended_analysis" not in cols:
+            conn.execute("ALTER TABLE predictions ADD COLUMN extended_analysis TEXT")
+
         conn.execute("""
             CREATE INDEX IF NOT EXISTS idx_predictions_symbol_analyzed
             ON predictions(symbol, source, analyzed_at DESC)
         """)
 
-        # Create user_analysis_triggers table for rate limiting
         conn.execute("""
             CREATE TABLE IF NOT EXISTS user_analysis_triggers (
                 user_id TEXT NOT NULL,
@@ -155,6 +146,10 @@ def _hydrate_extended_fields(result: dict, extended) -> None:
 
     `extended` may be the raw JSON string from the DB or an already-parsed
     dict (as built in save_prediction). Missing or malformed data is ignored.
+
+    Only dict-shaped values are copied — non-dict values (e.g. an LLM that
+    returned a plain string for one of these fields) are dropped so the
+    Pydantic response model doesn't fail validation.
     """
     if not extended:
         return
@@ -164,8 +159,12 @@ def _hydrate_extended_fields(result: dict, extended) -> None:
             extended = json.loads(extended)
         except (json.JSONDecodeError, ValueError):
             return
+    if not isinstance(extended, dict):
+        return
     for key in EXTENDED_ANALYSIS_KEYS:
-        result[key] = extended.get(key)
+        value = extended.get(key)
+        if isinstance(value, dict):
+            result[key] = value
 
 
 class TrendPredictionService:
@@ -183,7 +182,6 @@ class TrendPredictionService:
     ) -> dict:
         """Save or update a prediction (upsert behavior - one per symbol per day)."""
         import json as json_lib
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -244,7 +242,6 @@ class TrendPredictionService:
     @staticmethod
     def get_latest_prediction(symbol: str, source: str = "trend") -> Optional[dict]:
         """Get the latest prediction for a specific stock symbol and source."""
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -275,7 +272,6 @@ class TrendPredictionService:
     @staticmethod
     def get_all_latest_predictions() -> List[dict]:
         """Get the latest prediction for each stock that has been analyzed."""
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -315,7 +311,6 @@ class TrendPredictionService:
         Returns None if no prediction exists for today or if the existing prediction
         has confidence = 0 (failed analysis).
         """
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -347,7 +342,6 @@ class TrendPredictionService:
     @staticmethod
     def get_predictions_by_symbol(symbol: str, limit: int = 7) -> List[dict]:
         """Get recent predictions for a stock (for history/trends)."""
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -383,7 +377,6 @@ class TrendPredictionService:
         Returns True if rate limited (within 1 hour of last trigger), False otherwise.
         """
         from datetime import timedelta
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -404,7 +397,6 @@ class TrendPredictionService:
 
         Uses upsert behavior - updates triggered_at if record exists.
         """
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -425,7 +417,6 @@ class TrendPredictionService:
         Returns 0 if no active cooldown.
         """
         from datetime import timedelta
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()

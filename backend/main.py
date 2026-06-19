@@ -43,10 +43,15 @@ def start_scheduler():
         init_hourly_news_db,
         cleanup_old_hourly_news,
         init_trend_runs_db,
+        init_predictions_db,
     )
     from backend.services.trend_run_service import mark_stale_runs_interrupted
     from backend.services.news_analysis_task_queue import run_hourly_news_analysis
     from backend.services import trend_run_queue
+    from backend.services.db_migration import init_schema
+
+    # Ensure all tables exist (no-op once applied)
+    init_schema()
 
     # Initialize hourly_news database table
     init_hourly_news_db()
@@ -57,6 +62,9 @@ def start_scheduler():
     # Initialize trend_runs table and reconcile any stale runs from a prior process
     init_trend_runs_db()
     mark_stale_runs_interrupted()
+
+    # Initialize predictions + rate-limit tables in trend_predictions.db
+    init_predictions_db()
 
     scheduler = BackgroundScheduler()
 

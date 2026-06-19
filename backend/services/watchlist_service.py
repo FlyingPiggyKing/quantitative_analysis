@@ -14,38 +14,6 @@ def get_db_connection():
     return conn
 
 
-def init_db():
-    """Initialize the database, creating the watchlist table if it doesn't exist."""
-    conn = get_db_connection()
-    try:
-        # Create user_watchlist table with market column
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS user_watchlist (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                symbol TEXT NOT NULL,
-                name TEXT NOT NULL,
-                market TEXT DEFAULT 'A' NOT NULL,
-                added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                UNIQUE(user_id, symbol)
-            )
-        """)
-
-        # Migration: Add market column if it doesn't exist (for existing tables)
-        cursor = conn.execute("PRAGMA table_info(user_watchlist)")
-        columns = [row[1] for row in cursor.fetchall()]
-        if "market" not in columns:
-            conn.execute("ALTER TABLE user_watchlist ADD COLUMN market TEXT DEFAULT 'A' NOT NULL")
-
-        # Create index for faster market-based queries
-        conn.execute("""
-            CREATE INDEX IF NOT EXISTS idx_user_market ON user_watchlist(user_id, market)
-        """)
-        conn.commit()
-    finally:
-        conn.close()
-
-
 class WatchlistService:
     """Service for watchlist database operations with user isolation."""
 
@@ -60,7 +28,6 @@ class WatchlistService:
             market: Optional market filter ('A' for A-share, 'US' for US stocks)
                    If None, returns all markets
         """
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -122,7 +89,6 @@ class WatchlistService:
             name: Stock name
             market: Market type - 'A' for A-share, 'US' for US stocks (default: 'A')
         """
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -143,7 +109,6 @@ class WatchlistService:
     @staticmethod
     def remove_stock(user_id: int, symbol: str) -> bool:
         """Remove a stock from the user's watchlist. Returns True if removed, False if not found."""
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()
@@ -156,7 +121,6 @@ class WatchlistService:
     @staticmethod
     def check_stock(user_id: int, symbol: str) -> Optional[dict]:
         """Check if a stock is in the user's watchlist. Returns stock info if found, None otherwise."""
-        init_db()
         conn = get_db_connection()
         try:
             cursor = conn.cursor()

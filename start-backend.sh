@@ -10,5 +10,9 @@ cd "$(dirname "$0")"
 # Set PYTHONPATH so 'backend' module can be imported
 export PYTHONPATH="$(pwd)"
 
+# Ensure uv-managed MCP server is installed (no-op once present)
+export PATH="$HOME/.local/bin:$PATH"
+uv tool install minimax-coding-plan-mcp >/dev/null 2>&1 || true
+
 # Start backend using the virtual environment
 ./backend/.venv/bin/python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 "$@"

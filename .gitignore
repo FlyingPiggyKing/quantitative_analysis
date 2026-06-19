@@ -13,9 +13,11 @@ backend/*.db.backup
 frontend/.next/
 frontend/out/
 frontend/node_modules/
+frontend/package-lock.json
 
 # Environment
 .env
 .env.local
 
 logs/
+frontend/*.db

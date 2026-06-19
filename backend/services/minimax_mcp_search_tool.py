@@ -1,6 +1,7 @@
 """MiniMax MCP search tool for DeepAgent - fallback when Tavily is unavailable."""
 import os
 import json
+import shutil
 import asyncio
 import logging
 from datetime import datetime, timedelta
@@ -9,6 +10,26 @@ from typing import Optional, Literal
 from dotenv import load_dotenv
 from langchain.tools import tool
 from langchain_mcp_adapters.client import MultiServerMCPClient
+
+
+def _resolve_uvx_command() -> str:
+    """Locate the uvx binary, returning an absolute path when possible.
+
+    The MCP server is spawned as a subprocess and inherits PATH from the parent.
+    On machines where ~/.local/bin (the default uv install location) is not on
+    PATH, a bare 'uvx' command fails with FileNotFoundError. Resolve to an
+    absolute path so the spawn works regardless of PATH.
+    """
+    found = shutil.which("uvx")
+    if found:
+        return found
+    # uv and uvx ship together; if uv is on PATH, uvx lives next to it
+    uv_path = shutil.which("uv")
+    if uv_path:
+        sibling = Path(uv_path).parent / "uvx"
+        if sibling.exists():
+            return str(sibling)
+    return "uvx"  # fall through; the spawn will fail with a clear error
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -29,7 +50,7 @@ def _get_mcp_client() -> MultiServerMCPClient:
         _mcp_client = MultiServerMCPClient({
             "minimax": {
                 "transport": "stdio",
-                "command": "uvx",
+                "command": _resolve_uvx_command(),
                 "args": ["minimax-coding-plan-mcp", "-y"],
                 "env": {
                     "MINIMAX_API_KEY": os.environ.get("MINIMAX_API_KEY", ""),

@@ -26,3 +26,28 @@ The system SHALL provide a web search tool backed by MiniMax MCP server that can
 #### Scenario: Timeout protection
 - **WHEN** the MCP server does not respond within timeout (30 seconds)
 - **THEN** the tool SHALL return "Search error: Timeout communicating with MCP server"
+
+### Requirement: Robust uvx Binary Resolution
+The system SHALL locate the `uvx` binary reliably regardless of the calling process's `PATH`, because the MCP server is spawned as a subprocess and inherits the parent's environment.
+
+#### Scenario: uvx is on PATH
+- **WHEN** `shutil.which("uvx")` finds a binary on `PATH`
+- **THEN** the MCP client SHALL use that absolute path as the `command`
+
+#### Scenario: uvx is NOT on PATH but uv is
+- **WHEN** `shutil.which("uvx")` returns None
+- **AND** `shutil.which("uv")` returns a path
+- **THEN** the resolver SHALL return the sibling `uvx` next to that `uv` binary
+- **AND** the MCP client SHALL use that absolute path
+
+#### Scenario: Neither uvx nor uv is on PATH
+- **WHEN** neither `uvx` nor `uv` is found
+- **THEN** the resolver SHALL return the bare string `"uvx"` and the spawn SHALL fail loudly with a clear `FileNotFoundError`
+
+### Requirement: MCP Server Pre-installed by Start Script
+The system SHALL ensure the `minimax-coding-plan-mcp` server is installed before the backend starts, so the first call does not block on PyPI resolution and works offline / offline-restricted environments.
+
+#### Scenario: Local dev startup installs MCP server
+- **WHEN** `./start-backend.sh` (or `./start.sh`) is invoked
+- **THEN** it SHALL run `uv tool install minimax-coding-plan-mcp` (idempotent, no-op if already installed)
+- **AND** it SHALL export `~/.local/bin` to `PATH` so the spawned MCP subprocess can find `uvx`
