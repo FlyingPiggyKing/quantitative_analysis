@@ -272,6 +272,140 @@ async def get_main_business_futu_history(
     raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
 
 
+# ---------------------------------------------------------------------------
+# HK / US shareholder research (Futu protos 3237/3238/3239 + holding_changes)
+# ---------------------------------------------------------------------------
+def _dispatch_shareholders_symbol(symbol: str, kind: str):
+    """Dispatch a HK or US symbol to the right service method on
+    ``HKStockService`` or ``USStockService``. ``kind`` is one of:
+    ``overview``, ``institutional``, ``holder_detail``, ``holding_changes``.
+
+    Returns the service-method result, or raises ``HTTPException(400)`` for
+    symbols matching none of the supported patterns (including A-share
+    6-digit inputs)."""
+    import re
+
+    if not isinstance(symbol, str) or not symbol:
+        raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
+
+    if re.fullmatch(r"US\.[A-Z]{1,5}", symbol) or re.fullmatch(r"[A-Z]{1,5}", symbol):
+        svc = USStockService
+        dispatch = {
+            "overview": svc.get_shareholders_overview,
+            "institutional": svc.get_shareholders_institutional,
+            "holder_detail": svc.get_shareholders_holder_detail,
+            "holding_changes": svc.get_shareholders_holding_changes,
+        }
+        return dispatch[kind]
+    if re.fullmatch(r"HK\.\d{4,5}", symbol) or re.fullmatch(r"\d{4,5}", symbol):
+        svc = HKStockService
+        dispatch = {
+            "overview": svc.get_shareholders_overview,
+            "institutional": svc.get_shareholders_institutional,
+            "holder_detail": svc.get_shareholders_holder_detail,
+            "holding_changes": svc.get_shareholders_holding_changes,
+        }
+        return dispatch[kind]
+
+    raise HTTPException(status_code=400, detail={"error": "Unsupported symbol"})
+
+
+@router.get("/shareholders-futu/overview")
+async def get_shareholders_futu_overview(
+    symbol: str = Query(..., description="HK: 4-5 digit (e.g. 00700) or HK.00700; US: 1-5 letters (e.g. AAPL) or US.AAPL"),
+):
+    """Get HK/US shareholder overview (top holders + holder type + holding
+    period list) via Futu ``get_shareholders_overview`` (proto 3237).
+
+    Returns ``{data: <payload>, error: null}`` on success,
+    ``{data: <empty payload>, error: null}`` on older OpenD / unknown proto,
+    or ``{data: null, error: <msg>}`` on other upstream errors. A-share
+    symbols (6 digits) and other unsupported inputs return HTTP 400.
+    """
+    method = _dispatch_shareholders_symbol(symbol, "overview")
+    return method(symbol)
+
+
+@router.get("/shareholders-futu/institutional")
+async def get_shareholders_futu_institutional(
+    symbol: str = Query(..., description="HK: 4-5 digit or HK.XXXXX; US: 1-5 letters or US.XXXXX"),
+    n_periods: int = Query(default=30, ge=1, le=50, description="Number of quarterly periods to merge (cap 50, default 30)"),
+):
+    """Get HK/US institutional-holding aggregate via Futu
+    ``get_shareholders_institutional`` (proto 3238). Paginated
+    **server-side** across ``next_key`` cursors and merged into a single
+    payload (max 5 Futu round-trips, 10 rows per page).
+
+    Returns ``{data: {periods, has_more, ...}, error: null}`` on success,
+    ``{data: {periods: [], has_more: false, ...}, error: null}`` on older
+    OpenD, or ``{data: null, error: <msg>}`` on other upstream errors.
+    A-share symbols return HTTP 400.
+    """
+    method = _dispatch_shareholders_symbol(symbol, "institutional")
+    return method(symbol, n_periods)
+
+
+@router.get("/shareholders-futu/holder-detail")
+async def get_shareholders_futu_holder_detail(
+    symbol: str = Query(..., description="HK: 4-5 digit or HK.XXXXX; US: 1-5 letters or US.XXXXX"),
+    holder_id: Optional[int] = Query(default=None, description="When set, returns that holder's cross-period history"),
+    period_id: Optional[int] = Query(default=None, description="When set, scopes to a single report period (id from overview.holding_period)"),
+    num: int = Query(default=50, ge=1, le=50, description="Rows per page (1-50; the Futu SDK caps at 50)"),
+    next_key: Optional[str] = Query(default=None, description="Cursor from the previous response (df.attrs['next_key'])"),
+):
+    """Get HK/US shareholder-detail rows via Futu
+    ``get_shareholders_holder_detail`` (proto 3239).
+
+    Without filters returns a paginated top-N table (by
+    ``holder_quantity`` desc, default ``num=50``); set ``holder_id`` to
+    drill into a single holder's cross-period trajectory (e.g. Prosus
+    reductions over 5 years); set ``period_id`` to scope to a single
+    report period. ``next_key`` paginates forward.
+
+    Returns ``{data: {rows, next_key, has_more, ...}, error: null}`` on
+    success, ``{data: <empty>, error: null}`` on older OpenD, or
+    ``{data: null, error: <msg>}`` on other upstream errors. A-share
+    symbols return HTTP 400.
+    """
+    method = _dispatch_shareholders_symbol(symbol, "holder_detail")
+    return method(
+        symbol,
+        holder_id=holder_id,
+        period_id=period_id,
+        num=num,
+        next_key=next_key,
+    )
+
+
+@router.get("/shareholders-futu/holding-changes")
+async def get_shareholders_futu_holding_changes(
+    symbol: str = Query(..., description="HK: 4-5 digit or HK.XXXXX; US: 1-5 letters or US.XXXXX"),
+    filter_type: int = Query(default=1, description="1=increases (增持), 2=decreases (减持)"),
+    num: int = Query(default=50, ge=1, le=50, description="Rows per page (1-50; the Futu SDK caps at 50)"),
+    next_key: Optional[str] = Query(default=None, description="Cursor from the previous response"),
+    # NOTE: The Futu SDK does NOT accept a `holder_id` parameter on
+    # `get_shareholders_holding_changes`. Per-holder reduction history
+    # (e.g. "show me every Prosus sale") is served by
+    # `/api/stock/shareholders-futu/holder-detail?holder_id=...` instead.
+    holder_id: Optional[int] = Query(default=None, include_in_schema=False),
+):
+    """Get HK/US latest-period holding changes via Futu
+    ``get_shareholders_holding_changes``. ``filter_type=1`` returns
+    increases (增持), ``filter_type=2`` returns decreases (减持).
+
+    Returns ``{data: {rows, next_key, has_more, ...}, error: null}`` on
+    success, ``{data: <empty>, error: null}`` on older OpenD, or
+    ``{data: null, error: <msg>}`` on other upstream errors. A-share
+    symbols return HTTP 400.
+
+    Any ``holder_id`` query parameter is silently ignored — the Futu SDK
+    does not support per-holder filtering on this endpoint. Use
+    ``/shareholders-futu/holder-detail?holder_id=...`` instead.
+    """
+    method = _dispatch_shareholders_symbol(symbol, "holding_changes")
+    return method(symbol, filter_type=filter_type, num=num, next_key=next_key)
+
+
 def _symbol_to_ts_code_safe(symbol: str) -> str:
     """Best-effort convert 6-digit symbol to ts_code; never raises."""
     from backend.services.akshare_service import _symbol_to_ts_code

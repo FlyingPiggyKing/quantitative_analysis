@@ -1058,6 +1058,633 @@ class FutuQuoteService:
                 }
             return {"data": None, "error": f"获取跨期主营构成失败: {str(e)[:120]}"}
 
+    # ----------------------------------------------------------------------
+    # Shareholder research (HK / US only) — Futu protos 3237/3238/3239 + holding_changes
+    # ----------------------------------------------------------------------
+    @classmethod
+    def get_shareholders_overview(cls, symbol: str) -> dict:
+        """Get HK/US listed-company shareholder overview via Futu
+        ``get_shareholders_overview`` (proto 3237).
+
+        Returns 3 sub-tables: ``main_holder`` (top holders), ``holder_type``
+        (distribution by holder category), and ``holding_period`` (the list
+        of report periods). ``holder_id`` in ``main_holder`` may be ``NaN``
+        (the synthetic "Other" bucket) — coerced to ``None`` for clean JSON.
+
+        Returns ``{data: <normalized payload>, error: null}`` on success,
+        ``{data: <empty payload>, error: null}`` on older OpenD or upstream
+        empty / unknown-protocol (mirrors ``get_company_info`` / ``get_revenue_breakdown``),
+        or ``{data: None, error: <msg>}`` on other upstream errors.
+        Cached 24h in ``_company_info_cache``.
+        """
+        cache_key = f"shareholders_overview:{symbol.upper()}"
+
+        def fetch_overview() -> dict:
+            futu_code, market = _get_futu_code(symbol)
+            ctx = FutuQuoteService._get_quote_context()
+            ret, data = ctx.get_shareholders_overview(futu_code)
+            if ret != 0:
+                raise Exception(f"Futu get_shareholders_overview error: {data}")
+
+            empty_payload = _empty_shareholders_overview_payload(
+                symbol, futu_code, market
+            )
+
+            if not isinstance(data, dict) or not data:
+                return {"data": empty_payload, "error": None}
+
+            main_holder = _df_to_shareholder_rows(data.get("main_holder"))
+            holder_type = _df_to_shareholder_rows(data.get("holder_type"))
+            holding_period = _df_to_holding_period_rows(data.get("holding_period"))
+
+            return {
+                "data": {
+                    "symbol": symbol.upper(),
+                    "code": futu_code,
+                    "market": market,
+                    "main_holder": main_holder,
+                    "holder_type": holder_type,
+                    "holding_period": holding_period,
+                    "source": "futu",
+                    "updated_at": datetime.now().isoformat(),
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_info_cache.on_error_return_stale(cache_key, fetch_overview)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} shareholders overview error: {e}")
+            err_msg = str(e).lower()
+            if "unknown protocol" in err_msg or "unknown proto" in err_msg or "protocol id" in err_msg:
+                futu_code, market = _get_futu_code(symbol)
+                return {
+                    "data": _empty_shareholders_overview_payload(symbol, futu_code, market),
+                    "error": None,
+                }
+            return {"data": None, "error": f"获取持股概览失败: {str(e)[:120]}"}
+
+    @classmethod
+    def get_shareholders_institutional(
+        cls, symbol: str, n_periods: int = 30
+    ) -> dict:
+        """Get HK/US institutional-holding aggregate via Futu
+        ``get_shareholders_institutional`` (proto 3238).
+
+        Paginated **server-side** across the SDK's ``next_key`` cursor
+        (typically a timestamp string). Each page yields up to 10 periods;
+        a full pull of 30 periods fires 3 Futu round-trips. The merged
+        result is sorted descending (latest first) and capped at
+        ``min(n_periods, 50)`` rows. ``has_more`` is ``True`` when the last
+        page returned a non-``"-1"`` cursor and we hit the cap.
+
+        Returns ``{data: <payload>, error: null}`` on success,
+        ``{data: <empty payload>, error: null}`` on older OpenD, or
+        ``{data: None, error: <msg>}`` on other errors. Cached 24h.
+        """
+        cap = max(1, min(int(n_periods), 50))
+        cache_key = f"shareholders_institutional:{symbol.upper()}:{cap}"
+
+        def fetch_institutional() -> dict:
+            futu_code, market = _get_futu_code(symbol)
+            ctx = FutuQuoteService._get_quote_context()
+
+            empty_payload = _empty_shareholders_institutional_payload(
+                symbol, futu_code, market
+            )
+
+            merged: List[Dict[str, Any]] = []
+            next_key: Optional[str] = None
+            pages = 0
+            max_pages = 5  # hard cap; cap=50 rows / 10 per page = 5
+            last_cursor = None
+
+            try:
+                ret, data = ctx.get_shareholders_institutional(futu_code, num=10)
+            except Exception as e:
+                # Some Futu SDK versions raise on older-OpenD instead of
+                # returning a non-zero ret — bubble up so the outer handler
+                # can detect "unknown protocol".
+                raise Exception(f"Futu get_shareholders_institutional error: {e}")
+
+            if ret != 0:
+                raise Exception(f"Futu get_shareholders_institutional error: {data}")
+
+            # The SDK exposes the cursor as a column on the returned DataFrame
+            # (the same value is repeated on every row of the page).
+            last_cursor = _extract_next_key_from_df(data)
+            page_rows = _df_to_institutional_rows(data)
+            merged.extend(page_rows)
+            pages += 1
+            has_more_from_last = last_cursor not in (None, "-1", "")
+
+            while (
+                has_more_from_last
+                and len(merged) < cap
+                and pages < max_pages
+            ):
+                try:
+                    ret2, data2 = ctx.get_shareholders_institutional(
+                        futu_code, num=10, next_key=last_cursor
+                    )
+                except Exception as e:
+                    raise Exception(
+                        f"Futu get_shareholders_institutional page error: {e}"
+                    )
+                if ret2 != 0:
+                    raise Exception(
+                        f"Futu get_shareholders_institutional page error: {data2}"
+                    )
+                page2 = _df_to_institutional_rows(data2)
+                if not page2:
+                    has_more_from_last = False
+                    break
+                merged.extend(page2)
+                last_cursor = _extract_next_key_from_df(data2)
+                has_more_from_last = last_cursor not in (None, "-1", "")
+                pages += 1
+
+            # Trim to cap, preserve descending (latest-first) order.
+            merged = merged[:cap]
+            hit_cap = has_more_from_last and len(merged) >= cap
+
+            return {
+                "data": {
+                    "symbol": symbol.upper(),
+                    "code": futu_code,
+                    "market": market,
+                    "periods": merged,
+                    "has_more": hit_cap,
+                    "source": "futu",
+                    "updated_at": datetime.now().isoformat(),
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_info_cache.on_error_return_stale(cache_key, fetch_institutional)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} shareholders institutional error: {e}")
+            err_msg = str(e).lower()
+            if "unknown protocol" in err_msg or "unknown proto" in err_msg or "protocol id" in err_msg:
+                futu_code, market = _get_futu_code(symbol)
+                return {
+                    "data": _empty_shareholders_institutional_payload(
+                        symbol, futu_code, market
+                    ),
+                    "error": None,
+                }
+            return {"data": None, "error": f"获取机构持股失败: {str(e)[:120]}"}
+
+    @classmethod
+    def get_shareholders_holder_detail(
+        cls,
+        symbol: str,
+        holder_id: Optional[int] = None,
+        period_id: Optional[int] = None,
+        num: int = 50,
+        next_key: Optional[str] = None,
+    ) -> dict:
+        """Get HK/US shareholder-detail rows via Futu ``get_shareholders_holder_detail``
+        (proto 3239).
+
+        ``holder_id`` scopes to a single holder's cross-period history (the
+        Prosus-reduction use case). ``period_id`` (opaque, sourced from the
+        ``holding_period[]`` list returned by ``get_shareholders_overview``)
+        scopes to a single period. ``next_key`` is the SDK's
+        ``df.attrs['next_key']`` exposed as a top-level field for client
+        pagination. ``has_more`` is ``next_key != "-1"``.
+
+        Returns ``{data: <payload>, error: null}`` on success,
+        ``{data: <empty payload>, error: null}`` on older OpenD, or
+        ``{data: None, error: <msg>}`` on other errors. Cached 24h,
+        keyed by ``(symbol, holder_id, period_id, next_key)`` so distinct
+        signatures do not collide.
+        """
+        hid = "all" if holder_id is None else str(int(holder_id))
+        pid = "latest" if period_id is None else str(int(period_id))
+        nk = "0" if not next_key else str(next_key)
+        cache_key = (
+            f"shareholders_holder_detail:{symbol.upper()}:{hid}:{pid}:{nk}"
+        )
+
+        def fetch_holder_detail() -> dict:
+            futu_code, market = _get_futu_code(symbol)
+            ctx = FutuQuoteService._get_quote_context()
+
+            kwargs: Dict[str, Any] = {
+                "request_type": None,
+                "next_key": next_key,
+                "num": int(num),
+                "sort_column": None,
+                "sort_type": None,
+            }
+            if period_id is not None:
+                kwargs["period_id"] = int(period_id)
+            if holder_id is not None:
+                kwargs["holder_id"] = int(holder_id)
+
+            ret, data = ctx.get_shareholders_holder_detail(futu_code, **kwargs)
+            if ret != 0:
+                raise Exception(f"Futu get_shareholders_holder_detail error: {data}")
+
+            empty_payload = _empty_shareholders_holder_detail_payload(
+                symbol, futu_code, market
+            )
+
+            rows = _df_to_holder_detail_rows(data)
+
+            # Futu exposes the next-page cursor as df.attrs['next_key'] for
+            # this endpoint (string offset) — lift it to a top-level field.
+            attrs_next_key = _extract_next_key_from_df(data) or "-1"
+
+            return {
+                "data": {
+                    "symbol": symbol.upper(),
+                    "code": futu_code,
+                    "market": market,
+                    "rows": rows,
+                    "next_key": attrs_next_key,
+                    "has_more": attrs_next_key != "-1",
+                    "source": "futu",
+                    "updated_at": datetime.now().isoformat(),
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_info_cache.on_error_return_stale(cache_key, fetch_holder_detail)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} shareholders holder detail error: {e}")
+            err_msg = str(e).lower()
+            if "unknown protocol" in err_msg or "unknown proto" in err_msg or "protocol id" in err_msg:
+                futu_code, market = _get_futu_code(symbol)
+                return {
+                    "data": _empty_shareholders_holder_detail_payload(
+                        symbol, futu_code, market
+                    ),
+                    "error": None,
+                }
+            return {"data": None, "error": f"获取股东明细失败: {str(e)[:120]}"}
+
+    @classmethod
+    def get_shareholders_holding_changes(
+        cls,
+        symbol: str,
+        filter_type: int = 1,
+        num: int = 50,
+        next_key: Optional[str] = None,
+    ) -> dict:
+        """Get HK/US latest-period holding changes via Futu
+        ``get_shareholders_holding_changes`` (no proto ID exposed; a
+        variant of the shareholders family).
+
+        ``filter_type=1`` returns increases (增持), ``filter_type=2``
+        returns decreases (减持). The Futu SDK does NOT accept a
+        ``holder_id`` parameter on this endpoint — per-holder reduction
+        history (e.g. "show me every Prosus sale") must go through
+        ``get_shareholders_holder_detail(holder_id=...)`` instead. This
+        route silently ignores any ``holder_id`` query parameter on the
+        HTTP layer (see ``backend/api/stock.py``).
+
+        Returns ``{data: <payload>, error: null}`` on success,
+        ``{data: <empty payload>, error: null}`` on older OpenD, or
+        ``{data: None, error: <msg>}`` on other errors. Cached 24h,
+        keyed by ``(symbol, filter_type, next_key)``.
+        """
+        ft = int(filter_type) if filter_type in (1, 2) else 1
+        nk = "0" if not next_key else str(next_key)
+        cache_key = f"shareholders_holding_changes:{symbol.upper()}:{ft}:{nk}"
+
+        def fetch_holding_changes() -> dict:
+            futu_code, market = _get_futu_code(symbol)
+            ctx = FutuQuoteService._get_quote_context()
+
+            ret, data = ctx.get_shareholders_holding_changes(
+                futu_code,
+                next_key=next_key,
+                num=int(num),
+                sort_type=None,
+                sort_column=None,
+                filter_type=ft,
+            )
+            if ret != 0:
+                raise Exception(
+                    f"Futu get_shareholders_holding_changes error: {data}"
+                )
+
+            rows = _df_to_holding_changes_rows(data)
+
+            # Futu exposes the cursor as a column on the returned DataFrame.
+            next_key_val = _extract_next_key_from_df(data) or "-1"
+
+            empty_payload = _empty_shareholders_holding_changes_payload(
+                symbol, futu_code, market
+            )
+            if not rows:
+                return {
+                    "data": {
+                        **empty_payload,
+                        "next_key": "-1",
+                        "has_more": False,
+                    },
+                    "error": None,
+                }
+
+            return {
+                "data": {
+                    "symbol": symbol.upper(),
+                    "code": futu_code,
+                    "market": market,
+                    "rows": rows,
+                    "next_key": next_key_val,
+                    "has_more": next_key_val != "-1",
+                    "source": "futu",
+                    "updated_at": datetime.now().isoformat(),
+                },
+                "error": None,
+            }
+
+        try:
+            return _company_info_cache.on_error_return_stale(cache_key, fetch_holding_changes)
+        except Exception as e:
+            logger.error(f"[Futu] {symbol} shareholders holding changes error: {e}")
+            err_msg = str(e).lower()
+            if "unknown protocol" in err_msg or "unknown proto" in err_msg or "protocol id" in err_msg:
+                futu_code, market = _get_futu_code(symbol)
+                return {
+                    "data": _empty_shareholders_holding_changes_payload(
+                        symbol, futu_code, market
+                    ),
+                    "error": None,
+                }
+            return {"data": None, "error": f"获取近期持股变动失败: {str(e)[:120]}"}
+
+
+def _df_to_shareholder_rows(df) -> List[Dict[str, Any]]:
+    """Convert a shareholders-overview sub-table DataFrame to a JSON-safe
+    list of ``{static_date, static_date_str, name, holder_pct, holder_id}``.
+
+    ``holder_id`` is coerced to ``int`` when present and to ``None`` when
+    ``NaN``/missing (the synthetic "Other" row in ``main_holder`` and
+    every row in ``holder_type``). ``holder_pct`` is rounded to 4
+    decimals to keep the payload small.
+    """
+    if df is None or not hasattr(df, "__len__") or len(df) == 0:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for i in range(len(df)):
+        row = df.iloc[i] if hasattr(df, "iloc") else df[i]
+        static_date = _to_python_type(row.get("static_date"), None)
+        static_date_str = (
+            _to_python_type(row.get("static_date_str"), None)
+            or (str(static_date) if static_date is not None else "")
+        )
+        name = _to_python_type(row.get("name"), "") or ""
+        pct = _to_python_type(row.get("holder_pct"), 0.0) or 0.0
+        try:
+            pct = round(float(pct), 4)
+        except (TypeError, ValueError):
+            pct = 0.0
+        raw_id = row.get("holder_id")
+        if raw_id is None:
+            holder_id: Optional[int] = None
+        else:
+            try:
+                if isinstance(raw_id, float) and raw_id != raw_id:
+                    holder_id = None
+                else:
+                    holder_id = int(raw_id)
+            except (TypeError, ValueError):
+                holder_id = None
+        rows.append({
+            "static_date": static_date,
+            "static_date_str": str(static_date_str),
+            "name": str(name),
+            "holder_pct": pct,
+            "holder_id": holder_id,
+        })
+    return rows
+
+
+def _df_to_holding_period_rows(df) -> List[Dict[str, Any]]:
+    """Convert the ``holding_period`` DataFrame to ``[{period_text, period_id}]``."""
+    if df is None or not hasattr(df, "__len__") or len(df) == 0:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for i in range(len(df)):
+        row = df.iloc[i] if hasattr(df, "iloc") else df[i]
+        period_text = _to_python_type(row.get("period_text"), "") or ""
+        period_id = _to_python_type(row.get("period_id"), None)
+        rows.append({
+            "period_text": str(period_text),
+            "period_id": period_id,
+        })
+    return rows
+
+
+def _df_to_institutional_rows(df) -> List[Dict[str, Any]]:
+    """Convert an institutional DataFrame to a JSON-safe list. Each row is
+    a single report period (quarterly)."""
+    if df is None or not hasattr(df, "__len__") or len(df) == 0:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for i in range(len(df)):
+        row = df.iloc[i] if hasattr(df, "iloc") else df[i]
+
+        def _f(key, default=0.0):
+            v = _to_python_type(row.get(key), default)
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return default
+
+        period_text = _to_python_type(row.get("period_text"), "") or ""
+        update_time = _to_python_type(row.get("update_time_str"), "") or ""
+        rows.append({
+            "period_text": str(period_text),
+            "institution_quantity": _f("institution_quantity", 0.0),
+            "institution_quantity_change": _f("institution_quantity_change", 0.0),
+            "holder_quantity": _f("holder_quantity", 0.0),
+            "holder_quantity_change": _f("holder_quantity_change", 0.0),
+            "holder_pct": _f("holder_pct", 0.0),
+            "holder_pct_change": _f("holder_pct_change", 0.0),
+            "update_time_str": str(update_time),
+        })
+    return rows
+
+
+def _df_to_holder_detail_rows(df) -> List[Dict[str, Any]]:
+    """Convert a holder-detail DataFrame to a JSON-safe list. ``close_price``
+    is the latest snapshot price across all rows in a single period (a
+    known Futu-side quirk — NOT the historical close on ``holding_date``)."""
+    if df is None or not hasattr(df, "__len__") or len(df) == 0:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for i in range(len(df)):
+        row = df.iloc[i] if hasattr(df, "iloc") else df[i]
+
+        def _f(key, default=0.0):
+            v = _to_python_type(row.get(key), default)
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return default
+
+        raw_id = row.get("holder_id")
+        try:
+            holder_id = None if raw_id is None or (isinstance(raw_id, float) and raw_id != raw_id) else int(raw_id)
+        except (TypeError, ValueError):
+            holder_id = None
+
+        holding_date = _to_python_type(row.get("holding_date"), None)
+        holding_date_str = (
+            _to_python_type(row.get("holding_date_str"), None)
+            or (str(holding_date) if holding_date is not None else "")
+        )
+        rows.append({
+            "period_text": str(_to_python_type(row.get("period_text"), "") or ""),
+            "holder_id": holder_id,
+            "name": str(_to_python_type(row.get("name"), "") or ""),
+            "holder_quantity": _f("holder_quantity", 0.0),
+            "holder_quantity_change": _f("holder_quantity_change", 0.0),
+            "holder_pct": _f("holder_pct", 0.0),
+            "holder_pct_change": _f("holder_pct_change", 0.0),
+            "holding_date": holding_date,
+            "holding_date_str": str(holding_date_str),
+            "close_price": _f("close_price", 0.0),
+            "price_change_pct": _f("price_change_pct", 0.0),
+            "source_group_name": str(_to_python_type(row.get("source_group_name"), "") or ""),
+            "update_time_str": str(_to_python_type(row.get("update_time_str"), "") or ""),
+        })
+    return rows
+
+
+def _df_to_holding_changes_rows(df) -> List[Dict[str, Any]]:
+    """Convert a holding-changes DataFrame to a JSON-safe list."""
+    if df is None or not hasattr(df, "__len__") or len(df) == 0:
+        return []
+    rows: List[Dict[str, Any]] = []
+    for i in range(len(df)):
+        row = df.iloc[i] if hasattr(df, "iloc") else df[i]
+
+        def _f(key, default=0.0):
+            v = _to_python_type(row.get(key), default)
+            try:
+                return float(v)
+            except (TypeError, ValueError):
+                return default
+
+        raw_id = row.get("holder_id")
+        try:
+            holder_id = None if raw_id is None or (isinstance(raw_id, float) and raw_id != raw_id) else int(raw_id)
+        except (TypeError, ValueError):
+            holder_id = None
+
+        holding_date = _to_python_type(row.get("holding_date"), None)
+        holding_date_str = (
+            _to_python_type(row.get("holding_date_str"), None)
+            or (str(holding_date) if holding_date is not None else "")
+        )
+        rows.append({
+            "period_text": str(_to_python_type(row.get("period_text"), "") or ""),
+            "name": str(_to_python_type(row.get("name"), "") or ""),
+            "holder_id": holder_id,
+            "share_change_num": _f("share_change_num", 0.0),
+            "shares_change_price": _f("shares_change_price", 0.0),
+            "share_ratio": _f("share_ratio", 0.0),
+            "holder_type": str(_to_python_type(row.get("holder_type"), "") or ""),
+            "holder_type_id": _to_python_type(row.get("holder_type_id"), None),
+            "holding_date": holding_date,
+            "holding_date_str": str(holding_date_str),
+            "share_ratio_change": _f("share_ratio_change", 0.0),
+            "share_num": _f("share_num", 0.0),
+        })
+    return rows
+
+
+def _empty_shareholders_overview_payload(symbol: str, futu_code: str, market: str) -> dict:
+    return {
+        "symbol": symbol.upper() if symbol else "",
+        "code": futu_code,
+        "market": market,
+        "main_holder": [],
+        "holder_type": [],
+        "holding_period": [],
+        "source": "futu",
+        "updated_at": datetime.now().isoformat(),
+    }
+
+
+def _empty_shareholders_institutional_payload(symbol: str, futu_code: str, market: str) -> dict:
+    return {
+        "symbol": symbol.upper() if symbol else "",
+        "code": futu_code,
+        "market": market,
+        "periods": [],
+        "has_more": False,
+        "source": "futu",
+        "updated_at": datetime.now().isoformat(),
+    }
+
+
+def _extract_next_key_from_df(df) -> Optional[str]:
+    """Read the ``next_key`` pagination cursor from a shareholders
+    DataFrame returned by any of the three shareholders endpoints.
+
+    Two shapes:
+    - ``get_shareholders_institutional`` / ``get_shareholders_holding_changes``:
+      the SDK exposes ``next_key`` as a column on every row of the page
+      (same value repeated).
+    - ``get_shareholders_holder_detail``: the SDK exposes it as
+      ``df.attrs['next_key']``.
+
+    Returns the cursor as a string, ``"-1"`` when exhausted, ``None`` on
+    failure (so callers can treat both as "stop")."""
+    if df is None:
+        return None
+    try:
+        # 1) attrs (holder_detail)
+        if hasattr(df, "attrs"):
+            attrs_val = df.attrs.get("next_key")
+            if attrs_val not in (None, ""):
+                return str(attrs_val)
+        # 2) column (institutional, holding_changes)
+        if hasattr(df, "columns") and "next_key" in list(df.columns) and len(df):
+            raw = df["next_key"].iloc[0]
+            v = _to_python_type(raw, None)
+            if v is not None:
+                return str(v)
+    except Exception:
+        pass
+    return None
+
+
+def _empty_shareholders_holder_detail_payload(symbol: str, futu_code: str, market: str) -> dict:
+    return {
+        "symbol": symbol.upper() if symbol else "",
+        "code": futu_code,
+        "market": market,
+        "rows": [],
+        "next_key": "-1",
+        "has_more": False,
+        "source": "futu",
+        "updated_at": datetime.now().isoformat(),
+    }
+
+
+def _empty_shareholders_holding_changes_payload(symbol: str, futu_code: str, market: str) -> dict:
+    return {
+        "symbol": symbol.upper() if symbol else "",
+        "code": futu_code,
+        "market": market,
+        "rows": [],
+        "next_key": "-1",
+        "has_more": False,
+        "source": "futu",
+        "updated_at": datetime.now().isoformat(),
+    }
+
 
 def _item_has_revenue(item: dict) -> bool:
     """Return True if the breakdown item has a non-zero main_oper_income."""

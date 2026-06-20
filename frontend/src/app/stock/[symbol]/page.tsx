@@ -8,6 +8,7 @@ import IndicatorPanel from "@/components/IndicatorPanel";
 import FinancialIndicatorsPanel from "@/components/FinancialIndicatorsPanel";
 import CompanyInfoPanel from "@/components/CompanyInfoPanel";
 import MainBusinessPanel from "@/components/MainBusinessPanel";
+import ShareholdersPanel from "@/components/ShareholdersPanel";
 import TrendAnalysisPanel from "@/components/TrendAnalysisPanel";
 import PETrendSparkline from "@/components/PETrendSparkline";
 import MoneyFlowSparkline from "@/components/MoneyFlowSparkline";
@@ -825,6 +826,15 @@ export default function StockDetailPage() {
           futuLoading={futuMainBizLoading}
           futuError={futuMainBizError}
         />
+
+        {/* Shareholder research — rendered for HK and US markets only. A-share
+            (6-digit) pages skip this section entirely; no fetches fire. */}
+        {(companyInfo?.market === "HK" || companyInfo?.market === "US") && (
+          <ShareholdersPanel
+            market={companyInfo?.market as "HK" | "US"}
+            symbol={symbol}
+          />
+        )}
       </main>
 
       <AuthModal

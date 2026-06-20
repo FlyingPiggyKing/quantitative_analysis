@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useLayoutEffect } from "react";
+import CollapsibleHeader from "@/components/CollapsibleHeader";
 import type { CompanyInfo, CompanyLabel, CompanyExecutive } from "@/services/companyInfo";
 
 interface CompanyInfoPanelProps {
@@ -98,101 +99,108 @@ export default function CompanyInfoPanel({
   loading,
   error,
 }: CompanyInfoPanelProps) {
+  const [open, setOpen] = useState(true);
   return (
     <section className="vt-panel p-3 sm:p-4">
-      <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase mb-4">
-        <span className="text-vt-brass-400">❖</span> 公 司 信 息
-      </h2>
+      <CollapsibleHeader
+        title="公 司 信 息"
+        open={open}
+        onToggle={() => setOpen((o) => !o)}
+      />
 
-      {loading && (
-        <div className="animate-pulse space-y-2">
-          <div className="h-3 bg-vt-ink-700 rounded w-1/3" />
-          <div className="h-3 bg-vt-ink-700 rounded w-1/2" />
-          <div className="h-3 bg-vt-ink-700 rounded w-2/3" />
-          <div className="h-3 bg-vt-ink-700 rounded w-1/2" />
-          <div className="h-3 bg-vt-ink-700 rounded w-3/5" />
-          <div className="h-3 bg-vt-ink-700 rounded w-1/2" />
-        </div>
-      )}
-
-      {!loading && (error || !data) && (
-        <div className="text-center text-vt-brass-400 text-xs py-3 vt-engraved">
-          {error || "暂无公司信息"}
-        </div>
-      )}
-
-      {!loading && data && (
-        <div>
-          {data.market === "A" ? (
-            <>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
-                <Cell label="公司全称" value={data.com_name ?? NA} />
-                <Cell label="法人代表" value={data.chairman ?? NA} />
-                <Cell label="总经理" value={data.manager ?? NA} />
-                <Cell label="董秘" value={data.secretary ?? NA} />
-                <Cell label="注册资本" value={formatRegCapital(data.reg_capital)} />
-                <Cell label="注册日期" value={data.setup_date ?? NA} />
-                <Cell
-                  label="所在地区"
-                  value={[data.province, data.city].filter(Boolean).join(" · ") || NA}
-                />
-                <Cell label="员工人数" value={formatEmployees(data.employees)} />
-                <Cell
-                  label="公司主页"
-                  value={
-                    (() => {
-                      const site = firstOf(data.website);
-                      if (!site) return NA;
-                      const href = site.startsWith("http") ? site : `https://${site}`;
-                      return (
-                        <a
-                          href={href}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-vt-brass-300 hover:text-vt-brass-400 underline-offset-2 hover:underline"
-                        >
-                          {site}
-                        </a>
-                      );
-                    })()
-                  }
-                />
-              </div>
-
-              <div className="mt-4">
-                <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
-                  办公地址
-                </div>
-                <p className="font-[var(--font-geist-mono)] text-xs text-vt-parchment leading-relaxed">
-                  {data.office ?? NA}
-                </p>
-              </div>
-
-              <div className="mt-4">
-                <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
-                  主要业务及产品
-                </div>
-                <CollapsibleText value={data.main_business} />
-              </div>
-
-              <div className="mt-4">
-                <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
-                  经营范围
-                </div>
-                <CollapsibleText value={data.business_scope} />
-              </div>
-
-              <div className="mt-4">
-                <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
-                  公司介绍
-                </div>
-                <CollapsibleText value={data.introduction} />
-              </div>
-            </>
-          ) : (
-            <HkusPanel data={data} />
+      {open && (
+        <>
+          {loading && (
+            <div className="animate-pulse space-y-2">
+              <div className="h-3 bg-vt-ink-700 rounded w-1/3" />
+              <div className="h-3 bg-vt-ink-700 rounded w-1/2" />
+              <div className="h-3 bg-vt-ink-700 rounded w-2/3" />
+              <div className="h-3 bg-vt-ink-700 rounded w-1/2" />
+              <div className="h-3 bg-vt-ink-700 rounded w-3/5" />
+              <div className="h-3 bg-vt-ink-700 rounded w-1/2" />
+            </div>
           )}
-        </div>
+
+          {!loading && (error || !data) && (
+            <div className="text-center text-vt-brass-400 text-xs py-3 vt-engraved">
+              {error || "暂无公司信息"}
+            </div>
+          )}
+
+          {!loading && data && (
+            <div>
+              {data.market === "A" ? (
+                <>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6">
+                    <Cell label="公司全称" value={data.com_name ?? NA} />
+                    <Cell label="法人代表" value={data.chairman ?? NA} />
+                    <Cell label="总经理" value={data.manager ?? NA} />
+                    <Cell label="董秘" value={data.secretary ?? NA} />
+                    <Cell label="注册资本" value={formatRegCapital(data.reg_capital)} />
+                    <Cell label="注册日期" value={data.setup_date ?? NA} />
+                    <Cell
+                      label="所在地区"
+                      value={[data.province, data.city].filter(Boolean).join(" · ") || NA}
+                    />
+                    <Cell label="员工人数" value={formatEmployees(data.employees)} />
+                    <Cell
+                      label="公司主页"
+                      value={
+                        (() => {
+                          const site = firstOf(data.website);
+                          if (!site) return NA;
+                          const href = site.startsWith("http") ? site : `https://${site}`;
+                          return (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-vt-brass-300 hover:text-vt-brass-400 underline-offset-2 hover:underline"
+                            >
+                              {site}
+                            </a>
+                          );
+                        })()
+                      }
+                    />
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
+                      办公地址
+                    </div>
+                    <p className="font-[var(--font-geist-mono)] text-xs text-vt-parchment leading-relaxed">
+                      {data.office ?? NA}
+                    </p>
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
+                      主要业务及产品
+                    </div>
+                    <CollapsibleText value={data.main_business} />
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
+                      经营范围
+                    </div>
+                    <CollapsibleText value={data.business_scope} />
+                  </div>
+
+                  <div className="mt-4">
+                    <div className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim mb-1">
+                      公司介绍
+                    </div>
+                    <CollapsibleText value={data.introduction} />
+                  </div>
+                </>
+              ) : (
+                <HkusPanel data={data} />
+              )}
+            </div>
+          )}
+        </>
       )}
     </section>
   );

@@ -1663,6 +1663,57 @@ class USStockService:
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_revenue_breakdown_history(symbol, n_periods)
 
+    @staticmethod
+    def get_shareholders_overview(symbol: str) -> dict:
+        """Get US listed-company shareholder overview (top holders + holder
+        type + holding period list) via Futu ``get_shareholders_overview``
+        (proto 3237). See ``FutuQuoteService.get_shareholders_overview``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_overview(symbol)
+
+    @staticmethod
+    def get_shareholders_institutional(symbol: str, n_periods: int = 30) -> dict:
+        """Get US institutional-holding aggregate over the last N periods
+        via Futu ``get_shareholders_institutional`` (proto 3238, paginated
+        server-side up to N). See ``FutuQuoteService.get_shareholders_institutional``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_institutional(symbol, n_periods)
+
+    @staticmethod
+    def get_shareholders_holder_detail(
+        symbol: str,
+        holder_id=None,
+        period_id=None,
+        num: int = 50,
+        next_key=None,
+    ) -> dict:
+        """Get US shareholder-detail rows via Futu ``get_shareholders_holder_detail``
+        (proto 3239). See ``FutuQuoteService.get_shareholders_holder_detail``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_holder_detail(
+            symbol,
+            holder_id=holder_id,
+            period_id=period_id,
+            num=num,
+            next_key=next_key,
+        )
+
+    @staticmethod
+    def get_shareholders_holding_changes(
+        symbol: str,
+        filter_type: int = 1,
+        num: int = 50,
+        next_key=None,
+    ) -> dict:
+        """Get US latest-period holding changes (increases / decreases) via
+        Futu ``get_shareholders_holding_changes``. Note: the SDK does NOT
+        accept a ``holder_id`` parameter — per-holder reduction history
+        goes through ``get_shareholders_holder_detail(holder_id=...)``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_holding_changes(
+            symbol, filter_type=filter_type, num=num, next_key=next_key
+        )
+
 
 class HKStockService:
     """Service wrapper for HK stock data via Futu OpenAPI.
@@ -1738,6 +1789,57 @@ class HKStockService:
         """
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_revenue_breakdown_history(symbol, n_periods)
+
+    @staticmethod
+    def get_shareholders_overview(symbol: str) -> dict:
+        """Get HK listed-company shareholder overview (top holders + holder
+        type + holding period list) via Futu ``get_shareholders_overview``
+        (proto 3237). See ``FutuQuoteService.get_shareholders_overview``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_overview(symbol)
+
+    @staticmethod
+    def get_shareholders_institutional(symbol: str, n_periods: int = 30) -> dict:
+        """Get HK institutional-holding aggregate over the last N periods
+        via Futu ``get_shareholders_institutional`` (proto 3238, paginated
+        server-side up to N). See ``FutuQuoteService.get_shareholders_institutional``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_institutional(symbol, n_periods)
+
+    @staticmethod
+    def get_shareholders_holder_detail(
+        symbol: str,
+        holder_id=None,
+        period_id=None,
+        num: int = 50,
+        next_key=None,
+    ) -> dict:
+        """Get HK shareholder-detail rows via Futu ``get_shareholders_holder_detail``
+        (proto 3239). See ``FutuQuoteService.get_shareholders_holder_detail``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_holder_detail(
+            symbol,
+            holder_id=holder_id,
+            period_id=period_id,
+            num=num,
+            next_key=next_key,
+        )
+
+    @staticmethod
+    def get_shareholders_holding_changes(
+        symbol: str,
+        filter_type: int = 1,
+        num: int = 50,
+        next_key=None,
+    ) -> dict:
+        """Get HK latest-period holding changes (increases / decreases) via
+        Futu ``get_shareholders_holding_changes``. Note: the SDK does NOT
+        accept a ``holder_id`` parameter — per-holder reduction history
+        goes through ``get_shareholders_holder_detail(holder_id=...)``."""
+        from backend.services.futu_quote_service import FutuQuoteService
+        return FutuQuoteService.get_shareholders_holding_changes(
+            symbol, filter_type=filter_type, num=num, next_key=next_key
+        )
 
 
 # Backward compatibility - AkshareService now points to AShareService

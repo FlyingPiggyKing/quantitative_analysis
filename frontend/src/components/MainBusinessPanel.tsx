@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import CollapsibleHeader from "@/components/CollapsibleHeader";
 import {
   MainBusinessResponse,
   MainBusinessHistoryResponse,
@@ -896,6 +898,7 @@ function FutuCrossPeriodSection({
 }
 
 export default function MainBusinessPanel(props: MainBusinessPanelProps) {
+  const [open, setOpen] = useState(true);
   const {
     product,
     region,
@@ -924,15 +927,18 @@ export default function MainBusinessPanel(props: MainBusinessPanelProps) {
 
     return (
       <section className="vt-panel p-3 sm:p-4">
-        <div className="flex items-baseline justify-between gap-3 mb-4">
-          <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase">
-            <span className="text-vt-brass-400">❖</span> 主 营 业 务 构 成
-          </h2>
-          <span className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim">
-            数据源: Tushare
-          </span>
-        </div>
-
+        <CollapsibleHeader
+          title="主 营 业 务 构 成"
+          open={open}
+          onToggle={() => setOpen((o) => !o)}
+          rightSlot={
+            <span className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim">
+              数据源: Tushare
+            </span>
+          }
+        />
+        {open && (
+        <>
         {error && !product && (
           <div className="text-center text-vt-brass-400 text-xs py-3 vt-engraved">
             {error}
@@ -972,6 +978,8 @@ export default function MainBusinessPanel(props: MainBusinessPanelProps) {
             <CrossPeriodSection data={history} loading={loading.h} />
           </>
         ) : null}
+        </>
+        )}
       </section>
     );
   }
@@ -990,14 +998,18 @@ export default function MainBusinessPanel(props: MainBusinessPanelProps) {
 
   return (
     <section className="vt-panel p-3 sm:p-4">
-      <div className="flex items-baseline justify-between gap-3 mb-4">
-        <h2 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-parchment uppercase">
-          <span className="text-vt-brass-400">❖</span> 主 营 业 务 构 成
-        </h2>
-        <span className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim">
-          数据源: Futu
-        </span>
-      </div>
+      <CollapsibleHeader
+        title="主 营 业 务 构 成"
+        open={open}
+        onToggle={() => setOpen((o) => !o)}
+        rightSlot={
+          <span className="vt-engraved not-italic text-[10px] tracking-widest uppercase text-vt-parchment-dim">
+            数据源: Futu
+          </span>
+        }
+      />
+      {open && (
+      <>
 
       {futuError && !futuProduct && (
         <div className="text-center text-vt-brass-400 text-xs py-3 vt-engraved">
@@ -1064,6 +1076,8 @@ export default function MainBusinessPanel(props: MainBusinessPanelProps) {
           />
         </>
       ) : null}
+      </>
+      )}
     </section>
   );
 }
