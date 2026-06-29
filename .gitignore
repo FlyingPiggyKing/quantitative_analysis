@@ -2,9 +2,13 @@
 .DS_Store
 Thumbs.db
 
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
 # Backend
 backend/.venv/
-backend/__pycache__/
 backend/.env
 backend/*.db
 backend/*.db.backup
