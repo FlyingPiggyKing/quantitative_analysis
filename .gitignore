@@ -21,3 +21,8 @@ frontend/package-lock.json
 
 logs/
 frontend/*.db
+
+# Remote data pipeline (overseas machine)
+remote_data/.env
+remote_data/data/
+remote_data/.venv/
