@@ -25,6 +25,14 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# ETF ingest protection chain. Order matters: rate-limit is added first so HMAC
+# is the outermost middleware (a 401 from HMAC should NOT consume the per-IP
+# rate-limit budget). Both middlewares are no-ops on any non-ingest path.
+from backend.middleware.rate_limit import RateLimitMiddleware  # noqa: E402
+from backend.middleware.hmac_auth import HmacAuthMiddleware  # noqa: E402
+app.add_middleware(RateLimitMiddleware)
+app.add_middleware(HmacAuthMiddleware)
+
 # Include routers
 app.include_router(stock.router)
 app.include_router(watchlist.router)
@@ -35,6 +43,11 @@ app.include_router(institutional_trading_analysis.router)
 app.include_router(index_metrics.router)
 app.include_router(hourly_news.router)
 app.include_router(admin.router)
+# ETF ingest + read endpoints (registered last so middleware ordering is
+# deterministic in the OpenAPI schema).
+from backend.api import etf_ingest, etf_read  # noqa: E402
+app.include_router(etf_ingest.router)
+app.include_router(etf_read.router)
 
 
 def start_scheduler():
@@ -49,9 +62,17 @@ def start_scheduler():
     from backend.services.news_analysis_task_queue import run_hourly_news_analysis
     from backend.services import trend_run_queue
     from backend.services.db_migration import init_schema
+    from backend.services.etf_db import init as init_etf_db
+    from backend.services.etf_config import validate as validate_etf_config
+    from backend.middleware.rate_limit import start_flusher, stop_flusher
 
     # Ensure all tables exist (no-op once applied)
     init_schema()
+
+    # Validate ETF config and ensure remote DB schema exists (idempotent).
+    validate_etf_config()
+    init_etf_db()
+    start_flusher()
 
     # Initialize hourly_news database table
     init_hourly_news_db()
@@ -114,6 +135,8 @@ async def startup_event():
 async def shutdown_event():
     """Shutdown scheduler on app shutdown."""
     global _scheduler
+    from backend.middleware.rate_limit import stop_flusher
+    stop_flusher()
     if _scheduler:
         _scheduler.shutdown()
         print("[Scheduler] Scheduler shut down")
@@ -126,4 +149,9 @@ async def root():
 
 @app.get("/health")
 async def health():
-    return {"status": "healthy"}
+    """Health check. Includes ETF ingest status snapshot for diagnostics."""
+    from backend.services import etf_service
+    return {
+        "status": "healthy",
+        "etf": etf_service.health_snapshot(),
+    }

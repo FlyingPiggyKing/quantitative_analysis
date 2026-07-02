@@ -17,3 +17,6 @@ build/
 
 # Local database
 watchlist.db
+
+# ETF remote ingest database (populated by overseas pusher, not source-controlled)
+data/etf_remote.db
