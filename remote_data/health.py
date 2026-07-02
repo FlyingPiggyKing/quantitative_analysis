@@ -49,7 +49,7 @@ def _gather(conn: sqlite3.Connection) -> dict:
 
 class _HealthHandler(BaseHTTPRequestHandler):
     # Set by `make_server`.
-    conn_factory: Optional[Callable[[], sqlite3.Connection]] = None
+    db_path: Optional[str] = None
 
     def log_message(self, format, *args):  # noqa: A002 — silence default logging
         pass
@@ -60,8 +60,8 @@ class _HealthHandler(BaseHTTPRequestHandler):
             self.end_headers()
             return
         try:
-            assert self.conn_factory is not None
-            conn = self.conn_factory()
+            assert self.db_path is not None
+            conn = local_db.connect(self.db_path)
             try:
                 payload = _gather(conn)
             finally:
@@ -85,7 +85,7 @@ def make_server(
     port: int = 8001,
 ) -> ThreadingHTTPServer:
     db_path = resolve_db_path(cfg)
-    _HealthHandler.conn_factory = lambda: local_db.connect(db_path)
+    _HealthHandler.db_path = db_path
     return ThreadingHTTPServer((host, port), _HealthHandler)
 
 
