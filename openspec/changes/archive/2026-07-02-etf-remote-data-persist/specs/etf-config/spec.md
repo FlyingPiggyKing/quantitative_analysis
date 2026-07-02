@@ -11,7 +11,7 @@ The system MUST read the new configuration from environment variables, fail-fast
 - **WHEN** the backend starts without `ETF_PIPELINE_SECRET`
 - **THEN** startup aborts with a clear error message naming the missing variable
 
-### Requirement: Configuration keys and defaults
+### Requirement: Backend configuration keys and defaults
 The system MUST support the following keys:
 
 | Key | Required | Default | Purpose |

@@ -36,13 +36,14 @@ fresh deployments / disaster recovery / CI smoke tests.
 
 ```bash
 cd /path/to/repo
-./scripts/start-etf-fetcher.sh
+./start-fetcher.sh
 ```
 
-`start-etf-fetcher.sh` runs `init_local_db.py` first and then
-`python -m remote_data` in the foreground. Use this when systemd is unavailable
-(mac dev box, containers, debugging). The bootstrap contract is identical to
-the systemd path.
+`start-fetcher.sh` runs `init_local_db.py` first and then `python -m remote_data`
+in the background (PID file at `logs/remote_data.pid`, logs at
+`logs/remote_data.log`). Stop it with `./stop-fetcher.sh`. Use this when systemd
+is unavailable (mac dev box, containers, debugging). The bootstrap contract is
+identical to the systemd path.
 
 You can also run the bare entry point — `main.py`'s startup hook calls
 `local_db.init()` before the scheduler starts, so the schema is guaranteed to
@@ -104,7 +105,7 @@ WantedBy=multi-user.target
 |---|---|
 | `main.py` startup hook | Always invoked when daemon starts (systemd or `python -m remote_data`) |
 | `remote_data/scripts/init_local_db.py` | Standalone — disaster recovery, CI smoke tests, replica bootstrap |
-| `scripts/start-etf-fetcher.sh` | No-systemd deployments, ad-hoc foreground runs |
+| `start-fetcher.sh` (repo root) | Convenience wrapper that calls both of the above; use for nohup/PID-file deployments |
 
 All three call `local_db.init()` which is idempotent (safe on fresh filesystem,
 on a fully initialized DB, and on a partial DB).

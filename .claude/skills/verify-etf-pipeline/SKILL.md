@@ -64,7 +64,10 @@ The closest to production. The daemon will fetch real data from yahooquery (firs
 cp remote_data/.env.example remote_data/.env
 # Edit remote_data/.env: fill REMOTE_INGEST_URL (any https string works for the smoke test)
 #                     set ETF_PIPELINE_SECRET=0123456789abcdef0123456789abcdef
-timeout 90 ./scripts/start-etf-fetcher.sh 2>&1 | head -80
+./start-fetcher.sh                  # backgrounds, writes logs/remote_data.pid
+sleep 90                            # let it run
+./stop-fetcher.sh                   # clean up
+head -80 logs/remote_data.log       # captured output
 ```
 
 ### Option B: bare entry point
@@ -145,7 +148,10 @@ python3 /tmp/mock_ingest.py
 
 # Terminal 2 — point pusher at the mock (after the HTTPS bypass above)
 sed -i 's|^REMOTE_INGEST_URL=.*|REMOTE_INGEST_URL=http://127.0.0.1:9999/ingest|' remote_data/.env
-timeout 60 ./scripts/start-etf-fetcher.sh 2>&1 | tail -30
+./start-fetcher.sh                  # backgrounds, writes logs/remote_data.pid
+sleep 60                            # let it run
+./stop-fetcher.sh                   # clean up
+tail -30 logs/remote_data.log       # captured output
 
 # Verify rows got marked pushed
 sqlite3 remote_data/data/etf_local.db "
