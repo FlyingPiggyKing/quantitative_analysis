@@ -9,7 +9,6 @@ The system SHALL use APScheduler (or equivalent in-process scheduler) to invoke 
 | Job | Default cadence |
 |---|---|
 | `fetch_quotes` | every 5 minutes (market hours), every 30 minutes (pre/post-market) |
-| `fetch_news` | every 60 minutes |
 | `fetch_kline` | daily at 16:35 US/Eastern |
 | `fetch_fundamentals` | daily at 16:40 US/Eastern |
 | `fetch_performance` | daily at 16:45 US/Eastern |
@@ -25,6 +24,10 @@ The system SHALL use APScheduler (or equivalent in-process scheduler) to invoke 
 #### Scenario: Configurable cadence
 - **WHEN** `FETCH_QUOTES_INTERVAL_MINUTES=10` is set in `.env`
 - **THEN** `fetch_quotes` fires every 10 minutes instead of the default 5
+
+#### Scenario: News fetch is not scheduled
+- **WHEN** the scheduler starts
+- **THEN** no news fetch job is registered; `fetch_news` is not invoked on any cadence; this is the supported steady state until a future change re-introduces news ingestion from a different source
 
 ### Requirement: Pusher runs as a continuous loop independent of fetchers
 The push loop MUST run as a separate job (default: every 30 seconds) that scans for `pushed_at IS NULL` rows and ships them, decoupled from fetch cadence.

@@ -34,10 +34,6 @@ The system SHALL provide a fetcher module under `remote_data/fetcher/` with one 
 - **WHEN** `fetch_esg(["QQQ"])` is called
 - **THEN** the system returns a list with one record per symbol containing `symbol`, `as_of_date`, `total_esg`, `environment`, `social`, `governance` (nullable fields OK)
 
-#### Scenario: Fetch news
-- **WHEN** `fetch_news(["QQQ"], since=ISO8601)` is called
-- **THEN** the system returns a list of news items containing `url` (PK), `symbol`, `title`, `publisher`, `published_at` (ISO8601 UTC), `summary`
-
 #### Scenario: One symbol fails during batch fetch
 - **WHEN** `fetch_quotes(["QQQ", "BAD_SYMBOL"])` is called and yahooquery raises for `BAD_SYMBOL`
 - **THEN** the system returns records for the successful symbols and writes a row to `fetch_log` for the failed one; it MUST NOT raise
@@ -48,6 +44,10 @@ The system MUST convert raw yahooquery responses to the normalized record shapes
 #### Scenario: Timestamp fields are always ISO8601 UTC
 - **WHEN** any fetcher returns records with a timestamp
 - **THEN** that timestamp MUST be a string in ISO8601 UTC form with a `Z` suffix
+
+#### Scenario: Timestamp inputs from yahooquery may be epoch or ISO date string
+- **WHEN** the fetcher receives a `regularMarketTime`, `preMarketTime`, or `postMarketTime` value from yahooquery
+- **THEN** the fetcher MUST accept both shapes: an integer/float epoch in seconds AND an ISO date string (with or without trailing `Z`); both shapes are converted to a single canonical ISO8601 UTC `Z`-suffixed string before being placed in the record; values that cannot be parsed in either form are treated as missing and the corresponding record is dropped with a `fetch_log` error entry
 
 #### Scenario: Missing fields are null, not absent
 - **WHEN** a yahooquery field is unavailable (e.g., `preMarketPrice` for a non-trading moment)
