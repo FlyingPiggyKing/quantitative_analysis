@@ -90,7 +90,6 @@ def _cfg(tmp_path, url="https://example.com/ingest", timeout=5):
         symbols=["QQQ"],
         fetch_quotes_interval_minutes=5,
         fetch_quotes_offhours_interval_minutes=30,
-        fetch_news_interval_minutes=60,
         push_interval_seconds=30,
         batch_size=500,
         market_tz="US/Eastern",

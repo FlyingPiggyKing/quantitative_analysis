@@ -83,9 +83,21 @@ def now_utc_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def epoch_to_iso(ts: float | int | None) -> str | None:
+def epoch_to_iso(ts: float | int | str | None) -> str | None:
+    """Normalize a yahooquery time field to a canonical ISO8601 UTC `Z` string.
+
+    yahooquery has historically returned ``regularMarketTime`` etc. as integer
+    epochs, but newer versions return ISO date strings (e.g. ``"2026-07-02 20:00:01"``).
+    Accept both shapes so a single fetcher works against either API.
+    """
     if ts is None:
         return None
+    if isinstance(ts, str):
+        try:
+            normalized = ts.replace("Z", "+00:00") if ts.endswith("Z") else ts
+            return datetime.fromisoformat(normalized).astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+        except (OverflowError, OSError, ValueError, TypeError):
+            return None
     try:
         return datetime.fromtimestamp(float(ts), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     except (OverflowError, OSError, ValueError, TypeError):

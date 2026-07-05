@@ -1,4 +1,19 @@
-"""ETF news fetcher."""
+"""ETF news fetcher.
+
+PARKING: News fetcher is parked as of OpenSpec change ``fix-quote-and-news``.
+Yahoo Finance /v2/finance/news endpoint is currently unreachable from the
+overseas host (HTTP 429 / error response for every symbol under the deployed
+yahooquery version), and the call shape ``Ticker.news`` is now a method, not a
+property.
+
+The ``etf_news`` table, ``insert_etf_news`` helper, and this module remain in
+place so a future change can re-introduce news ingestion from a different source
+without a schema migration. The scheduler no longer schedules a news fetch job
+(removed from ``remote_data/scheduler/jobs.py:_FETCH_TABLE`` and
+``build_scheduler``).
+
+See: openspec/changes/fix-quote-and-news/design.md (decision D3).
+"""
 
 from __future__ import annotations
 

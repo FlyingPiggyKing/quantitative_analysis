@@ -22,11 +22,15 @@ import pytest
 class _FakeTicker:
     def __init__(self, symbol, **kwargs):
         self.symbol = symbol
+        # yahooquery 2.4.x returns market-time fields as ISO date STRINGS
+        # (not integer epochs as earlier versions did). The fetcher must
+        # accept both shapes — see epoch_to_iso + test_epoch_to_iso_accepts_both_epoch_and_iso_string.
         self._price = {
-            "regularMarketTime": 1751200000,
+            "regularMarketTime": "2025-06-29 12:26:40",
             "regularMarketPrice": 521.34,
             "preMarketPrice": 522.10,
             "postMarketPrice": None,
+            "postMarketTime": "2025-06-29 19:59:58",
             "regularMarketVolume": 1234567,
         }
 
@@ -274,6 +278,25 @@ def test_epoch_to_iso_handles_bad_input():
     assert epoch_to_iso(None) is None
     assert epoch_to_iso("not-a-number") is None
     assert epoch_to_iso(0) is not None
+
+
+def test_epoch_to_iso_accepts_both_epoch_and_iso_string():
+    """Regression test for OpenSpec change fix-quote-and-news.
+
+    yahooquery 2.4.x returns ``regularMarketTime`` as an ISO date string;
+    older versions returned an integer epoch. epoch_to_iso MUST accept both.
+    """
+    from remote_data.fetcher.base import epoch_to_iso
+    # (a) integer epoch — pre-existing path
+    assert epoch_to_iso(1751200000) == "2025-06-29T12:26:40Z"
+    # (b) ISO date string WITHOUT timezone suffix — current live API shape
+    assert epoch_to_iso("2025-06-29 12:26:40") == "2025-06-29T12:26:40Z"
+    # (c) ISO date string WITH trailing Z — also accepted
+    assert epoch_to_iso("2025-06-29T12:26:40Z") == "2025-06-29T12:26:40Z"
+    # (d) garbage string → None
+    assert epoch_to_iso("not a date") is None
+    # (e) None → None
+    assert epoch_to_iso(None) is None
 
 
 def test_retry_policy_delays():

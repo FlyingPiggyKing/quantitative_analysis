@@ -30,7 +30,6 @@ def _cfg(tmp_path) -> Config:
         symbols=["QQQ"],
         fetch_quotes_interval_minutes=5,
         fetch_quotes_offhours_interval_minutes=30,
-        fetch_news_interval_minutes=60,
         push_interval_seconds=30,
         batch_size=500,
         market_tz="US/Eastern",
@@ -148,7 +147,7 @@ def test_build_scheduler_registers_all_jobs(tmp_path, monkeypatch):
     scheduler = build_scheduler(cfg, conn_factory=conn_factory)
     job_ids = {j.id for j in scheduler.get_jobs()}
     expected = {
-        "push_loop", "fetch_quotes_market", "fetch_news",
+        "push_loop", "fetch_quotes_market",
         "fetch_fundamentals", "fetch_performance",
         "fetch_holdings", "fetch_sector_weights",
         "fetch_equity_holdings", "fetch_esg", "prune",

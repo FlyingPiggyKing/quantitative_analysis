@@ -50,7 +50,6 @@ class Config:
 
     fetch_quotes_interval_minutes: int
     fetch_quotes_offhours_interval_minutes: int
-    fetch_news_interval_minutes: int
     push_interval_seconds: int
     batch_size: int
 
@@ -139,7 +138,6 @@ def load_config(env_file: Path | str | None = None) -> Config:
         fetch_quotes_offhours_interval_minutes=_int(
             "FETCH_QUOTES_OFFHOURS_INTERVAL_MINUTES", 30
         ),
-        fetch_news_interval_minutes=_int("FETCH_NEWS_INTERVAL_MINUTES", 60),
         push_interval_seconds=_int("PUSH_INTERVAL_SECONDS", 30),
         batch_size=_int("BATCH_SIZE", 500),
         market_tz=_str("MARKET_TZ", "US/Eastern"),

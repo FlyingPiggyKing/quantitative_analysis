@@ -24,7 +24,6 @@ from remote_data.fetcher import (
     fetch_esg,
     fetch_fundamentals,
     fetch_holdings,
-    fetch_news,
     fetch_performance,
     fetch_quotes,
     fetch_sector_weightings,
@@ -35,6 +34,8 @@ logger = logging.getLogger(__name__)
 
 
 # Map (data_type -> (fetcher_fn, inserter)).
+# Note: "etf_news" is parked as of OpenSpec change fix-quote-and-news. See
+# remote_data/fetcher/etf_news.py for the parking rationale.
 _FETCH_TABLE = {
     "etf_quote": (fetch_quotes, local_db.insert_etf_quote),
     "etf_fundamentals": (fetch_fundamentals, local_db.insert_etf_fundamentals),
@@ -43,7 +44,6 @@ _FETCH_TABLE = {
     "etf_performance": (fetch_performance, local_db.insert_etf_performance),
     "etf_equity_holdings": (fetch_equity_holdings, local_db.insert_etf_equity_holdings),
     "etf_esg": (fetch_esg, local_db.insert_etf_esg),
-    "etf_news": (fetch_news, local_db.insert_etf_news),
 }
 
 
@@ -62,7 +62,7 @@ def safe_run(
     """
     logger.info("fetch start data_type=%s symbols=%d", data_type, len(symbols))
     try:
-        records = fn(symbols) if data_type != "etf_news" else fn(symbols, since=None)
+        records = fn(symbols)
     except Exception as exc:
         logger.error(
             "fetch failed data_type=%s: %s\n%s",
@@ -209,16 +209,9 @@ def build_scheduler(
         coalesce=True,
     )
 
-    fetch_news_job = make_fetch_job(
-        "etf_news", conn_factory=conn_factory, cfg=cfg
-    )
-    scheduler.add_job(
-        fetch_news_job,
-        IntervalTrigger(minutes=cfg.fetch_news_interval_minutes),
-        id="fetch_news",
-        max_instances=1,
-        coalesce=True,
-    )
+    # Note: etf_news fetch is parked as of OpenSpec change fix-quote-and-news.
+    # The fetch_news module + etf_news table remain in place so a future
+    # change can re-introduce news ingestion from a different source.
 
     # Daily EOD jobs
     fetch_fundamentals_job = make_fetch_job(
