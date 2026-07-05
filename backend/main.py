@@ -74,6 +74,16 @@ def start_scheduler():
     init_etf_db()
     start_flusher()
 
+    # Warm the ETF symbol cache so the first US-stock valuation request doesn't
+    # pay the DB hit. A missing/unreachable etf_remote.db must NOT block boot —
+    # the lazy fallback in `is_etf()` will retry on the first request.
+    try:
+        from backend.services import etf_valuation
+        loaded = etf_valuation.refresh_etf_symbols()
+        print(f"[ETF-VAL] Warmed ETF symbol cache: {len(loaded)} symbols")
+    except Exception as e:
+        print(f"[ETF-VAL] Startup warmup skipped: {e}")
+
     # Initialize hourly_news database table
     init_hourly_news_db()
 

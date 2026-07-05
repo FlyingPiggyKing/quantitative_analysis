@@ -72,6 +72,10 @@ export default function StockDetailPage() {
   const [indicators, setIndicators] = useState<Indicators | null>(null);
   const [valuation, setValuation] = useState<ValuationRecord | null>(null);
   const [valuationHistory, setValuationHistory] = useState<ValuationRecord[]>([]);
+  // Top-level is_etf flag from /api/stock/{symbol}/valuation. Drives the
+  // conditional rendering of the dividend chips. Stored separately because
+  // `valuation` only holds the latest ValuationRecord.
+  const [isEtf, setIsEtf] = useState(false);
   const [moneyFlowHistory, setMoneyFlowHistory] = useState<MoneyFlowRecord[]>([]);
   const [moneyFlowLoading, setMoneyFlowLoading] = useState(false);
   const [moneyFlowMarket, setMoneyFlowMarket] = useState<string>("");
@@ -152,6 +156,7 @@ export default function StockDetailPage() {
         if (valuationResult.data) {
           setValuationHistory(valuationResult.data);
         }
+        setIsEtf(Boolean(valuationResult.is_etf));
       } catch (err) {
         setError("数据加载失败，请确保后端服务已启动");
         console.error(err);
@@ -678,6 +683,26 @@ export default function StockDetailPage() {
                       : "N/A"}
                   </span>
                 </div>
+                {isEtf && (
+                  <>
+                    <div className="flex items-center gap-1">
+                      <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>股息率</span>
+                      <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
+                        {valuation.dividend_yield != null
+                          ? `${(valuation.dividend_yield * 100).toFixed(2)}%`
+                          : "N/A"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <span className="vt-prediction-label" style={{ fontSize: "0.6rem" }}>年股息</span>
+                      <span className="text-vt-parchment font-[var(--font-geist-mono)] font-medium">
+                        {valuation.dividend_rate != null
+                          ? `$${valuation.dividend_rate.toFixed(2)}`
+                          : "N/A"}
+                      </span>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>

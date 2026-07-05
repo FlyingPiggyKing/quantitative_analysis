@@ -7,6 +7,10 @@ export interface ValuationRecord {
   turnover_rate: number | null;
   total_mv: number | null;
   circ_mv: number | null;
+  // ETF-specific fields (only populated when is_etf=true on ValuationResponse).
+  dividend_yield?: number | null;
+  dividend_rate?: number | null;
+  as_of?: string | null;
 }
 
 export interface ValuationResponse {
@@ -14,6 +18,10 @@ export interface ValuationResponse {
   data?: ValuationRecord[];
   latest?: ValuationRecord;
   error?: string;
+  // True when the symbol is recognised as a US ETF and the latest record was
+  // merged with yahooquery fundamentals. False (or absent for non-US markets)
+  // for regular stocks.
+  is_etf?: boolean;
 }
 
 export async function fetchStockValuation(

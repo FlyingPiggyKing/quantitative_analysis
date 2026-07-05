@@ -1591,6 +1591,17 @@ class USStockService:
     """
 
     @staticmethod
+    def get_daily_basic(symbol: str, days: int = 30) -> dict:
+        """Get daily basic metrics for US stock via Futu OpenAPI.
+
+        Routes through `etf_valuation.get_etf_aware_daily_basic` so ETF symbols
+        pick up yahooquery-sourced PE/PB and dividend fields; non-ETF symbols
+        are byte-identical to the Futu response (plus `is_etf: false`).
+        """
+        from backend.services import etf_valuation
+        return etf_valuation.get_etf_aware_daily_basic(symbol, days)
+
+    @staticmethod
     def get_stock_info(symbol: str) -> dict:
         """Get basic US stock information via Futu OpenAPI."""
         from backend.services.futu_quote_service import FutuQuoteService
@@ -1612,12 +1623,6 @@ class USStockService:
         """Get real-time quote for a US stock via Futu OpenAPI."""
         from backend.services.futu_quote_service import FutuQuoteService
         return FutuQuoteService.get_realtime_quote(symbol)
-
-    @staticmethod
-    def get_daily_basic(symbol: str, days: int = 30) -> dict:
-        """Get daily basic metrics for US stock via Futu OpenAPI."""
-        from backend.services.futu_quote_service import FutuQuoteService
-        return FutuQuoteService.get_daily_basic(symbol, days)
 
     @staticmethod
     def get_daily_basic_batch(symbols: List[str], days: int = 30) -> dict:
