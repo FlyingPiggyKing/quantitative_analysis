@@ -14,6 +14,42 @@ const RUN_STATUS_LABELS: Record<string, string> = {
   interrupted: "已中断",
 };
 
+const STATUS_LABELS: Record<string, string> = {
+  ok: "正常",
+  warn: "滞后",
+  stale: "停滞",
+  unknown: "无数据",
+};
+
+const STATUS_PILL_CLASS: Record<string, string> = {
+  ok: "vt-pill vt-pill-ok",
+  warn: "vt-pill vt-pill-warn",
+  stale: "vt-pill vt-pill-stale",
+  unknown: "vt-pill vt-pill-unknown",
+};
+
+function formatRelative(iso: string | null): string {
+  if (!iso) return "—";
+  const then = new Date(iso).getTime();
+  const now = Date.now();
+  const diffMs = now - then;
+  if (Number.isNaN(diffMs)) return iso;
+  const minutes = Math.round(diffMs / 60000);
+  if (minutes < 1) return "刚刚";
+  if (minutes < 60) return `${minutes} 分钟前`;
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return `${hours} 小时前`;
+  const days = Math.round(hours / 24);
+  return `${days} 天前`;
+}
+
+function formatDateOnly(iso: string | null): string {
+  if (!iso) return "—";
+  // Accept either an ISO timestamp or a YYYY-MM-DD business date.
+  const m = iso.match(/^(\d{4}-\d{2}-\d{2})/);
+  return m ? m[1] : iso;
+}
+
 interface WatchlistStock {
   symbol: string;
   name: string;
@@ -33,6 +69,24 @@ interface AdminStats {
   watchlist_count: number;
   users: User[];
   user_count: number;
+}
+
+interface EtfPushRow {
+  data_type: string;
+  label_zh: string;
+  last_received_at: string | null;
+  last_record_date: string | null;
+  row_count: number;
+  lag_hours: number | null;
+  status: "ok" | "warn" | "stale" | "unknown";
+}
+
+interface EtfPushStatus {
+  tables: EtfPushRow[];
+  server_time: string;
+  db_path: string;
+  thresholds: { warn_hours: number; stale_hours: number };
+  error?: string;
 }
 
 export default function SystemAdminPanel() {
@@ -79,6 +133,37 @@ export default function SystemAdminPanel() {
     const intervalId = setInterval(refreshTrendRun, isActive ? 4000 : 30000);
     return () => clearInterval(intervalId);
   }, [refreshTrendRun, trendRun?.run?.status]);
+
+  // ETF push status — auto-refresh every 60s; manual refresh via button.
+  const [etfPush, setEtfPush] = useState<EtfPushStatus | null>(null);
+  const [etfPushLoading, setEtfPushLoading] = useState(true);
+  const [etfPushError, setEtfPushError] = useState<string | null>(null);
+  const [etfPushRefreshing, setEtfPushRefreshing] = useState(false);
+
+  const refreshEtfPush = useCallback(async (manual = false) => {
+    if (manual) setEtfPushRefreshing(true);
+    try {
+      const res = await fetch(`${API_BASE}/api/admin/etf-remote-push-status`, {
+        headers: getAuthHeaders(),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data: EtfPushStatus = await res.json();
+      setEtfPush(data);
+      setEtfPushError(null);
+    } catch (err) {
+      // Keep previous snapshot visible; surface the error inline.
+      setEtfPushError(err instanceof Error ? err.message : "刷新失败");
+    } finally {
+      setEtfPushLoading(false);
+      if (manual) setEtfPushRefreshing(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshEtfPush();
+    const intervalId = setInterval(() => refreshEtfPush(), 60000);
+    return () => clearInterval(intervalId);
+  }, [refreshEtfPush]);
 
   const handleTriggerTrendRun = useCallback(async () => {
     if (!trendRun) return;
@@ -223,6 +308,82 @@ export default function SystemAdminPanel() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* ETF Data Push Monitor Block */}
+      <div className="vt-panel p-4">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-[var(--font-playfair)] text-lg tracking-[0.18em] text-vt-brass-400">
+            ETF 数 据 推 送 监 控
+          </h3>
+          <button
+            type="button"
+            onClick={() => refreshEtfPush(true)}
+            disabled={etfPushRefreshing}
+            className="vt-btn-oxblood px-3 py-1 text-xs min-h-[28px] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {etfPushRefreshing ? "刷 新 中 …" : "刷 新"}
+          </button>
+        </div>
+
+        {etfPushLoading ? (
+          <p className="vt-engraved text-vt-parchment-dim text-sm">加载中…</p>
+        ) : etfPush?.error && etfPush.tables.length === 0 ? (
+          <p className="vt-engraved text-vt-parchment-dim text-sm">
+            {etfPush.db_path ? `${etfPush.db_path} 未找到，` : ""}
+            请检查 etf_remote.db 是否存在
+          </p>
+        ) : etfPush?.tables.length === 0 ? (
+          <p className="vt-engraved text-vt-parchment-dim text-sm">暂无数据</p>
+        ) : (
+          <>
+            <div className="max-h-72 overflow-y-auto">
+              <table className="w-full text-left">
+                <thead className="sticky top-0 bg-vt-ink-900">
+                  <tr className="text-vt-brass-400 text-xs">
+                    <th className="py-1 px-2">数据</th>
+                    <th className="py-1 px-2">最近推送</th>
+                    <th className="py-1 px-2">最新数据日期</th>
+                    <th className="py-1 px-2">行数</th>
+                    <th className="py-1 px-2">状态</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {etfPush!.tables.map((row) => (
+                    <tr key={row.data_type} className="border-t border-vt-ink-800">
+                      <td className="py-1 px-2 vt-engraved">{row.label_zh}</td>
+                      <td
+                        className="py-1 px-2 vt-engraved text-vt-parchment-dim"
+                        title={row.last_received_at ?? ""}
+                      >
+                        {formatRelative(row.last_received_at)}
+                      </td>
+                      <td className="py-1 px-2 vt-engraved text-vt-parchment-dim">
+                        {formatDateOnly(row.last_record_date)}
+                      </td>
+                      <td className="py-1 px-2 vt-engraved">{row.row_count}</td>
+                      <td className="py-1 px-2">
+                        <span className={STATUS_PILL_CLASS[row.status]}>
+                          {STATUS_LABELS[row.status] ?? row.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="flex items-center justify-between mt-3">
+              <p className="vt-engraved text-vt-parchment-dim text-xs">
+                最近检查：{etfPush?.server_time ?? "—"}
+              </p>
+              {etfPushError && (
+                <p className="vt-engraved text-red-400 text-xs">
+                  刷新失败（已保留上次快照）
+                </p>
+              )}
+            </div>
+          </>
+        )}
       </div>
 
       {/* User Statistics Block */}

@@ -592,3 +592,33 @@ html { -webkit-overflow-scrolling: touch; }
 .scrollbar-hide::-webkit-scrollbar {
   display: none;
 }
+
+/* Status pills — small colored badges used by the ETF push monitor block.
+   Inherit the warm/aged palette so they read as ink seals on parchment, not
+   flat Bootstrap-style alerts. */
+.vt-pill {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  padding: 2px 8px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+  text-transform: uppercase;
+}
+.vt-pill-ok {
+  color: #6fbf73;
+  background: rgba(111, 191, 115, 0.08);
+}
+.vt-pill-warn {
+  color: #e0a347;
+  background: rgba(224, 163, 71, 0.08);
+}
+.vt-pill-stale {
+  color: #d96459;
+  background: rgba(217, 100, 89, 0.08);
+}
+.vt-pill-unknown {
+  color: var(--vt-parchment-dim);
+  background: rgba(184, 168, 125, 0.08);
+}

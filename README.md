@@ -67,3 +67,12 @@ npm run dev
 | `GET /api/stock/main-business-futu?symbol=00700` | 港股 / 美股主营业务构成（Futu get_financials_revenue_breakdown；按产品/地区/行业/业务，仅收入与占比） |
 | `GET /api/stock/main-business-futu/history?symbol=00700` | 港股 / 美股最近 4 年按产品跨期对比（4 次并行 Futu 调用） |
 | `GET /health` | 健康检查 |
+
+## 系统管理面板
+
+拥有 `system_statistics` 权限的账户登录后，首页会出现 **"系统管理"** 标签，包含：
+
+- **趋势分析进度**：查看 / 触发趋势分析任务
+- **股票统计**：所有用户自选股的去重统计
+- **用户统计**：注册用户列表
+- **ETF 数据推送监控**：海外 `remote_data` → 国内 `etf_remote.db` 推送健康度（每张表最近一次推送时间、最新数据日期、行数、状态色）。阈值由 `ETF_PUSH_WARN_HOURS` / `ETF_PUSH_STALE_HOURS` 控制，请求时读取，修改后无需重启。

@@ -2,6 +2,8 @@
 from fastapi import APIRouter, Depends, HTTPException
 from backend.services.admin_service import AdminService
 from backend.api.auth import get_current_user, require_permission
+from backend.api.etf_remote_push_status import compute_push_status
+from backend.services.etf_db import _resolve_db_path
 from backend.services.role_service import RoleService
 from backend.services import trend_run_service, trend_run_queue
 
@@ -84,3 +86,16 @@ async def trigger_trend_run(current_user: dict = Depends(get_current_user)):
     run_id = trend_run_queue.start_run("manual")
     run = trend_run_service.get_latest_run()
     return {"run": _run_status_payload(run), "run_id": run_id}
+
+
+@router.get("/etf-remote-push-status")
+async def get_etf_remote_push_status(current_user: dict = Depends(get_current_user)):
+    """Per-table push health for etf_remote.db - requires system_statistics permission.
+
+    Opens the remote database read-only via SQLite URI `mode=ro`; safe to call
+    against a live ingest. Always returns 200; a missing DB shows up as
+    `tables: []` with an `error` field.
+    """
+    if not RoleService.user_has_permission(current_user["user_id"], "system_statistics"):
+        raise HTTPException(status_code=403, detail="Insufficient permissions: system_statistics required")
+    return compute_push_status(_resolve_db_path())

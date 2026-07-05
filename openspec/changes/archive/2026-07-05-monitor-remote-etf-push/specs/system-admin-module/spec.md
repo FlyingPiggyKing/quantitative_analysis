@@ -1,26 +1,6 @@
-# system-admin-module Specification
+# system-admin-module Specification (delta)
 
-## Purpose
-The system needs an administrative module for users with `system_statistics` permission to view system-wide statistics. This provides visibility into watch list usage, user activity, and overseas ETF ingest health for admin users like jack.zhu.
-
-## Requirements
-
-### Requirement: System Admin Module Visibility
-The system SHALL display a "系统管理" (System Administration) tab in the top-level module navigation ONLY for users who have the `system_statistics` permission.
-
-#### Scenario: Admin user sees System Administration tab
-- **WHEN** an authenticated user with `system_statistics` permission views the homepage
-- **THEN** the module tab bar shows three tabs: "我的自选", "投资分析", and "系统管理"
-
-#### Scenario: Regular user does not see System Administration tab
-- **WHEN** an authenticated user without `system_statistics` permission views the homepage
-- **THEN** the module tab bar shows only two tabs: "我的自选" and "投资分析"
-- **AND** "系统管理" tab is not rendered
-
-#### Scenario: Guest user does not see System Administration tab
-- **WHEN** an unauthenticated (guest) user views the homepage
-- **THEN** the module tab bar shows only two tabs: "我的自选" and "投资分析"
-- **AND** "系统管理" tab is not rendered
+## MODIFIED Requirements
 
 ### Requirement: System Admin Module Content
 The system SHALL display statistics blocks within the System Administration module for system-wide observability: stock statistics, user statistics, and an ETF Data Push Monitor block. The ETF block visibility follows the same `system_statistics` permission gate as the rest of the module.
@@ -45,6 +25,8 @@ The system SHALL display statistics blocks within the System Administration modu
 - **AND** each row shows: data_type label, last push time (relative + absolute), latest business date, row count, and a colour-coded status pill (`ok` / `warn` / `stale` / `unknown`)
 - **AND** the block includes a "刷新" (Refresh) button and auto-refreshes every 60 seconds
 - **AND** the block shows a "last checked at" timestamp derived from the endpoint response
+
+## ADDED Requirements
 
 ### Requirement: Admin API endpoints for System Administration
 The system SHALL provide admin-only API endpoints under `/api/admin`, accessible only to users with `system_statistics` permission:
